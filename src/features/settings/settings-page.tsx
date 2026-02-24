@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings, Shield, Brain, Cpu, Trash2, Plus, Info } from "lucide-react";
+import { Settings, Shield, Brain, Cpu, Trash2, Plus, Info, History } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

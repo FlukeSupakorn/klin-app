@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bootstrapAppData } from "@/services/bootstrap-service";
+import { Input } from "@/components/ui/input";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutGrid },
@@ -27,46 +28,56 @@ export function AppShell() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-muted/30 p-6">
-      <div className="mx-auto grid max-w-[1280px] grid-cols-[72px_1fr] rounded-[28px] border border-border bg-card p-5 shadow-sm">
-        <aside className="flex flex-col items-center border-r border-border/70 pr-4">
-          <div className="mb-8 mt-2 flex h-10 w-10 items-center justify-center rounded-full bg-foreground text-background">
-            <span className="text-lg font-semibold">K</span>
-          </div>
-          <nav className="flex flex-1 flex-col items-center gap-2">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                title={item.label}
-                className={({ isActive }) =>
-                  cn(
-                    "flex h-10 w-10 items-center justify-center rounded-full transition-colors",
-                    isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )
-                }
-              >
-                <item.icon className="h-5 w-5" />
-              </NavLink>
-            ))}
-          </nav>
-        </aside>
+    <div className="flex h-screen w-full overflow-hidden bg-background">
+      {/* Sidebar */}
+      <aside className="flex w-[72px] flex-col items-center border-r border-border bg-card py-6">
+        <div className="mb-8 flex h-10 w-10 items-center justify-center rounded-full bg-foreground text-background">
+          <span className="text-lg font-semibold">K</span>
+        </div>
+        <nav className="flex flex-1 flex-col items-center gap-4">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/"}
+              title={item.label}
+              className={({ isActive }) =>
+                cn(
+                  "flex h-12 w-12 items-center justify-center rounded-xl transition-all",
+                  isActive 
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" 
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )
+              }
+            >
+              <item.icon className="h-6 w-6" />
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
 
-        <main className="px-6">
-          <header className="mb-6 flex items-center justify-between gap-4">
-            <h1 className="text-4xl font-semibold tracking-tight">Welcome back 👋</h1>
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-[280px] items-center gap-2 rounded-full border border-border bg-background px-4 text-muted-foreground">
-                <Search className="h-4 w-4" />
-                <span className="text-sm">Search something</span>
-              </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-sm font-semibold">
-                SK
-              </div>
+      {/* Main Content */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex h-16 items-center justify-between border-b border-border bg-card px-8">
+          <h1 className="text-xl font-bold tracking-tight">Klin Organizer</h1>
+          <div className="flex items-center gap-4">
+            <div className="relative hidden md:block">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input 
+                placeholder="Quick search..." 
+                className="h-9 w-[240px] rounded-full bg-muted/50 pl-9 border-none focus-visible:ring-1" 
+              />
             </div>
-          </header>
-          <Outlet />
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
+              SK
+            </div>
+          </div>
+        </header>
+        
+        <main className="flex-1 overflow-y-auto bg-muted/10 p-8">
+          <div className="mx-auto max-w-[1400px]">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
