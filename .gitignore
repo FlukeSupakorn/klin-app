@@ -1,0 +1,97 @@
+# =========================
+# Node / Bun
+# =========================
+node_modules/
+.bun/
+bun.lockb
+
+# Vite / Build Output
+dist/
+dist-ssr/
+build/
+coverage/
+.vite/
+*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# =========================
+# Tauri / Rust
+# =========================
+src-tauri/target/
+src-tauri/.tauri/
+src-tauri/gen/
+src-tauri/bundle/
+
+# macOS app bundle
+*.app
+
+# Windows build artifacts
+*.msi
+
+# Linux build artifacts
+*.deb
+*.AppImage
+*.rpm
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*~
+
+# =========================
+# Editor / IDE
+# =========================
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.iml
+.cursor/
+
+# =========================
+# Temporary Files
+# =========================
+tmp/
+temp/
+*.tmp
+*.swp
+
+# =========================
+# App Data / Databases
+# =========================
+app-data/
+*.sqlite
+*.db
+
+# =========================
+# Testing
+# =========================
+playwright-report/
+test-results/
+
+# =========================
+# Misc
+# =========================
+*.bak
+*.orig
+*.rej

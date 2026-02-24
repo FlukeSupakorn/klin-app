@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "shadcn-ui": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "computedHash": "b418209ba816e012ac72e71a8256350a9676d1b31102112e4b174c91026033f8"
+    }
+  }
+}
