@@ -19,6 +19,7 @@ export function CalendarEventModal() {
   const navigate = useNavigate();
   const selectedDate = useCalendarStore((state) => state.selectedDate);
   const isOpen = useCalendarStore((state) => state.isEventModalOpen);
+  const isLoadingMonth = useCalendarStore((state) => state.isLoadingMonth);
   const close = useCalendarStore((state) => state.closeDateModal);
   const getEventsForDate = useCalendarStore((state) => state.getEventsForDate);
 
@@ -66,7 +67,11 @@ export function CalendarEventModal() {
             </Dialog.Close>
           </div>
 
-          {events.length === 0 ? (
+          {isLoadingMonth ? (
+            <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+              Loading events...
+            </div>
+          ) : events.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
               No events
             </div>

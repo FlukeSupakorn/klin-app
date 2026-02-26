@@ -27,10 +27,36 @@ interface GoogleCalendarListResponse {
   nextPageToken?: string;
 }
 
+interface GoogleApiErrorItem {
+  reason?: string;
+  message?: string;
+}
+
+interface GoogleApiErrorPayload {
+  error?: {
+    code?: number;
+    message?: string;
+    status?: string;
+    errors?: GoogleApiErrorItem[];
+  };
+}
+
 export class CalendarTokenExpiredError extends Error {
   constructor() {
     super("Google token expired");
     this.name = "CalendarTokenExpiredError";
+  }
+}
+
+export class CalendarApiError extends Error {
+  status: number;
+  reason: string | null;
+
+  constructor(status: number, message: string, reason: string | null = null) {
+    super(message);
+    this.name = "CalendarApiError";
+    this.status = status;
+    this.reason = reason;
   }
 }
 
@@ -136,7 +162,17 @@ class GoogleCalendarService {
       }
 
       if (!response.ok) {
-        throw new Error(`Calendar API error (${response.status})`);
+        let payload: GoogleApiErrorPayload | null = null;
+
+        try {
+          payload = (await response.json()) as GoogleApiErrorPayload;
+        } catch {
+          payload = null;
+        }
+
+        const apiMessage = payload?.error?.message ?? `Calendar API error (${response.status})`;
+        const apiReason = payload?.error?.errors?.[0]?.reason ?? null;
+        throw new CalendarApiError(response.status, apiMessage, apiReason);
       }
 
       const data = (await response.json()) as GoogleCalendarListResponse;

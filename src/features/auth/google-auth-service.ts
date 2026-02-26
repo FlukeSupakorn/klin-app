@@ -78,17 +78,18 @@ class GoogleAuthService {
       throw new Error("Google Identity Services is not available");
     }
 
-    if (this.tokenClient) {
-      return this.tokenClient;
+    if (!this.tokenClient) {
+      this.tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: GOOGLE_CALENDAR_SCOPES.join(" "),
+        callback: (response: GoogleTokenResponse) => {
+          console.log("Google Auth Callback (default)", response);
+        },
+        error_callback: (err: unknown) => {
+          console.error("Google Auth Error", err);
+        }
+      });
     }
-
-    this.tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: GOOGLE_CALENDAR_SCOPES.join(" "),
-      callback: () => {
-        return;
-      },
-    });
 
     return this.tokenClient;
   }
@@ -107,17 +108,33 @@ class GoogleAuthService {
     const tokenClient = this.ensureTokenClient(clientId);
 
     const tokenResponse = await new Promise<GoogleTokenResponse>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Google login timed out. Please check if a popup was blocked by your browser/system."));
+      }, 60000);
+
       tokenClient.callback = (response) => {
-        if (response.error || !response.access_token) {
+        clearTimeout(timeout);
+        console.log("Google Auth Response received", response);
+        
+        if (response.error) {
           reject(new Error(response.error_description ?? response.error ?? "Google sign-in failed"));
           return;
         }
+        
+        if (!response.access_token) {
+          reject(new Error("No access token received from Google"));
+          return;
+        }
+        
         resolve(response);
       };
 
       try {
+        console.log("Opening Google Auth popup...");
         tokenClient.requestAccessToken({ prompt });
       } catch (error) {
+        clearTimeout(timeout);
+        console.error("Failed to trigger Google Auth popup", error);
         reject(error instanceof Error ? error : new Error("Failed to request access token"));
       }
     });
@@ -172,6 +189,41 @@ class GoogleAuthService {
     }
 
     return Date.now() >= expiresAt - 30_000;
+  }
+
+  getManualAuthUrl(clientId: string): string {
+    const redirectUri = window.location.origin.endsWith("/") 
+      ? window.location.origin 
+      : `${window.location.origin}/`;
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "token",
+      scope: GOOGLE_CALENDAR_SCOPES.join(" "),
+      prompt: "consent",
+      include_granted_scopes: "true",
+    });
+
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  parseTokenFromUrl(): { accessToken: string; expiresAt: number } | null {
+    const hash = window.location.hash.substring(1);
+    if (!hash) return null;
+
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get("access_token");
+    const expiresIn = params.get("expires_in");
+
+    if (accessToken && expiresIn) {
+      return {
+        accessToken,
+        expiresAt: Date.now() + parseInt(expiresIn) * 1000,
+      };
+    }
+
+    return null;
   }
 }
 

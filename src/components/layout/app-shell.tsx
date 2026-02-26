@@ -9,6 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import { bootstrapAppData } from "@/services/bootstrap-service";
 import { Input } from "@/components/ui/input";
+import { useAuthStore } from "@/features/auth/use-auth-store";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutGrid },
@@ -17,9 +18,12 @@ const navItems = [
 ];
 
 export function AppShell() {
+  const initializeAuth = useAuthStore((state) => state.initialize);
+
   useEffect(() => {
+    void initializeAuth();
     void bootstrapAppData().catch(() => undefined);
-  }, []);
+  }, [initializeAuth]);
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background pt-4">

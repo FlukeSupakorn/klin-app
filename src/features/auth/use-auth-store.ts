@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import {
   googleAuthService,
   type GoogleProfile,
@@ -19,7 +20,7 @@ interface AuthState {
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   initialized: false,
   status: "idle",
   accessToken: null,
@@ -32,6 +33,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return;
     }
 
+    const restoredToken = get().accessToken;
+    const restoredExpiry = get().expiresAt;
+
+    if (restoredToken && restoredExpiry) {
+      if (!googleAuthService.isExpired(restoredExpiry)) {
+        set({
+          initialized: true,
+          status: "authenticated",
+          error: null,
+        });
+      } else {
+        set({
+          accessToken: null,
+          expiresAt: null,
+          profile: null,
+          status: "idle",
+        });
+      }
+    }
+
     if (!googleClientId) {
       set({
         initialized: true,
@@ -41,9 +62,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return;
     }
 
+    const callbackData = googleAuthService.parseTokenFromUrl();
+    if (callbackData) {
+      set({ status: "loading", error: null });
+      try {
+        const profile = await googleAuthService.fetchProfile(callbackData.accessToken);
+        set({
+          initialized: true,
+          status: "authenticated",
+          accessToken: callbackData.accessToken,
+          expiresAt: callbackData.expiresAt,
+          profile,
+          error: null,
+        });
+        window.history.replaceState(null, "", window.location.pathname);
+        return;
+      } catch (error) {
+        set({
+          initialized: true,
+          status: "error",
+          error: error instanceof Error ? error.message : "Failed to fetch profile",
+        });
+        return;
+      }
+    }
+
     try {
       await googleAuthService.initialize(googleClientId);
-      set({ initialized: true, status: "idle", error: null });
+      set({ initialized: true, error: null });
     } catch (error) {
       set({
         initialized: true,
@@ -61,21 +107,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     set({ status: "loading", error: null });
 
-    try {
-      const result = await googleAuthService.requestAccessToken(googleClientId, "consent");
-      set({
-        status: "authenticated",
-        accessToken: result.accessToken,
-        expiresAt: result.expiresAt,
-        profile: result.profile,
-        error: null,
-      });
-    } catch (error) {
-      set({
-        status: "error",
-        error: error instanceof Error ? error.message : "Google login failed",
-      });
-    }
+    const authUrl = googleAuthService.getManualAuthUrl(googleClientId);
+    window.location.href = authUrl;
   },
 
   ensureValidToken: async () => {
@@ -89,31 +122,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return state.accessToken;
     }
 
-    if (!googleClientId) {
-      set({ status: "error", error: "Missing VITE_GOOGLE_CLIENT_ID" });
-      return null;
-    }
-
-    try {
-      const refreshed = await googleAuthService.requestAccessToken(googleClientId, "");
-      set({
-        status: "authenticated",
-        accessToken: refreshed.accessToken,
-        expiresAt: refreshed.expiresAt,
-        profile: refreshed.profile,
-        error: null,
-      });
-      return refreshed.accessToken;
-    } catch {
-      set({
-        status: "idle",
-        accessToken: null,
-        expiresAt: null,
-        profile: null,
-        error: "Session expired. Please sign in again.",
-      });
-      return null;
-    }
+    set({
+      status: "idle",
+      accessToken: null,
+      expiresAt: null,
+      profile: null,
+      error: "Session expired. Please sign in again.",
+    });
+    return null;
   },
 
   logout: async () => {
@@ -130,4 +146,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       error: null,
     });
   },
+}), {
+  name: "google-auth-session",
+  storage: createJSONStorage(() => localStorage),
+  partialize: (state) => ({
+    accessToken: state.accessToken,
+    expiresAt: state.expiresAt,
+    profile: state.profile,
+  }),
 }));

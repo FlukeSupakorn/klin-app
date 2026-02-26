@@ -52,18 +52,16 @@ export function DashboardPage() {
   }, [isGoogleConnected, loadVisibleMonth, visibleMonth]);
 
   const calendarDayButton = useMemo(() => {
-    return function DayButton(props: {
+    return function DayButton(props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
       day: { date: Date };
-      children?: React.ReactNode;
-      className?: string;
-      [key: string]: unknown;
+      modifiers?: Record<string, boolean>;
     }) {
-      const { day, children, className, ...rest } = props;
+      const { day, children, className, modifiers, ...rest } = props;
       const count = getEventCountForDate(day.date);
       const showDots = count > 0 && count <= 3;
 
       return (
-        <button {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)} className={cn(className, "relative") }>
+        <button {...rest} className={cn(className, "relative") }>
           <span>{children}</span>
           {count > 0 && (
             <span className="pointer-events-none absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-0.5">
@@ -247,7 +245,13 @@ export function DashboardPage() {
             onSelect={(date) => {
               setSelectedDate(date);
               if (date) {
-                openDateModal(date);
+                void (async () => {
+                  if (isGoogleConnected) {
+                    setVisibleMonth(date);
+                    await loadVisibleMonth(date);
+                  }
+                  openDateModal(date);
+                })();
               }
             }}
             components={{
