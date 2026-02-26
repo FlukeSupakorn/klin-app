@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, FolderOpen, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, FolderOpen, CheckCircle2, FolderSearch, Trash2, FolderPlus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { categoryManagementService } from "@/services/category-management-service";
+import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
+import { useAutomationStore } from "@/stores/use-automation-store";
 import type { ManagedCategory } from "@/types/domain";
 
 type ModalMode = "edit" | "add";
@@ -32,8 +34,12 @@ export function SettingsPage() {
   const setDefaultFolder = useCategoryManagementStore((state) => state.setDefaultFolder);
   const addCategory = useCategoryManagementStore((state) => state.addCategory);
   const updateCategory = useCategoryManagementStore((state) => state.updateCategory);
+  const watchedFolders = useAutomationStore((state) => state.watchedFolders);
+  const addWatchedFolder = useAutomationStore((state) => state.addWatchedFolder);
+  const removeWatchedFolder = useAutomationStore((state) => state.removeWatchedFolder);
 
   const [draftDefaultFolder, setDraftDefaultFolder] = useState(defaultFolder);
+  const [newWatchedFolderPath, setNewWatchedFolderPath] = useState("");
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [formState, setFormState] = useState<CategoryFormState>(emptyForm);
@@ -103,8 +109,8 @@ export function SettingsPage() {
   return (
     <div className="space-y-6 pb-10">
       <div>
-        <h2 className="text-3xl font-semibold tracking-tight">Category Management</h2>
-        <p className="text-muted-foreground">Manage categories, descriptions, and destination folders used by automation.</p>
+        <h2 className="text-3xl font-semibold tracking-tight">Settings</h2>
+        <p className="text-muted-foreground">Manage watched folders, categories, and destination paths used by automation.</p>
       </div>
 
       <Card className="border-0 bg-muted/40 shadow-none">
@@ -132,6 +138,81 @@ export function SettingsPage() {
             Change
           </Button>
           <Badge variant="secondary">{enabledCount} enabled</Badge>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle>Watched Folders</CardTitle>
+          <CardDescription>The automation engine monitors these locations for new files.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button
+              variant="outline"
+              className="justify-start gap-2"
+              onClick={async () => addWatchedFolder(await tauriClient.getDownloadsFolder())}
+            >
+              <FolderPlus className="h-4 w-4" /> Add Downloads
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start gap-2"
+              onClick={() => addWatchedFolder("C:/Users/User/Desktop")}
+            >
+              <FolderPlus className="h-4 w-4" /> Add Desktop
+            </Button>
+          </div>
+
+          <div className="flex gap-2">
+            <Input
+              value={newWatchedFolderPath}
+              onChange={(event) => setNewWatchedFolderPath(event.target.value)}
+              placeholder="Enter folder path manually..."
+              className="bg-muted/30"
+            />
+            <Button
+              onClick={() => {
+                if (!newWatchedFolderPath.trim()) {
+                  return;
+                }
+                addWatchedFolder(newWatchedFolderPath.trim());
+                setNewWatchedFolderPath("");
+              }}
+            >
+              Add Path
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {watchedFolders.length === 0 ? (
+              <div className="rounded-2xl border-2 border-dashed py-10 text-center text-muted-foreground">
+                No folders being watched yet.
+              </div>
+            ) : (
+              watchedFolders.map((folder) => (
+                <div key={folder} className="flex items-center justify-between rounded-xl border border-border/60 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <FolderSearch className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="font-mono text-sm font-medium">{folder}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Active Watch</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeWatchedFolder(folder)}
+                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
 

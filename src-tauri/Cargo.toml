@@ -32,6 +32,6 @@ default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
 [package.metadata.tauri-winres]
-ProductName = "Klin App"
+ProductName = "KLIN"
 FileDescription = "Klin automation-first desktop organizer"
 OriginalFilename = "klin-app.exe"

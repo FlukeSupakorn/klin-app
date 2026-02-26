@@ -121,9 +121,9 @@ export function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <Link to="/automation">
+              <Link to="/settings">
                 <Button variant="outline" className="rounded-full gap-2">
-                  Configure <ChevronRight className="h-4 w-4" />
+                  Manage Watched Folders <ChevronRight className="h-4 w-4" />
                 </Button>
               </Link>
             </div>

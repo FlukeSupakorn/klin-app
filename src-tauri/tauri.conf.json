@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Klin App",
+  "productName": "KLIN",
   "version": "1.0.0",
   "identifier": "com.klin.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Klin App",
+        "title": "KLIN",
         "width": 1200,
         "height": 800,
         "minWidth": 1000,
