@@ -1,158 +1,222 @@
-import { useState } from "react";
-import { Settings, Shield, Brain, Cpu, Trash2, Plus, Info, History } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Pencil, FolderOpen, CheckCircle2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { usePrivacyStore } from "@/stores/use-privacy-store";
+import { categoryManagementService } from "@/services/category-management-service";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
+import type { ManagedCategory } from "@/types/domain";
+
+type ModalMode = "edit" | "add";
+
+interface CategoryFormState {
+  name: string;
+  description: string;
+  folderPath: string;
+  enabled: boolean;
+  aiLearned: boolean;
+}
+
+const emptyForm: CategoryFormState = {
+  name: "",
+  description: "",
+  folderPath: "",
+  enabled: true,
+  aiLearned: true,
+};
 
 export function SettingsPage() {
-  const { exclusionPatterns, addPattern, removePattern } = usePrivacyStore();
-  const [newPattern, setNewPattern] = useState("");
+  const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
+  const categories = useCategoryManagementStore((state) => state.categories);
+  const setDefaultFolder = useCategoryManagementStore((state) => state.setDefaultFolder);
+  const addCategory = useCategoryManagementStore((state) => state.addCategory);
+  const updateCategory = useCategoryManagementStore((state) => state.updateCategory);
+
+  const [draftDefaultFolder, setDraftDefaultFolder] = useState(defaultFolder);
+  const [modalMode, setModalMode] = useState<ModalMode | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [formState, setFormState] = useState<CategoryFormState>(emptyForm);
+
+  const enabledCount = useMemo(() => categories.filter((category) => category.enabled).length, [categories]);
+
+  useEffect(() => {
+    setDraftDefaultFolder(defaultFolder);
+  }, [defaultFolder]);
+
+  const openEditModal = (category: ManagedCategory) => {
+    setModalMode("edit");
+    setEditingCategoryId(category.id);
+    setFormState({
+      name: category.name,
+      description: category.description,
+      folderPath: category.folderPath,
+      enabled: category.enabled,
+      aiLearned: category.aiLearned,
+    });
+  };
+
+  const openAddModal = () => {
+    setModalMode("add");
+    setEditingCategoryId(null);
+    setFormState({
+      ...emptyForm,
+      folderPath: `${defaultFolder}/New Category`,
+    });
+  };
+
+  const closeModal = () => {
+    setModalMode(null);
+    setEditingCategoryId(null);
+    setFormState(emptyForm);
+  };
+
+  const handleSave = () => {
+    if (!formState.name.trim() || !formState.description.trim() || !formState.folderPath.trim()) {
+      return;
+    }
+
+    if (modalMode === "edit" && editingCategoryId) {
+      updateCategory(editingCategoryId, {
+        name: formState.name.trim(),
+        description: formState.description.trim(),
+        folderPath: formState.folderPath.trim(),
+        enabled: formState.enabled,
+        aiLearned: formState.aiLearned,
+      });
+    }
+
+    if (modalMode === "add") {
+      addCategory({
+        name: formState.name.trim(),
+        description: formState.description.trim(),
+        folderPath: formState.folderPath.trim(),
+        enabled: formState.enabled,
+        aiLearned: formState.aiLearned,
+      });
+    }
+
+    categoryManagementService.syncToAutomationStores();
+    closeModal();
+  };
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-6 pb-10">
       <div>
-        <h2 className="text-4xl font-semibold tracking-tight text-foreground">Settings</h2>
-        <p className="text-muted-foreground mt-1">Configure global application preferences and privacy rules.</p>
+        <h2 className="text-3xl font-semibold tracking-tight">Category Management</h2>
+        <p className="text-muted-foreground">Manage categories, descriptions, and destination folders used by automation.</p>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_1.5fr]">
-        <div className="space-y-8">
-          <Card className="border-0 bg-muted/40 shadow-none">
-            <CardHeader>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                  <Shield className="h-5 w-5" />
+      <Card className="border-0 bg-muted/40 shadow-none">
+        <CardHeader>
+          <CardTitle className="text-lg">Default Folder</CardTitle>
+          <CardDescription>
+            Category folders are created and resolved under this base path.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 md:flex-row md:items-center">
+          <Input
+            value={draftDefaultFolder}
+            onChange={(event) => setDraftDefaultFolder(event.target.value)}
+            className="bg-background"
+          />
+          <Button
+            onClick={() => {
+              if (!draftDefaultFolder.trim()) {
+                return;
+              }
+              setDefaultFolder(draftDefaultFolder.trim());
+              categoryManagementService.syncToAutomationStores();
+            }}
+          >
+            Change
+          </Button>
+          <Badge variant="secondary">{enabledCount} enabled</Badge>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Categories</CardTitle>
+            <CardDescription>
+              Edit category name, description, and folder destination path.
+            </CardDescription>
+          </div>
+          <Button className="gap-2" onClick={openAddModal}>
+            <Plus className="h-4 w-4" /> Add New Category
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {categories.map((category) => (
+            <div key={category.id} className="rounded-xl border border-border/60 p-4">
+              <div className="mb-2 flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">{category.name}</h3>
+                    <Badge variant={category.enabled ? "default" : "outline"}>{category.enabled ? "Enabled" : "Disabled"}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{category.description}</p>
                 </div>
-                <CardTitle>Privacy & Security</CardTitle>
-              </div>
-              <CardDescription>Exclude specific files or paths from being processed by AI.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input 
-                  placeholder="e.g. .git, node_modules, sensitive" 
-                  value={newPattern} 
-                  onChange={(e) => setNewPattern(e.target.value)}
-                  className="bg-background"
-                />
-                <Button onClick={() => {
-                  if (!newPattern.trim()) return;
-                  addPattern(newPattern.trim());
-                  setNewPattern("");
-                }}>
-                  <Plus className="h-4 w-4" />
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => openEditModal(category)}>
+                  <Pencil className="h-3 w-3" /> Edit
                 </Button>
               </div>
-              <div className="space-y-2">
-                {exclusionPatterns.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic text-center py-4 bg-background/50 rounded-xl">No exclusion patterns defined.</p>
-                ) : (
-                  exclusionPatterns.map((pattern) => (
-                    <div key={pattern} className="flex items-center justify-between rounded-xl bg-background p-3 border border-border/50">
-                      <span className="text-sm font-medium">{pattern}</span>
-                      <Button variant="ghost" size="sm" onClick={() => removePattern(pattern)} className="text-muted-foreground hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))
-                )}
+              <div className="flex items-center gap-2 text-xs text-primary">
+                <FolderOpen className="h-3 w-3" /> {category.folderPath}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
-          <Card className="border-0 bg-primary/5 shadow-none">
+      {modalMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4">
+          <Card className="w-full max-w-2xl">
             <CardHeader>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-8 w-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center">
-                  <Brain className="h-5 w-5" />
-                </div>
-                <CardTitle>AI Model</CardTitle>
-              </div>
-              <CardDescription>Configuration for the classification engine.</CardDescription>
+              <CardTitle>{modalMode === "edit" ? "Edit Category" : "Add New Category"}</CardTitle>
+              <CardDescription>
+                {modalMode === "edit"
+                  ? "Update category details to keep AI recommendations accurate."
+                  : "Create a custom category for organizing your files."}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-4 rounded-2xl bg-background border border-primary/10 space-y-3">
-                 <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold">Model Provider</span>
-                    <Badge variant="outline" className="bg-primary/5 text-primary">Mock Strategy</Badge>
-                 </div>
-                 <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold">Min Confidence</span>
-                    <span className="text-sm text-muted-foreground">15%</span>
-                 </div>
-                 <Button variant="secondary" className="w-full text-xs font-bold uppercase tracking-wider h-8" disabled>
-                   Switch to OpenAI
-                 </Button>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Category Name</label>
+                <Input
+                  value={formState.name}
+                  onChange={(event) => setFormState((state) => ({ ...state, name: event.target.value }))}
+                />
               </div>
-              <div className="flex items-start gap-3 p-3 bg-primary/10 rounded-xl text-[11px] text-primary leading-tight">
-                <Info className="h-4 w-4 shrink-0" />
-                Currently using Mock Strategy for high-performance offline classification.
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Description</label>
+                <textarea
+                  value={formState.description}
+                  onChange={(event) => setFormState((state) => ({ ...state, description: event.target.value }))}
+                  className="min-h-[120px] w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+                />
               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-8">
-          <Card className="border-0 bg-muted/40 shadow-none h-full">
-            <CardHeader>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-8 w-8 rounded-lg bg-foreground/10 text-foreground flex items-center justify-center">
-                  <Cpu className="h-5 w-5" />
-                </div>
-                <CardTitle>System Information</CardTitle>
+              <div>
+                <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Folder Path</label>
+                <Input
+                  value={formState.folderPath}
+                  onChange={(event) => setFormState((state) => ({ ...state, folderPath: event.target.value }))}
+                />
+                <p className="mt-1 text-xs text-primary">Resolved path: {formState.folderPath}</p>
               </div>
-              <CardDescription>Global application state and runtime information.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                 <div className="p-4 rounded-3xl bg-background border border-border/50">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">App Version</p>
-                    <p className="text-xl font-bold">v1.2.0-beta</p>
-                 </div>
-                 <div className="p-4 rounded-3xl bg-background border border-border/50">
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Runtime</p>
-                    <p className="text-xl font-bold">Tauri / React</p>
-                 </div>
+              <div className="flex items-center gap-3 rounded-lg bg-muted/40 p-3 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                Ready - AI knows this category and can classify files into it.
               </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-background border border-border/50">
-                   <div className="space-y-1">
-                      <p className="font-bold">Automatic Updates</p>
-                      <p className="text-xs text-muted-foreground">Keep the app updated with latest features.</p>
-                   </div>
-                   <Badge className="bg-green-500 hover:bg-green-600">Enabled</Badge>
-                </div>
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-background border border-border/50 opacity-60">
-                   <div className="space-y-1">
-                      <p className="font-bold">Dark Mode</p>
-                      <p className="text-xs text-muted-foreground">Locked to Light Theme by design system.</p>
-                   </div>
-                   <Badge variant="outline">Disabled</Badge>
-                </div>
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-background border border-border/50">
-                   <div className="space-y-1">
-                      <p className="font-bold">Debug Logs</p>
-                      <p className="text-xs text-muted-foreground">Verbose output for troubleshooting.</p>
-                   </div>
-                   <Badge variant="outline">Disabled</Badge>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-border/50 flex flex-col gap-3">
-                 <Button variant="outline" className="justify-start gap-3 rounded-2xl h-12">
-                   <History className="h-4 w-4" /> Reset Application Database
-                 </Button>
-                 <Button variant="destructive" className="justify-start gap-3 rounded-2xl h-12">
-                   <Trash2 className="h-4 w-4" /> Factory Reset
-                 </Button>
+              <div className="flex justify-between pt-2">
+                <Button variant="ghost" onClick={closeModal}>Cancel</Button>
+                <Button onClick={handleSave}>{modalMode === "edit" ? "Save Changes" : "Add Category"}</Button>
               </div>
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
     </div>
   );
 }

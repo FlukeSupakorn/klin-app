@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useLogStore } from "@/stores/use-log-store";
 import { cn } from "@/lib/utils";
 
-export function LogsPage() {
+export function HistoryPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const logs = useLogStore((state) => state.logs);
   const filters = useLogStore((state) => state.filters);
@@ -40,8 +40,8 @@ export function LogsPage() {
     <div className="space-y-8 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-4xl font-semibold tracking-tight">Activity Log</h2>
-          <p className="text-muted-foreground">Monitor and review AI-driven file movements.</p>
+          <h2 className="text-4xl font-semibold tracking-tight">History</h2>
+          <p className="text-muted-foreground">Monitor file and folder change history from AI-driven operations.</p>
         </div>
         <Card className="flex items-center gap-3 px-4 py-2 shadow-none">
           <History className="h-4 w-4 text-primary" />
@@ -56,7 +56,7 @@ export function LogsPage() {
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-lg">Filter Logs</CardTitle>
+            <CardTitle className="text-lg">Filter History</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -89,7 +89,8 @@ export function LogsPage() {
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="w-[40%]">File Name</TableHead>
-              <TableHead>AI Classification</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>AI Classification</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Timestamp</TableHead>
               <TableHead className="text-right">Action</TableHead>
@@ -98,8 +99,8 @@ export function LogsPage() {
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                  No movement logs found.
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  No history records found.
                 </TableCell>
               </TableRow>
             ) : (
@@ -111,6 +112,11 @@ export function LogsPage() {
                         <FileText className="h-4 w-4 text-muted-foreground" />
                         <span className="truncate max-w-[300px]" title={log.fileName}>{log.fileName}</span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                        {log.itemType ?? "file"}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -152,7 +158,7 @@ export function LogsPage() {
                   </TableRow>
                   {expandedId === log.id && (
                     <TableRow className="bg-muted/10">
-                      <TableCell colSpan={5} className="p-0">
+                      <TableCell colSpan={6} className="p-0">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border-t border-border/50 animate-in fade-in slide-in-from-top-2 duration-200">
                           <div className="space-y-4">
                             <div className="space-y-2">
@@ -216,7 +222,7 @@ export function LogsPage() {
         </Table>
         <div className="flex items-center justify-between px-6 py-4 bg-muted/50 border-t border-border">
           <p className="text-xs text-muted-foreground">
-            Showing <span className="font-semibold">{rows.length}</span> of <span className="font-semibold">{total}</span> movements
+            Showing <span className="font-semibold">{rows.length}</span> of <span className="font-semibold">{total}</span> history records
           </p>
           <div className="flex items-center gap-2">
             <Button 

@@ -1,4 +1,5 @@
 import { tauriClient } from "@/services/tauri-client";
+import { categoryManagementService } from "@/services/category-management-service";
 import { useCategoryStore } from "@/stores/use-category-store";
 import { useLogStore } from "@/stores/use-log-store";
 
@@ -21,6 +22,8 @@ export async function bootstrapAppData() {
   if (JSON.stringify(logState.logs) !== JSON.stringify(logs)) {
     logState.setLogs(logs);
   }
+
+  categoryManagementService.syncToAutomationStores();
 
   didBootstrap = true;
 }

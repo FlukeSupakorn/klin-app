@@ -7,6 +7,15 @@ export interface Category {
   active: boolean;
 }
 
+export interface ManagedCategory {
+  id: string;
+  name: string;
+  description: string;
+  folderPath: string;
+  enabled: boolean;
+  aiLearned: boolean;
+}
+
 export interface CategoryScore {
   name: string;
   score: number;
@@ -24,6 +33,7 @@ export interface RuleMapping {
 
 export interface AutomationLog {
   id: string;
+  itemType?: "file" | "folder";
   fileName: string;
   originalPath: string;
   movedTo: string;
@@ -55,4 +65,15 @@ export interface LogFilter {
 export interface PaginationState {
   page: number;
   pageSize: number;
+}
+
+export interface OrganizePreviewItem {
+  id: string;
+  fileName: string;
+  currentPath: string;
+  suggestedName: string | null;
+  selectedCategory: string;
+  destinationPath: string;
+  confidence: number;
+  topScores: CategoryScore[];
 }

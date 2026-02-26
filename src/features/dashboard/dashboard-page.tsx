@@ -35,7 +35,7 @@ export function DashboardPage() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <Link to="/categories">
+          <Link to="/settings">
             <Card className="group border-0 bg-muted/40 shadow-none transition-all hover:bg-muted/60">
               <CardContent className="p-6">
                 <div className="mb-6 flex items-start justify-between">
@@ -71,7 +71,7 @@ export function DashboardPage() {
             </Card>
           </Link>
 
-          <Link to="/rules">
+          <Link to="/settings">
             <Card className="group border-0 bg-primary/10 shadow-none transition-all hover:bg-primary/15">
               <CardContent className="p-6">
                 <div className="mb-6 flex items-start justify-between">
@@ -140,7 +140,7 @@ export function DashboardPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-2xl font-semibold">Recent Movements</h3>
-            <Link to="/logs" className="text-sm font-medium text-primary hover:underline">View all activity</Link>
+            <Link to="/history" className="text-sm font-medium text-primary hover:underline">View all history</Link>
           </div>
           <div className="space-y-3">
             {recentLogs.length === 0 ? (

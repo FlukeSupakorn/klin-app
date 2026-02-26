@@ -5,9 +5,7 @@ import {
   LayoutGrid,
   Search,
   Settings,
-  Tags,
   Zap,
-  GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bootstrapAppData } from "@/services/bootstrap-service";
@@ -17,9 +15,7 @@ import { Button } from "@/components/ui/button";
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutGrid },
   { to: "/automation", label: "Automation", icon: Zap },
-  { to: "/categories", label: "Categories", icon: Tags },
-  { to: "/rules", label: "Rules", icon: GitBranch },
-  { to: "/logs", label: "Logs", icon: History },
+  { to: "/history", label: "History", icon: History },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

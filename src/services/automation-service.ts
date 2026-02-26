@@ -38,6 +38,7 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
   if (!targetFolder) {
     const unmappedLog: AutomationLog = {
       id: uuidv4(),
+      itemType: "file",
       fileName: job.fileName,
       originalPath: job.filePath,
       movedTo: "",
@@ -60,6 +61,7 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
 
   const log: AutomationLog = {
     id: uuidv4(),
+    itemType: "file",
     fileName: job.fileName,
     originalPath: job.filePath,
     movedTo: destinationPath,

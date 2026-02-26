@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Zap, Play, Square, Settings2, FolderPlus, FolderSearch, Clock, RefreshCw, Trash2 } from "lucide-react";
+import { Zap, Play, Square, Settings2, FolderPlus, FolderSearch, Clock, RefreshCw, Trash2, Sparkles, PencilLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AsyncProcessingQueue } from "@/services/automation-queue";
 import { processAutomationJob } from "@/services/automation-service";
+import { MockOrganizePreviewFactory } from "@/services/mock-organize-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useAutomationStore } from "@/stores/use-automation-store";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { cn } from "@/lib/utils";
+import type { OrganizePreviewItem } from "@/types/domain";
 
 export function AutomationPage() {
   const [newFolderPath, setNewFolderPath] = useState("");
@@ -21,6 +24,11 @@ export function AutomationPage() {
   const setConcurrencyLimit = useAutomationStore((state) => state.setConcurrencyLimit);
   const lastScanTime = useAutomationStore((state) => state.lastScanTime);
   const setLastScanTime = useAutomationStore((state) => state.setLastScanTime);
+  const managedCategories = useCategoryManagementStore((state) => state.categories);
+
+  const [organizeModalOpen, setOrganizeModalOpen] = useState(false);
+  const [organizeItems, setOrganizeItems] = useState<OrganizePreviewItem[]>([]);
+
   const queueRef = useRef(new AsyncProcessingQueue(concurrencyLimit));
 
   useEffect(() => {
@@ -46,6 +54,37 @@ export function AutomationPage() {
     });
 
     setLastScanTime(new Date().toISOString());
+  };
+
+  const openOrganizeModal = () => {
+    const next = MockOrganizePreviewFactory.create(managedCategories);
+    setOrganizeItems(next);
+    setOrganizeModalOpen(true);
+  };
+
+  const applyCategorySelection = (itemId: string, categoryName: string) => {
+    const category = managedCategories.find((entry) => entry.name === categoryName);
+    if (!category) {
+      return;
+    }
+
+    setOrganizeItems((state) =>
+      state.map((item) =>
+        item.id === itemId ? MockOrganizePreviewFactory.applyCategory(item, category) : item,
+      ),
+    );
+  };
+
+  const applyAiRename = (itemId: string) => {
+    setOrganizeItems((state) =>
+      state.map((item) => {
+        if (item.id !== itemId) {
+          return item;
+        }
+        const enableRename = item.suggestedName === null;
+        return MockOrganizePreviewFactory.toggleRename(item, enableRename);
+      }),
+    );
   };
 
   return (
@@ -208,6 +247,93 @@ export function AutomationPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Card className="border-0 bg-muted/30 shadow-none">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Organize Files In Program</CardTitle>
+            <CardDescription>Manual add files flow with mocked AI category scoring and rename recommendation.</CardDescription>
+          </div>
+          <Button onClick={openOrganizeModal}>Add Files To Organize</Button>
+        </CardHeader>
+      </Card>
+
+      {organizeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4">
+          <Card className="h-[80vh] w-full max-w-5xl overflow-hidden">
+            <CardHeader>
+              <CardTitle>Files to organize</CardTitle>
+              <CardDescription>Mocked data preview for AI organization workflow.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex h-[calc(80vh-96px)] flex-col gap-4 overflow-hidden">
+              <div className="flex gap-2">
+                <Input placeholder="Search files..." />
+              </div>
+
+              <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+                {organizeItems.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-border p-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold">{item.fileName}</p>
+                        <p className="text-xs text-muted-foreground">{item.currentPath}</p>
+                      </div>
+                      <Button size="sm">Move</Button>
+                    </div>
+
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {item.topScores.map((score) => (
+                        <button
+                          type="button"
+                          key={score.name}
+                          onClick={() => applyCategorySelection(item.id, score.name)}
+                          className={cn(
+                            "rounded-full px-3 py-1 text-xs transition-colors",
+                            item.selectedCategory === score.name
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-foreground",
+                          )}
+                        >
+                          {score.name} · {Math.round(score.score * 100)}%
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="space-y-2 rounded-lg bg-muted/40 p-3 text-xs">
+                      <p><strong>Move to:</strong> {item.destinationPath}</p>
+                      <p><strong>AI confidence:</strong> {Math.round(item.confidence * 100)}%</p>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => applyAiRename(item.id)}>
+                          <PencilLine className="h-3 w-3" /> AI Rename
+                        </Button>
+                        <span>
+                          {item.suggestedName ? (
+                            <>Suggested name: <strong>{item.suggestedName}</strong></>
+                          ) : (
+                            <>No recommendation</>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between border-t border-border pt-3">
+                <div className="flex gap-2">
+                  <Button className="gap-2"><Sparkles className="h-4 w-4" /> Move All Files</Button>
+                  <Button variant="outline">Add More Files</Button>
+                  <Button variant="outline">Manage Categories</Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="ghost" onClick={() => setOrganizeItems([])}>Clear All</Button>
+                  <Button variant="outline" onClick={() => setOrganizeModalOpen(false)}>Close</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
