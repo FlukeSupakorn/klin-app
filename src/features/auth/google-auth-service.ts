@@ -1,0 +1,178 @@
+const GOOGLE_IDENTITY_SCRIPT_URL = "https://accounts.google.com/gsi/client";
+
+export const GOOGLE_CALENDAR_SCOPES = [
+  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/userinfo.profile",
+] as const;
+
+export interface GoogleProfile {
+  id: string;
+  name: string;
+  picture?: string;
+}
+
+export interface GoogleAccessTokenResult {
+  accessToken: string;
+  expiresAt: number;
+  profile: GoogleProfile;
+}
+
+interface GoogleTokenResponse {
+  access_token: string;
+  expires_in: number;
+  error?: string;
+  error_description?: string;
+}
+
+interface GoogleTokenClient {
+  callback: (response: GoogleTokenResponse) => void;
+  requestAccessToken: (options?: { prompt?: string }) => void;
+}
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        oauth2?: {
+          initTokenClient: (config: {
+            client_id: string;
+            scope: string;
+            callback: (response: GoogleTokenResponse) => void;
+            error_callback?: (error: unknown) => void;
+          }) => GoogleTokenClient;
+          revoke: (token: string, callback?: () => void) => void;
+        };
+      };
+    };
+  }
+}
+
+class GoogleAuthService {
+  private scriptPromise: Promise<void> | null = null;
+  private tokenClient: GoogleTokenClient | null = null;
+
+  private async loadScript(): Promise<void> {
+    if (window.google?.accounts?.oauth2) {
+      return;
+    }
+
+    if (this.scriptPromise) {
+      return this.scriptPromise;
+    }
+
+    this.scriptPromise = new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = GOOGLE_IDENTITY_SCRIPT_URL;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load Google Identity Services"));
+      document.head.appendChild(script);
+    });
+
+    return this.scriptPromise;
+  }
+
+  private ensureTokenClient(clientId: string): GoogleTokenClient {
+    if (!window.google?.accounts?.oauth2) {
+      throw new Error("Google Identity Services is not available");
+    }
+
+    if (this.tokenClient) {
+      return this.tokenClient;
+    }
+
+    this.tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: GOOGLE_CALENDAR_SCOPES.join(" "),
+      callback: () => {
+        return;
+      },
+    });
+
+    return this.tokenClient;
+  }
+
+  async initialize(clientId: string): Promise<void> {
+    if (!clientId) {
+      throw new Error("Missing VITE_GOOGLE_CLIENT_ID");
+    }
+
+    await this.loadScript();
+    this.ensureTokenClient(clientId);
+  }
+
+  async requestAccessToken(clientId: string, prompt: "consent" | "" = "consent"): Promise<GoogleAccessTokenResult> {
+    await this.initialize(clientId);
+    const tokenClient = this.ensureTokenClient(clientId);
+
+    const tokenResponse = await new Promise<GoogleTokenResponse>((resolve, reject) => {
+      tokenClient.callback = (response) => {
+        if (response.error || !response.access_token) {
+          reject(new Error(response.error_description ?? response.error ?? "Google sign-in failed"));
+          return;
+        }
+        resolve(response);
+      };
+
+      try {
+        tokenClient.requestAccessToken({ prompt });
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error("Failed to request access token"));
+      }
+    });
+
+    const profile = await this.fetchProfile(tokenResponse.access_token);
+
+    return {
+      accessToken: tokenResponse.access_token,
+      expiresAt: Date.now() + tokenResponse.expires_in * 1000,
+      profile,
+    };
+  }
+
+  async fetchProfile(accessToken: string): Promise<GoogleProfile> {
+    const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch Google profile");
+    }
+
+    const data = (await response.json()) as {
+      sub: string;
+      name: string;
+      picture?: string;
+    };
+
+    return {
+      id: data.sub,
+      name: data.name,
+      picture: data.picture,
+    };
+  }
+
+  revoke(accessToken: string): Promise<void> {
+    return new Promise((resolve) => {
+      if (!window.google?.accounts?.oauth2 || !accessToken) {
+        resolve();
+        return;
+      }
+
+      window.google.accounts.oauth2.revoke(accessToken, () => resolve());
+    });
+  }
+
+  isExpired(expiresAt: number | null): boolean {
+    if (!expiresAt) {
+      return true;
+    }
+
+    return Date.now() >= expiresAt - 30_000;
+  }
+}
+
+export const googleAuthService = new GoogleAuthService();

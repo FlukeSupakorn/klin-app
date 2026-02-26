@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, BookOpenText, Star, Zap, Tags, ChevronRight, BarChart3, Clock, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
+import { CalendarEventModal } from "@/features/calendar/event-modal";
+import { useCalendarStore } from "@/features/calendar/use-calendar-store";
+import { useAuthStore } from "@/features/auth/use-auth-store";
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useCategoryStore } from "@/stores/use-category-store";
@@ -20,7 +23,17 @@ export function DashboardPage() {
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
   const isRunning = useAutomationStore((state) => state.isRunning);
   const lastScanTime = useAutomationStore((state) => state.lastScanTime);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const selectedDate = useCalendarStore((state) => state.selectedDate);
+  const visibleMonth = useCalendarStore((state) => state.visibleMonth);
+  const setVisibleMonth = useCalendarStore((state) => state.setVisibleMonth);
+  const setSelectedDate = useCalendarStore((state) => state.setSelectedDate);
+  const openDateModal = useCalendarStore((state) => state.openDateModal);
+  const loadVisibleMonth = useCalendarStore((state) => state.loadVisibleMonth);
+  const getEventCountForDate = useCalendarStore((state) => state.getEventCountForDate);
+  const isLoadingMonth = useCalendarStore((state) => state.isLoadingMonth);
+  const isCalendarOffline = useCalendarStore((state) => state.isOffline);
+  const calendarError = useCalendarStore((state) => state.error);
+  const authToken = useAuthStore((state) => state.accessToken);
   const [noteComposerOpen, setNoteComposerOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [notes, setNotes] = useState<Array<{ id: string; text: string; createdAt: string }>>([]);
@@ -28,6 +41,45 @@ export function DashboardPage() {
 
   const recentLogs = [...logs].reverse().slice(0, 5);
   const activeManagedCategories = managedCategories.filter((category) => category.enabled);
+  const isGoogleConnected = Boolean(authToken);
+
+  useEffect(() => {
+    if (!isGoogleConnected) {
+      return;
+    }
+
+    void loadVisibleMonth(visibleMonth);
+  }, [isGoogleConnected, loadVisibleMonth, visibleMonth]);
+
+  const calendarDayButton = useMemo(() => {
+    return function DayButton(props: {
+      day: { date: Date };
+      children?: React.ReactNode;
+      className?: string;
+      [key: string]: unknown;
+    }) {
+      const { day, children, className, ...rest } = props;
+      const count = getEventCountForDate(day.date);
+      const showDots = count > 0 && count <= 3;
+
+      return (
+        <button {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)} className={cn(className, "relative") }>
+          <span>{children}</span>
+          {count > 0 && (
+            <span className="pointer-events-none absolute bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-0.5">
+              {showDots ? (
+                Array.from({ length: count }).map((_, index) => (
+                  <span key={index} className="h-1 w-1 rounded-full bg-primary" />
+                ))
+              ) : (
+                <span className="text-[9px] font-semibold leading-none text-primary">+</span>
+              )}
+            </span>
+          )}
+        </button>
+      );
+    };
+  }, [getEventCountForDate]);
 
   const addNote = () => {
     const trimmed = noteDraft.trim();
@@ -185,11 +237,35 @@ export function DashboardPage() {
           <Calendar
             mode="single"
             selected={selectedDate}
-            onSelect={setSelectedDate}
+            month={visibleMonth}
+            onMonthChange={(month) => {
+              setVisibleMonth(month);
+              if (isGoogleConnected) {
+                void loadVisibleMonth(month);
+              }
+            }}
+            onSelect={(date) => {
+              setSelectedDate(date);
+              if (date) {
+                openDateModal(date);
+              }
+            }}
+            components={{
+              DayButton: calendarDayButton,
+            }}
             className="w-full rounded-3xl bg-background p-6 shadow-xl"
             fromYear={2020}
             toYear={2030}
           />
+          {isLoadingMonth && (
+            <p className="mt-2 text-xs text-muted-foreground">Loading events...</p>
+          )}
+          {!isLoadingMonth && isCalendarOffline && (
+            <p className="mt-2 text-xs text-muted-foreground">Offline. Showing cached events only.</p>
+          )}
+          {!isLoadingMonth && calendarError && !isCalendarOffline && (
+            <p className="mt-2 text-xs text-muted-foreground">{calendarError}</p>
+          )}
         </div>
 
         <Card className="border-0 bg-muted/40 shadow-none rounded-3xl">
@@ -281,6 +357,8 @@ export function DashboardPage() {
         description="Edit your categories."
         onClose={() => setOpenCategoryManager(false)}
       />
+
+      <CalendarEventModal />
     </div>
   );
 }
