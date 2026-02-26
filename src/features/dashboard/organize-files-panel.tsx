@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
+import { SettingsManagementDialogs, type SettingsSection } from "@/features/settings/settings-management-dialogs";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { cn } from "@/lib/utils";
 import type { OrganizePreviewItem } from "@/types/domain";
@@ -16,6 +17,8 @@ export function OrganizeFilesPanel() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [openSuggestionFor, setOpenSuggestionFor] = useState<string | null>(null);
+  const [movedItemIds, setMovedItemIds] = useState<string[]>([]);
+  const [openSettingsSection, setOpenSettingsSection] = useState<SettingsSection | null>(null);
 
   const openWithPaths = async (paths: string[]) => {
     if (paths.length === 0) {
@@ -28,9 +31,11 @@ export function OrganizeFilesPanel() {
     try {
       const analyzedItems = await organizeApiService.analyze(paths, categories);
       setItems(analyzedItems);
+      setMovedItemIds([]);
     } catch {
       setErrorMessage("Could not analyze files from API. Make sure your API server is running at localhost:3000 and supports POST /organize or /organize/analyze.");
       setItems([]);
+      setMovedItemIds([]);
     } finally {
       setIsAnalyzing(false);
     }
@@ -81,9 +86,8 @@ export function OrganizeFilesPanel() {
           return item;
         }
 
-        const folderPath = item.destinationPath.includes("/")
-          ? item.destinationPath.slice(0, item.destinationPath.lastIndexOf("/"))
-          : item.destinationPath;
+        const slashIndex = Math.max(item.destinationPath.lastIndexOf("/"), item.destinationPath.lastIndexOf("\\"));
+        const folderPath = slashIndex >= 0 ? item.destinationPath.slice(0, slashIndex) : item.destinationPath;
 
         const finalName = selectedName ?? item.fileName;
 
@@ -97,6 +101,24 @@ export function OrganizeFilesPanel() {
 
     setOpenSuggestionFor(null);
   };
+
+  const toggleMoved = (itemId: string) => {
+    setMovedItemIds((state) =>
+      state.includes(itemId) ? state.filter((id) => id !== itemId) : [...state, itemId],
+    );
+  };
+
+  const toggleMoveAll = () => {
+    if (items.length === 0) {
+      return;
+    }
+
+    setMovedItemIds((state) =>
+      state.length === items.length ? [] : items.map((item) => item.id),
+    );
+  };
+
+  const allMoved = items.length > 0 && movedItemIds.length === items.length;
 
   return (
     <>
@@ -158,7 +180,13 @@ export function OrganizeFilesPanel() {
                         <p className="font-semibold">{item.fileName}</p>
                         <p className="text-xs text-muted-foreground">{item.currentPath}</p>
                       </div>
-                      <Button size="sm">Move</Button>
+                      <Button
+                        size="sm"
+                        variant={movedItemIds.includes(item.id) ? "outline" : "default"}
+                        onClick={() => toggleMoved(item.id)}
+                      >
+                        {movedItemIds.includes(item.id) ? "Undo" : "Move"}
+                      </Button>
                     </div>
 
                     <div className="mb-3 flex flex-wrap gap-2">
@@ -237,12 +265,14 @@ export function OrganizeFilesPanel() {
 
               <div className="flex items-center justify-between border-t border-border pt-3">
                 <div className="flex gap-2">
-                  <Button className="gap-2"><Sparkles className="h-4 w-4" /> Move All Files</Button>
+                  <Button className="gap-2" onClick={toggleMoveAll}>
+                    <Sparkles className="h-4 w-4" /> {allMoved ? "Undo All" : "Move All Files"}
+                  </Button>
                   <Button variant="outline" onClick={() => void handleAddFiles()}>Add More Files</Button>
-                  <Button variant="outline">Manage Categories</Button>
+                  <Button variant="outline" onClick={() => setOpenSettingsSection("categories")}>Manage Categories</Button>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="ghost" onClick={() => setItems([])}>Clear All</Button>
+                  <Button variant="ghost" onClick={() => { setItems([]); setMovedItemIds([]); }}>Clear All</Button>
                   <Button variant="outline" onClick={() => setModalOpen(false)}>Close</Button>
                 </div>
               </div>
@@ -250,6 +280,8 @@ export function OrganizeFilesPanel() {
           </Card>
         </div>
       )}
+
+      <SettingsManagementDialogs openSection={openSettingsSection} onClose={() => setOpenSettingsSection(null)} />
     </>
   );
 }

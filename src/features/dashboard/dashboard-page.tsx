@@ -182,43 +182,6 @@ export function DashboardPage() {
 
         <Card className="border-0 bg-muted/40 shadow-none rounded-3xl">
           <CardHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <BarChart3 className="h-5 w-5" />
-              </div>
-              <CardTitle className="text-xl">Category Distribution</CardTitle>
-            </div>
-            <CardDescription>How AI is classifying your files across categories.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {categories.filter(c => c.active).slice(0, 6).map((cat) => {
-              const count = logs.filter(l => l.chosenCategory === cat.name).length;
-              const percentage = logs.length ? (count / logs.length) * 100 : 0;
-              return (
-                <div key={cat.id} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium">{cat.name}</span>
-                    <span className="text-muted-foreground">{count} files ({Math.round(percentage)}%)</span>
-                  </div>
-                  <div className="h-2 w-full bg-background rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-primary rounded-full transition-all duration-1000" 
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-            {categories.filter(c => c.active).length === 0 && (
-              <p className="text-sm text-center text-muted-foreground py-10 italic">
-                No active categories. Create some to see distribution.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 bg-muted/40 shadow-none rounded-3xl">
-          <CardHeader>
             <CardTitle className="text-lg">Quick Notes</CardTitle>
             <CardDescription>Click the box to add a note.</CardDescription>
           </CardHeader>
@@ -257,6 +220,43 @@ export function DashboardPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 bg-muted/40 shadow-none rounded-3xl">
+          <CardHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <BarChart3 className="h-5 w-5" />
+              </div>
+              <CardTitle className="text-xl">Category Distribution</CardTitle>
+            </div>
+            <CardDescription>How AI is classifying your files across categories.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {categories.filter(c => c.active).slice(0, 6).map((cat) => {
+              const count = logs.filter(l => l.chosenCategory === cat.name).length;
+              const percentage = logs.length ? (count / logs.length) * 100 : 0;
+              return (
+                <div key={cat.id} className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">{cat.name}</span>
+                    <span className="text-muted-foreground">{count} files ({Math.round(percentage)}%)</span>
+                  </div>
+                  <div className="h-2 w-full bg-background rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary rounded-full transition-all duration-1000" 
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+            {categories.filter(c => c.active).length === 0 && (
+              <p className="text-sm text-center text-muted-foreground py-10 italic">
+                No active categories. Create some to see distribution.
+              </p>
             )}
           </CardContent>
         </Card>
