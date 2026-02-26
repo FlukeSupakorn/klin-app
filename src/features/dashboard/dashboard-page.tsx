@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
+import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { useAutomationStore } from "@/stores/use-automation-store";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useCategoryStore } from "@/stores/use-category-store";
 import { useLogStore } from "@/stores/use-log-store";
 import { cn } from "@/lib/utils";
@@ -14,6 +16,7 @@ import { cn } from "@/lib/utils";
 export function DashboardPage() {
   const logs = useLogStore((state) => state.logs);
   const categories = useCategoryStore((state) => state.categories);
+  const managedCategories = useCategoryManagementStore((state) => state.categories);
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
   const isRunning = useAutomationStore((state) => state.isRunning);
   const lastScanTime = useAutomationStore((state) => state.lastScanTime);
@@ -21,8 +24,10 @@ export function DashboardPage() {
   const [noteComposerOpen, setNoteComposerOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [notes, setNotes] = useState<Array<{ id: string; text: string; createdAt: string }>>([]);
+  const [openCategoryManager, setOpenCategoryManager] = useState(false);
 
   const recentLogs = [...logs].reverse().slice(0, 5);
+  const activeManagedCategories = managedCategories.filter((category) => category.enabled);
 
   const addNote = () => {
     const trimmed = noteDraft.trim();
@@ -47,16 +52,26 @@ export function DashboardPage() {
       <section className="space-y-8">
         <div>
           <h2 className="text-4xl font-semibold tracking-tight">
-            System Overview <span className="text-muted-foreground text-2xl ml-2">({logs.length} operations)</span>
+            Overview <span className="text-muted-foreground text-2xl ml-2">({logs.length} operations)</span>
           </h2>
-          <p className="text-muted-foreground mt-1">Real-time status of your AI-driven file organization.</p>
+          <p className="text-muted-foreground mt-1">Recent activity and status.</p>
         </div>
 
         <OrganizeFilesPanel />
 
         <div className="grid gap-6 md:grid-cols-1">
-          <Link to="/settings">
-            <Card className="group border-0 bg-muted/40 shadow-none transition-all hover:bg-muted/60">
+          <Card
+            role="button"
+            tabIndex={0}
+            onClick={() => setOpenCategoryManager(true)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setOpenCategoryManager(true);
+              }
+            }}
+            className="group border-0 bg-muted/40 shadow-none transition-all hover:bg-muted/60 cursor-pointer"
+          >
               <CardContent className="p-6">
                 <div className="mb-6 flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -68,19 +83,17 @@ export function DashboardPage() {
                       <h3 className="text-xl font-semibold">Active Categories</h3>
                     </div>
                   </div>
-                  <Badge variant="secondary" className="bg-background">+{categories.filter(c => c.active).length}</Badge>
+                  <Badge variant="secondary" className="bg-background">{activeManagedCategories.length} active</Badge>
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex -space-x-3">
-                    {categories.slice(0, 4).map((c, i) => (
-                      <div key={c.id} className="h-9 w-9 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[10px] font-bold overflow-hidden" style={{ zIndex: 4-i }}>
-                        {c.name.slice(0, 2).toUpperCase()}
-                      </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {activeManagedCategories.slice(0, 3).map((category) => (
+                      <Badge key={category.id} variant="outline" className="bg-background text-xs">
+                        {category.name}
+                      </Badge>
                     ))}
-                    {categories.length > 4 && (
-                      <div className="h-9 w-9 rounded-full border-2 border-background bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold" style={{ zIndex: 0 }}>
-                        +{categories.length - 4}
-                      </div>
+                    {activeManagedCategories.length > 3 && (
+                      <Badge variant="secondary" className="text-xs">+{activeManagedCategories.length - 3} more</Badge>
                     )}
                   </div>
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-background transition-transform group-hover:translate-x-1 group-hover:-translate-y-1">
@@ -89,7 +102,6 @@ export function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
-          </Link>
         </div>
 
         <Card className="border-0 bg-muted/40 shadow-none overflow-hidden">
@@ -102,7 +114,7 @@ export function DashboardPage() {
                 <div>
                   <h3 className="text-2xl font-semibold">Automation Engine</h3>
                   <p className="text-sm text-muted-foreground">
-                    {isRunning ? "Actively monitoring folders" : "Engine is currently paused"}
+                    {isRunning ? "Watching folders" : "Paused"}
                   </p>
                 </div>
               </div>
@@ -153,7 +165,7 @@ export function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-6">
                       <div className="hidden md:block text-right">
-                        <p className="text-xs font-bold uppercase text-muted-foreground">AI Score</p>
+                        <p className="text-xs font-bold uppercase text-muted-foreground">Score</p>
                         <p className="text-sm font-bold text-primary">{Math.round(log.score * 100)}%</p>
                       </div>
                       <div className={cn("h-10 w-10 flex items-center justify-center rounded-full bg-background", log.status === "completed" ? "text-green-500" : "text-destructive")}>
@@ -232,7 +244,7 @@ export function DashboardPage() {
               </div>
               <CardTitle className="text-xl">Category Distribution</CardTitle>
             </div>
-            <CardDescription>How AI is classifying your files across categories.</CardDescription>
+            <CardDescription>File count by category.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {categories.filter(c => c.active).slice(0, 6).map((cat) => {
@@ -261,6 +273,14 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </section>
+
+      <SettingsManagementDialogs
+        open={openCategoryManager}
+        sections={["categories"]}
+        title="Manage Categories"
+        description="Edit your categories."
+        onClose={() => setOpenCategoryManager(false)}
+      />
     </div>
   );
 }

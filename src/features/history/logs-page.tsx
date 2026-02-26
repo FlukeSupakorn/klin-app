@@ -41,7 +41,7 @@ export function HistoryPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-4xl font-semibold tracking-tight">History</h2>
-          <p className="text-muted-foreground">Monitor file and folder change history from AI-driven operations.</p>
+          <p className="text-muted-foreground">File and folder activity history.</p>
         </div>
         <Card className="flex items-center gap-3 px-4 py-2 shadow-none">
           <History className="h-4 w-4 text-primary" />

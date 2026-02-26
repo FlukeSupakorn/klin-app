@@ -34,7 +34,7 @@ export function OrganizeFilesPanel() {
       setItems(analyzedItems);
       setMovedItemIds([]);
     } catch {
-      setErrorMessage("Could not analyze files from API. Make sure your API server is running at localhost:3000 and supports POST /organize or /organize/analyze.");
+      setErrorMessage("Could not load suggestions. Check your API server at localhost:3000.");
       setItems([]);
       setMovedItemIds([]);
     } finally {
@@ -181,7 +181,7 @@ export function OrganizeFilesPanel() {
             <CardHeader>
               <CardTitle>Files to organize</CardTitle>
               <CardDescription>
-                {isAnalyzing ? "Analyzing with AI API..." : `${items.length} file(s)`}
+                {isAnalyzing ? "Getting suggestions..." : `${items.length} file(s)`}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex h-[calc(80vh-96px)] flex-col gap-4 overflow-hidden">
@@ -195,7 +195,7 @@ export function OrganizeFilesPanel() {
 
               {isAnalyzing && (
                 <div className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                  Sending file paths to API and waiting for recommendations...
+                  Loading suggestions...
                 </div>
               )}
 
@@ -236,7 +236,7 @@ export function OrganizeFilesPanel() {
 
                     <div className="space-y-2 rounded-lg bg-muted/40 p-3 text-xs">
                       <p><strong>Move to:</strong> {item.destinationPath}</p>
-                      <p><strong>AI confidence:</strong> {Math.round(item.confidence * 100)}%</p>
+                      <p><strong>Confidence:</strong> {Math.round(item.confidence * 100)}%</p>
                       <p><strong>Summary:</strong> {item.summary ?? "No summary"}</p>
                       <div className="flex items-center gap-2">
                         <Button
@@ -312,7 +312,7 @@ export function OrganizeFilesPanel() {
         open={openSettingsWindow}
         sections={["default-folder", "categories"]}
         title="Manage Categories"
-        description="Update default folder and categories used by organize flow."
+        description="Update default folder and categories."
         onClose={() => setOpenSettingsWindow(false)}
       />
     </>

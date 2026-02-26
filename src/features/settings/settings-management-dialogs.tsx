@@ -41,8 +41,8 @@ interface SettingsManagementDialogsProps {
 export function SettingsManagementDialogs({
   open,
   sections,
-  title = "Settings Management",
-  description = "Manage default folder, watched folders, and categories in one window.",
+  title = "Settings",
+  description = "Manage folders and categories.",
   onClose,
 }: SettingsManagementDialogsProps) {
   const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
@@ -96,6 +96,11 @@ export function SettingsManagementDialogs({
     setFormState(emptyForm);
   };
 
+  const toggleCategoryEnabled = (category: ManagedCategory) => {
+    updateCategory(category.id, { enabled: !category.enabled });
+    categoryManagementService.syncToAutomationStores();
+  };
+
   const handleSaveCategory = () => {
     if (!formState.name.trim() || !formState.description.trim() || !formState.folderPath.trim()) {
       return;
@@ -145,7 +150,7 @@ export function SettingsManagementDialogs({
             {showDefaultFolder && (
               <div className="rounded-2xl border border-border/60 p-4">
                 <h3 className="text-sm font-semibold">Default Folder</h3>
-                <p className="mb-3 text-xs text-muted-foreground">Category folders are created and resolved under this base path.</p>
+                <p className="mb-3 text-xs text-muted-foreground">Base folder for categories.</p>
                 <div className="flex flex-col gap-3 md:flex-row md:items-center">
                   <Input
                     value={draftDefaultFolder}
@@ -171,7 +176,7 @@ export function SettingsManagementDialogs({
             {showWatchedFolders && (
               <div className="rounded-2xl border border-border/60 p-4">
                 <h3 className="text-sm font-semibold">Watched Folders</h3>
-                <p className="mb-3 text-xs text-muted-foreground">The automation engine monitors these locations for new files.</p>
+                <p className="mb-3 text-xs text-muted-foreground">Folders to watch.</p>
 
                 <div className="mb-3 grid gap-2 sm:grid-cols-2">
                   <Button
@@ -194,7 +199,7 @@ export function SettingsManagementDialogs({
                   <Input
                     value={newWatchedFolderPath}
                     onChange={(event) => setNewWatchedFolderPath(event.target.value)}
-                    placeholder="Enter folder path manually..."
+                    placeholder="Folder path"
                     className="bg-muted/30"
                   />
                   <Button
@@ -247,7 +252,7 @@ export function SettingsManagementDialogs({
                 <div className="mb-3 flex items-center justify-between gap-4">
                   <div>
                     <h3 className="text-sm font-semibold">Categories</h3>
-                    <p className="text-xs text-muted-foreground">Edit category name, description, and folder destination path.</p>
+                    <p className="text-xs text-muted-foreground">Name, description, and folder.</p>
                   </div>
                   <Button className="gap-2" onClick={openAddModal}>
                     <Plus className="h-4 w-4" /> Add New Category
@@ -256,21 +261,46 @@ export function SettingsManagementDialogs({
 
                 <div className="space-y-2">
                   {categories.map((category) => (
-                    <div key={category.id} className="rounded-xl border border-border/60 p-4">
+                    <div
+                      key={category.id}
+                      className={`rounded-xl border border-border/60 p-4 transition-colors ${
+                        category.enabled ? "bg-background" : "bg-muted/40"
+                      }`}
+                    >
                       <div className="mb-2 flex items-start justify-between gap-4">
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">{category.name}</h3>
-                            <Badge variant={category.enabled ? "default" : "outline"}>{category.enabled ? "Enabled" : "Disabled"}</Badge>
+                            <h3 className={category.enabled ? "font-semibold" : "font-semibold text-muted-foreground"}>{category.name}</h3>
+                            <button
+                              type="button"
+                              onClick={() => toggleCategoryEnabled(category)}
+                              className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                                category.enabled
+                                  ? "border-transparent bg-primary text-primary-foreground"
+                                  : "border-border bg-background text-muted-foreground"
+                              }`}
+                              aria-pressed={category.enabled}
+                              title="Toggle enabled state"
+                            >
+                              {category.enabled ? "Enabled" : "Disabled"}
+                            </button>
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">{category.description}</p>
                         </div>
-                        <Button variant="outline" size="sm" className="gap-2" onClick={() => openEditModal(category)}>
-                          <Pencil className="h-3 w-3" /> Edit
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" className="gap-2" onClick={() => openEditModal(category)}>
+                            <Pencil className="h-3 w-3" /> Edit
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-primary">
-                        <FolderOpen className="h-3 w-3" /> {category.folderPath}
+                      <div className={`flex items-center justify-between gap-2 text-xs ${category.enabled ? "text-primary" : "text-muted-foreground"}`}>
+                        <div className="flex items-center gap-2">
+                          <FolderOpen className="h-3 w-3" /> {category.folderPath}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`h-2 w-2 rounded-full ${category.aiLearned ? "bg-emerald-500" : "bg-amber-400"}`} />
+                          <span className="text-[11px]">{category.aiLearned ? "AI understood" : "AI learning"}</span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -286,11 +316,7 @@ export function SettingsManagementDialogs({
           <Card className="w-full max-w-2xl">
             <CardHeader>
               <CardTitle>{modalMode === "edit" ? "Edit Category" : "Add New Category"}</CardTitle>
-              <CardDescription>
-                {modalMode === "edit"
-                  ? "Update category details to keep AI recommendations accurate."
-                  : "Create a custom category for organizing your files."}
-              </CardDescription>
+              <CardDescription>{modalMode === "edit" ? "Update category details." : "Create a new category."}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -317,8 +343,14 @@ export function SettingsManagementDialogs({
                 <p className="mt-1 text-xs text-primary">Resolved path: {formState.folderPath}</p>
               </div>
               <div className="flex items-center gap-3 rounded-lg bg-muted/40 p-3 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Ready - AI knows this category and can classify files into it.
+                {formState.aiLearned ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                ) : (
+                  <FolderSearch className="h-4 w-4 text-amber-500" />
+                )}
+                {formState.aiLearned
+                  ? "AI already understands this category."
+                  : "AI learning this category • 72%"}
               </div>
               <div className="flex justify-between pt-2">
                 <Button variant="ghost" onClick={closeCategoryEditor}>Cancel</Button>
