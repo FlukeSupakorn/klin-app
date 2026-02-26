@@ -150,7 +150,7 @@ export function OrganizeFilesPanel() {
   return (
     <>
       <Card className="border-0 bg-muted/30 shadow-none">
-        <CardContent>
+        <CardContent className="p-0">
           <div
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
@@ -163,7 +163,7 @@ export function OrganizeFilesPanel() {
                 void handleAddFiles();
               }
             }}
-            className="cursor-pointer rounded-2xl border border-dashed border-border bg-muted/30 p-14 text-center"
+            className="flex min-h-[320px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/30 px-8 py-16 text-center"
           >
             <div className="mb-3 flex justify-center gap-2 text-muted-foreground">
               <FolderOpen className="h-8 w-8" />
