@@ -71,9 +71,31 @@ export interface OrganizePreviewItem {
   id: string;
   fileName: string;
   currentPath: string;
+  suggestedNames: string[];
   suggestedName: string | null;
   selectedCategory: string;
   destinationPath: string;
   confidence: number;
   topScores: CategoryScore[];
+  summary: string | null;
+  calendar: string | null;
+}
+
+export interface OrganizeAnalyzeRequest {
+  filePaths: string[];
+  categories: Array<{
+    name: string;
+    description: string;
+  }>;
+}
+
+export interface OrganizeAnalyzeFileResult {
+  score: Record<string, number>;
+  new_name: string[];
+  summary: string | null;
+  calendar: string | null;
+}
+
+export interface OrganizeAnalyzeResponse {
+  result: Record<string, OrganizeAnalyzeFileResult>;
 }

@@ -3,7 +3,7 @@ import { FolderOpen, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { MockOrganizePreviewFactory } from "@/services/mock-organize-service";
+import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { cn } from "@/lib/utils";
@@ -13,24 +13,43 @@ export function OrganizeFilesPanel() {
   const categories = useCategoryManagementStore((state) => state.categories);
   const [items, setItems] = useState<OrganizePreviewItem[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [openSuggestionFor, setOpenSuggestionFor] = useState<string | null>(null);
 
-  const openWithPaths = (paths: string[]) => {
+  const openWithPaths = async (paths: string[]) => {
     if (paths.length === 0) {
       return;
     }
-    setItems(MockOrganizePreviewFactory.fromPaths(paths, categories));
+
+    setIsAnalyzing(true);
+    setErrorMessage(null);
+
+    try {
+      const analyzedItems = await organizeApiService.analyze(paths, categories);
+      setItems(analyzedItems);
+    } catch {
+      setErrorMessage("Could not analyze files from API. Make sure your API server is running at localhost:3000 and supports POST /organize or /organize/analyze.");
+      setItems([]);
+    } finally {
+      setIsAnalyzing(false);
+    }
+
     setModalOpen(true);
   };
 
   const handleAddFiles = async () => {
     const selected = await tauriClient.pickFilesForOrganize();
-    openWithPaths(selected);
+    await openWithPaths(selected);
   };
 
   const handleDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
     event.preventDefault();
-    const dropped = Array.from(event.dataTransfer.files).map((file) => `Dropped/${file.name}`);
-    openWithPaths(dropped);
+    const dropped = Array.from(event.dataTransfer.files).map((file) => {
+      const fileWithPath = file as File & { path?: string };
+      return fileWithPath.path ?? `Dropped/${file.name}`;
+    });
+    void openWithPaths(dropped);
   };
 
   const applyCategory = (itemId: string, categoryName: string) => {
@@ -39,22 +58,44 @@ export function OrganizeFilesPanel() {
       return;
     }
 
-    setItems((state) =>
-      state.map((item) =>
-        item.id === itemId ? MockOrganizePreviewFactory.applyCategory(item, category) : item,
-      ),
-    );
-  };
-
-  const toggleRename = (itemId: string) => {
-    setItems((state) =>
-      state.map((item) => {
+    setItems((state) => {
+      return state.map((item) => {
         if (item.id !== itemId) {
           return item;
         }
-        return MockOrganizePreviewFactory.toggleRename(item, item.suggestedName === null);
-      }),
-    );
+
+        const activeName = item.suggestedName ?? item.fileName;
+        return {
+          ...item,
+          selectedCategory: category.name,
+          destinationPath: `${category.folderPath}/${activeName}`,
+        };
+      });
+    });
+  };
+
+  const applySuggestedName = (itemId: string, selectedName: string | null) => {
+    setItems((state) => {
+      return state.map((item) => {
+        if (item.id !== itemId) {
+          return item;
+        }
+
+        const folderPath = item.destinationPath.includes("/")
+          ? item.destinationPath.slice(0, item.destinationPath.lastIndexOf("/"))
+          : item.destinationPath;
+
+        const finalName = selectedName ?? item.fileName;
+
+        return {
+          ...item,
+          suggestedName: selectedName,
+          destinationPath: `${folderPath}/${finalName}`,
+        };
+      });
+    });
+
+    setOpenSuggestionFor(null);
   };
 
   return (
@@ -90,10 +131,24 @@ export function OrganizeFilesPanel() {
           <Card className="h-[80vh] w-full max-w-5xl overflow-hidden">
             <CardHeader>
               <CardTitle>Files to organize</CardTitle>
-              <CardDescription>{items.length} file(s)</CardDescription>
+              <CardDescription>
+                {isAnalyzing ? "Analyzing with AI API..." : `${items.length} file(s)`}
+              </CardDescription>
             </CardHeader>
             <CardContent className="flex h-[calc(80vh-96px)] flex-col gap-4 overflow-hidden">
               <Input placeholder="Search files..." />
+
+              {errorMessage && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {errorMessage}
+                </div>
+              )}
+
+              {isAnalyzing && (
+                <div className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                  Sending file paths to API and waiting for recommendations...
+                </div>
+              )}
 
               <div className="flex-1 space-y-4 overflow-y-auto pr-1">
                 {items.map((item) => (
@@ -127,9 +182,15 @@ export function OrganizeFilesPanel() {
                     <div className="space-y-2 rounded-lg bg-muted/40 p-3 text-xs">
                       <p><strong>Move to:</strong> {item.destinationPath}</p>
                       <p><strong>AI confidence:</strong> {Math.round(item.confidence * 100)}%</p>
+                      <p><strong>Summary:</strong> {item.summary ?? "No summary"}</p>
                       <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => toggleRename(item.id)}>
-                          AI Rename
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 gap-1"
+                          onClick={() => setOpenSuggestionFor((state) => (state === item.id ? null : item.id))}
+                        >
+                          Suggest Name
                         </Button>
                         <span>
                           {item.suggestedName ? (
@@ -139,6 +200,36 @@ export function OrganizeFilesPanel() {
                           )}
                         </span>
                       </div>
+
+                      {openSuggestionFor === item.id && (
+                        <div className="flex flex-wrap gap-2">
+                          {item.suggestedNames.length > 0 ? (
+                            <>
+                              {item.suggestedNames.map((name) => (
+                                <Button
+                                  key={name}
+                                  size="sm"
+                                  variant={item.suggestedName === name ? "default" : "outline"}
+                                  className="h-7"
+                                  onClick={() => applySuggestedName(item.id, name)}
+                                >
+                                  {name}
+                                </Button>
+                              ))}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7"
+                                onClick={() => applySuggestedName(item.id, null)}
+                              >
+                                Use Original
+                              </Button>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">No recommendation</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

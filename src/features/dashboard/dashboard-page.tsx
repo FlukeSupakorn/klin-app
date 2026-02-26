@@ -1,28 +1,46 @@
-import { ArrowUpRight, BookOpenText, Star, Zap, Tags, GitBranch, History, ChevronRight, BarChart3, Clock, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { ArrowUpRight, BookOpenText, Star, Zap, Tags, ChevronRight, BarChart3, Clock, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { useCategoryStore } from "@/stores/use-category-store";
 import { useLogStore } from "@/stores/use-log-store";
-import { useRuleStore } from "@/stores/use-rule-store";
 import { cn } from "@/lib/utils";
 
 export function DashboardPage() {
   const logs = useLogStore((state) => state.logs);
   const categories = useCategoryStore((state) => state.categories);
-  const mappings = useRuleStore((state) => state.categoryToFolderMap);
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
   const isRunning = useAutomationStore((state) => state.isRunning);
   const lastScanTime = useAutomationStore((state) => state.lastScanTime);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [noteComposerOpen, setNoteComposerOpen] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [notes, setNotes] = useState<Array<{ id: string; text: string; createdAt: string }>>([]);
 
   const recentLogs = [...logs].reverse().slice(0, 5);
-  const completedLogs = logs.filter((l) => l.status === "completed");
-  const averageScore = logs.length 
-    ? Math.round((logs.reduce((acc, item) => acc + item.score, 0) / logs.length) * 100) 
-    : 0;
+
+  const addNote = () => {
+    const trimmed = noteDraft.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    setNotes((current) => [
+      {
+        id: crypto.randomUUID(),
+        text: trimmed,
+        createdAt: new Date().toISOString(),
+      },
+      ...current,
+    ]);
+    setNoteDraft("");
+    setNoteComposerOpen(false);
+  };
 
   return (
     <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1.5fr_1fr] pb-10">
@@ -36,7 +54,7 @@ export function DashboardPage() {
 
         <OrganizeFilesPanel />
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-1">
           <Link to="/settings">
             <Card className="group border-0 bg-muted/40 shadow-none transition-all hover:bg-muted/60">
               <CardContent className="p-6">
@@ -72,39 +90,6 @@ export function DashboardPage() {
               </CardContent>
             </Card>
           </Link>
-
-          <Link to="/settings">
-            <Card className="group border-0 bg-primary/10 shadow-none transition-all hover:bg-primary/15">
-              <CardContent className="p-6">
-                <div className="mb-6 flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-background text-primary">
-                      <GitBranch className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold uppercase text-primary/70">Execution</p>
-                      <h3 className="text-xl font-semibold">Routing Rules</h3>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="bg-background">+{mappings.length}</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    Mapping categories to paths
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-background transition-transform group-hover:translate-x-1 group-hover:-translate-y-1">
-                    <ArrowUpRight className="h-5 w-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-0 bg-muted/40 shadow-none"><CardContent className="p-6 text-center"><p className="text-xs font-bold uppercase text-muted-foreground tracking-widest mb-2">Completed</p><p className="text-4xl font-semibold">{completedLogs.length}</p></CardContent></Card>
-          <Card className="border-0 bg-primary/20 shadow-none"><CardContent className="p-6 text-center"><p className="text-xs font-bold uppercase text-primary/70 tracking-widest mb-2">Avg AI Score</p><p className="text-4xl font-semibold">{averageScore}%</p></CardContent></Card>
-          <Card className="border-0 bg-muted/60 shadow-none"><CardContent className="p-6 text-center"><p className="text-xs font-bold uppercase text-muted-foreground tracking-widest mb-2">Failed</p><p className="text-4xl font-semibold">{logs.filter(l => l.status === "failed").length}</p></CardContent></Card>
         </div>
 
         <Card className="border-0 bg-muted/40 shadow-none overflow-hidden">
@@ -184,6 +169,17 @@ export function DashboardPage() {
       </section>
 
       <section className="space-y-8">
+        <div className="w-full">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={setSelectedDate}
+            className="w-full rounded-3xl bg-background p-6 shadow-xl"
+            fromYear={2020}
+            toYear={2030}
+          />
+        </div>
+
         <Card className="border-0 bg-muted/40 shadow-none rounded-3xl">
           <CardHeader>
             <div className="flex items-center gap-3 mb-2">
@@ -221,53 +217,48 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 bg-primary/5 shadow-none rounded-3xl overflow-hidden">
-          <CardHeader className="bg-primary/5 border-b border-primary/10">
-            <CardTitle className="text-lg">AI Performance</CardTitle>
+        <Card className="border-0 bg-muted/40 shadow-none rounded-3xl">
+          <CardHeader>
+            <CardTitle className="text-lg">Quick Notes</CardTitle>
+            <CardDescription>Click the box to add a note.</CardDescription>
           </CardHeader>
-          <CardContent className="p-6 space-y-4">
-             <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Confidence Rating</span>
-                <div className="flex gap-0.5">
-                  {[1, 2, 3, 4, 5].map(i => (
-                    <Star key={i} className={cn("h-4 w-4", i <= 4 ? "text-yellow-500 fill-yellow-500" : "text-muted")} />
-                  ))}
+          <CardContent className="space-y-3">
+            {!noteComposerOpen ? (
+              <button
+                type="button"
+                onClick={() => setNoteComposerOpen(true)}
+                className="w-full rounded-2xl border-2 border-dashed border-border bg-background/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:bg-background"
+              >
+                + Click to add note
+              </button>
+            ) : (
+              <div className="space-y-2 rounded-2xl border border-border/70 bg-background p-3">
+                <textarea
+                  value={noteDraft}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                  placeholder="Write your note..."
+                  className="min-h-[84px] w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setNoteComposerOpen(false)}>Cancel</Button>
+                  <Button size="sm" onClick={addNote}>Add Note</Button>
                 </div>
-             </div>
-             <p className="text-xs text-muted-foreground leading-relaxed">
-               The AI model is currently performing with high confidence based on your recent 50 file classifications.
-             </p>
-             <div className="pt-4 grid grid-cols-2 gap-4">
-                <div className="p-3 bg-background rounded-2xl">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Avg Process Time</p>
-                  <p className="text-xl font-bold">~420ms</p>
-                </div>
-                <div className="p-3 bg-background rounded-2xl">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Success Rate</p>
-                  <p className="text-xl font-bold text-green-600">98.2%</p>
-                </div>
-             </div>
-          </CardContent>
-        </Card>
+              </div>
+            )}
 
-        <Card className="border-0 bg-muted/40 shadow-none rounded-3xl p-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="h-12 w-12 rounded-full bg-foreground text-background flex items-center justify-center text-xl font-bold">
-              SK
-            </div>
-            <div>
-              <p className="font-bold">System Admin</p>
-              <p className="text-xs text-muted-foreground uppercase font-bold tracking-tighter">Pro Plan Active</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-             <Button variant="outline" className="w-full justify-between rounded-2xl h-12">
-               System Health <Badge variant="secondary" className="bg-green-500/10 text-green-600">Stable</Badge>
-             </Button>
-             <Button variant="outline" className="w-full justify-between rounded-2xl h-12 text-destructive hover:bg-destructive/10">
-               Clear All Logs <History className="h-4 w-4" />
-             </Button>
-          </div>
+            {notes.length > 0 && (
+              <div className="space-y-2">
+                {notes.slice(0, 3).map((note) => (
+                  <div key={note.id} className="rounded-xl bg-background p-3">
+                    <p className="text-sm leading-relaxed">{note.text}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {new Date(note.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
         </Card>
       </section>
     </div>
