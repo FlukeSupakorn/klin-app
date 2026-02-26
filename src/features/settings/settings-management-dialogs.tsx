@@ -10,7 +10,7 @@ import { useCategoryManagementStore } from "@/stores/use-category-management-sto
 import { useAutomationStore } from "@/stores/use-automation-store";
 import type { ManagedCategory } from "@/types/domain";
 
-export type SettingsSection = "default-folder" | "watched-folders" | "categories";
+export type SettingsDialogSection = "default-folder" | "watched-folders" | "categories";
 
 type ModalMode = "edit" | "add";
 
@@ -31,11 +31,20 @@ const emptyForm: CategoryFormState = {
 };
 
 interface SettingsManagementDialogsProps {
-  openSection: SettingsSection | null;
+  open: boolean;
+  sections: SettingsDialogSection[];
+  title?: string;
+  description?: string;
   onClose: () => void;
 }
 
-export function SettingsManagementDialogs({ openSection, onClose }: SettingsManagementDialogsProps) {
+export function SettingsManagementDialogs({
+  open,
+  sections,
+  title = "Settings Management",
+  description = "Manage default folder, watched folders, and categories in one window.",
+  onClose,
+}: SettingsManagementDialogsProps) {
   const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
   const categories = useCategoryManagementStore((state) => state.categories);
   const setDefaultFolder = useCategoryManagementStore((state) => state.setDefaultFolder);
@@ -52,6 +61,9 @@ export function SettingsManagementDialogs({ openSection, onClose }: SettingsMana
   const [formState, setFormState] = useState<CategoryFormState>(emptyForm);
 
   const enabledCount = useMemo(() => categories.filter((category) => category.enabled).length, [categories]);
+  const showDefaultFolder = sections.includes("default-folder");
+  const showWatchedFolders = sections.includes("watched-folders");
+  const showCategories = sections.includes("categories");
 
   useEffect(() => {
     setDraftDefaultFolder(defaultFolder);
@@ -113,53 +125,55 @@ export function SettingsManagementDialogs({ openSection, onClose }: SettingsMana
     closeCategoryEditor();
   };
 
-  if (!openSection) {
+  if (!open) {
     return null;
   }
 
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4">
-        <Card className="w-full max-w-4xl">
-          {openSection === "default-folder" && (
-            <>
-              <CardHeader>
-                <CardTitle className="text-lg">Set Default Folder</CardTitle>
-                <CardDescription>
-                  Category folders are created and resolved under this base path.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3 md:flex-row md:items-center">
-                <Input
-                  value={draftDefaultFolder}
-                  onChange={(event) => setDraftDefaultFolder(event.target.value)}
-                  className="bg-background"
-                />
-                <Button
-                  onClick={() => {
-                    if (!draftDefaultFolder.trim()) {
-                      return;
-                    }
-                    setDefaultFolder(draftDefaultFolder.trim());
-                    categoryManagementService.syncToAutomationStores();
-                  }}
-                >
-                  Change
-                </Button>
-                <Badge variant="secondary">{enabledCount} enabled</Badge>
-                <Button variant="outline" className="md:ml-auto" onClick={onClose}>Close</Button>
-              </CardContent>
-            </>
-          )}
+        <Card className="w-full max-w-5xl">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-xl">{title}</CardTitle>
+              <CardDescription>{description}</CardDescription>
+            </div>
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </CardHeader>
 
-          {openSection === "watched-folders" && (
-            <>
-              <CardHeader>
-                <CardTitle>Set Watched Folders</CardTitle>
-                <CardDescription>The automation engine monitors these locations for new files.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-2 sm:grid-cols-2">
+          <CardContent className="max-h-[70vh] space-y-6 overflow-y-auto pr-1">
+            {showDefaultFolder && (
+              <div className="rounded-2xl border border-border/60 p-4">
+                <h3 className="text-sm font-semibold">Default Folder</h3>
+                <p className="mb-3 text-xs text-muted-foreground">Category folders are created and resolved under this base path.</p>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                  <Input
+                    value={draftDefaultFolder}
+                    onChange={(event) => setDraftDefaultFolder(event.target.value)}
+                    className="bg-background"
+                  />
+                  <Button
+                    onClick={() => {
+                      if (!draftDefaultFolder.trim()) {
+                        return;
+                      }
+                      setDefaultFolder(draftDefaultFolder.trim());
+                      categoryManagementService.syncToAutomationStores();
+                    }}
+                  >
+                    Change
+                  </Button>
+                  <Badge variant="secondary">{enabledCount} enabled</Badge>
+                </div>
+              </div>
+            )}
+
+            {showWatchedFolders && (
+              <div className="rounded-2xl border border-border/60 p-4">
+                <h3 className="text-sm font-semibold">Watched Folders</h3>
+                <p className="mb-3 text-xs text-muted-foreground">The automation engine monitors these locations for new files.</p>
+
+                <div className="mb-3 grid gap-2 sm:grid-cols-2">
                   <Button
                     variant="outline"
                     className="justify-start gap-2"
@@ -176,7 +190,7 @@ export function SettingsManagementDialogs({ openSection, onClose }: SettingsMana
                   </Button>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="mb-3 flex gap-2">
                   <Input
                     value={newWatchedFolderPath}
                     onChange={(event) => setNewWatchedFolderPath(event.target.value)}
@@ -196,7 +210,7 @@ export function SettingsManagementDialogs({ openSection, onClose }: SettingsMana
                   </Button>
                 </div>
 
-                <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[30vh] overflow-y-auto pr-1">
                   {watchedFolders.length === 0 ? (
                     <div className="rounded-2xl border-2 border-dashed py-10 text-center text-muted-foreground">
                       No folders being watched yet.
@@ -225,53 +239,45 @@ export function SettingsManagementDialogs({ openSection, onClose }: SettingsMana
                     ))
                   )}
                 </div>
+              </div>
+            )}
 
-                <div className="flex justify-end">
-                  <Button variant="outline" onClick={onClose}>Close</Button>
-                </div>
-              </CardContent>
-            </>
-          )}
-
-          {openSection === "categories" && (
-            <>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Set Categories</CardTitle>
-                  <CardDescription>
-                    Edit category name, description, and folder destination path.
-                  </CardDescription>
-                </div>
-                <Button className="gap-2" onClick={openAddModal}>
-                  <Plus className="h-4 w-4" /> Add New Category
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-                {categories.map((category) => (
-                  <div key={category.id} className="rounded-xl border border-border/60 p-4">
-                    <div className="mb-2 flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{category.name}</h3>
-                          <Badge variant={category.enabled ? "default" : "outline"}>{category.enabled ? "Enabled" : "Disabled"}</Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">{category.description}</p>
-                      </div>
-                      <Button variant="outline" size="sm" className="gap-2" onClick={() => openEditModal(category)}>
-                        <Pencil className="h-3 w-3" /> Edit
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-primary">
-                      <FolderOpen className="h-3 w-3" /> {category.folderPath}
-                    </div>
+            {showCategories && (
+              <div className="rounded-2xl border border-border/60 p-4">
+                <div className="mb-3 flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Categories</h3>
+                    <p className="text-xs text-muted-foreground">Edit category name, description, and folder destination path.</p>
                   </div>
-                ))}
-                <div className="flex justify-end pt-2">
-                  <Button variant="outline" onClick={onClose}>Close</Button>
+                  <Button className="gap-2" onClick={openAddModal}>
+                    <Plus className="h-4 w-4" /> Add New Category
+                  </Button>
                 </div>
-              </CardContent>
-            </>
-          )}
+
+                <div className="space-y-2">
+                  {categories.map((category) => (
+                    <div key={category.id} className="rounded-xl border border-border/60 p-4">
+                      <div className="mb-2 flex items-start justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{category.name}</h3>
+                            <Badge variant={category.enabled ? "default" : "outline"}>{category.enabled ? "Enabled" : "Disabled"}</Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">{category.description}</p>
+                        </div>
+                        <Button variant="outline" size="sm" className="gap-2" onClick={() => openEditModal(category)}>
+                          <Pencil className="h-3 w-3" /> Edit
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-primary">
+                        <FolderOpen className="h-3 w-3" /> {category.folderPath}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
         </Card>
       </div>
 

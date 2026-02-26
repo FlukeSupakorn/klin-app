@@ -5,20 +5,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
-import { SettingsManagementDialogs, type SettingsSection } from "@/features/settings/settings-management-dialogs";
+import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { cn } from "@/lib/utils";
 import type { OrganizePreviewItem } from "@/types/domain";
 
 export function OrganizeFilesPanel() {
   const categories = useCategoryManagementStore((state) => state.categories);
+  const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
   const [items, setItems] = useState<OrganizePreviewItem[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [openSuggestionFor, setOpenSuggestionFor] = useState<string | null>(null);
   const [movedItemIds, setMovedItemIds] = useState<string[]>([]);
-  const [openSettingsSection, setOpenSettingsSection] = useState<SettingsSection | null>(null);
+  const [openSettingsWindow, setOpenSettingsWindow] = useState(false);
 
   const openWithPaths = async (paths: string[]) => {
     if (paths.length === 0) {
@@ -57,11 +58,35 @@ export function OrganizeFilesPanel() {
     void openWithPaths(dropped);
   };
 
-  const applyCategory = (itemId: string, categoryName: string) => {
-    const category = categories.find((entry) => entry.name === categoryName);
-    if (!category) {
-      return;
+  const normalizeCategoryLabel = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+  const findCategoryByLabel = (label: string) => {
+    const normalizedLabel = normalizeCategoryLabel(label);
+
+    const exact = categories.find((entry) => normalizeCategoryLabel(entry.name) === normalizedLabel);
+    if (exact) {
+      return exact;
     }
+
+    const contains = categories.find((entry) => {
+      const normalizedCategory = normalizeCategoryLabel(entry.name);
+      return normalizedCategory.includes(normalizedLabel) || normalizedLabel.includes(normalizedCategory);
+    });
+
+    if (contains) {
+      return contains;
+    }
+
+    const firstToken = normalizedLabel.split(" ")[0] ?? "";
+    if (!firstToken) {
+      return undefined;
+    }
+
+    return categories.find((entry) => normalizeCategoryLabel(entry.name).includes(firstToken));
+  };
+
+  const applyCategory = (itemId: string, categoryName: string) => {
+    const category = findCategoryByLabel(categoryName);
 
     setItems((state) => {
       return state.map((item) => {
@@ -70,10 +95,12 @@ export function OrganizeFilesPanel() {
         }
 
         const activeName = item.suggestedName ?? item.fileName;
+        const folderPath = category ? category.folderPath : `${defaultFolder}/${categoryName}`;
+
         return {
           ...item,
-          selectedCategory: category.name,
-          destinationPath: `${category.folderPath}/${activeName}`,
+          selectedCategory: category?.name ?? categoryName,
+          destinationPath: `${folderPath}/${activeName}`,
         };
       });
     });
@@ -269,7 +296,7 @@ export function OrganizeFilesPanel() {
                     <Sparkles className="h-4 w-4" /> {allMoved ? "Undo All" : "Move All Files"}
                   </Button>
                   <Button variant="outline" onClick={() => void handleAddFiles()}>Add More Files</Button>
-                  <Button variant="outline" onClick={() => setOpenSettingsSection("categories")}>Manage Categories</Button>
+                  <Button variant="outline" onClick={() => setOpenSettingsWindow(true)}>Manage Categories</Button>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="ghost" onClick={() => { setItems([]); setMovedItemIds([]); }}>Clear All</Button>
@@ -281,7 +308,13 @@ export function OrganizeFilesPanel() {
         </div>
       )}
 
-      <SettingsManagementDialogs openSection={openSettingsSection} onClose={() => setOpenSettingsSection(null)} />
+      <SettingsManagementDialogs
+        open={openSettingsWindow}
+        sections={["default-folder", "categories"]}
+        title="Manage Categories"
+        description="Update default folder and categories used by organize flow."
+        onClose={() => setOpenSettingsWindow(false)}
+      />
     </>
   );
 }

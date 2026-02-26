@@ -11,6 +11,53 @@ const ORGANIZE_API_URL_CANDIDATES = [
   "http://localhost:3000/organize/analyze",
 ];
 
+function normalizeCategoryLabel(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function findMatchingManagedCategoryName(rawName: string, categoryCatalog: ManagedCategory[]): string | null {
+  const normalizedRaw = normalizeCategoryLabel(rawName);
+  if (!normalizedRaw) {
+    return null;
+  }
+
+  const exact = categoryCatalog.find((category) => normalizeCategoryLabel(category.name) === normalizedRaw);
+  if (exact) {
+    return exact.name;
+  }
+
+  const contains = categoryCatalog.find((category) => {
+    const normalizedCategory = normalizeCategoryLabel(category.name);
+    return normalizedCategory.includes(normalizedRaw) || normalizedRaw.includes(normalizedCategory);
+  });
+
+  if (contains) {
+    return contains.name;
+  }
+
+  const firstToken = normalizedRaw.split(" ")[0] ?? "";
+  if (!firstToken) {
+    return null;
+  }
+
+  const tokenMatch = categoryCatalog.find((category) => normalizeCategoryLabel(category.name).includes(firstToken));
+  return tokenMatch?.name ?? null;
+}
+
+function alignScoresToManagedCategories(scores: CategoryScore[], categoryCatalog: ManagedCategory[]): CategoryScore[] {
+  const merged = new Map<string, number>();
+
+  scores.forEach((score) => {
+    const matchedName = findMatchingManagedCategoryName(score.name, categoryCatalog) ?? score.name;
+    const previous = merged.get(matchedName) ?? 0;
+    merged.set(matchedName, Math.max(previous, score.score));
+  });
+
+  return [...merged.entries()]
+    .map(([name, score]) => ({ name, score }))
+    .sort((a, b) => b.score - a.score);
+}
+
 function normalizeScore(value: number): number {
   if (!Number.isFinite(value) || value <= 0) {
     return 0;
@@ -191,7 +238,8 @@ export const organizeApiService = {
       const fileName = path.split(/[\\/]/).pop() ?? `file-${index + 1}`;
       const fileResult = resultMap[path];
       const topScores = parseScoreEntries(fileResult?.score);
-      const fallbackScores = topScores.length > 0 ? topScores : buildFallbackScores(categoryCatalog);
+      const alignedScores = alignScoresToManagedCategories(topScores, categoryCatalog);
+      const fallbackScores = alignedScores.length > 0 ? alignedScores : buildFallbackScores(categoryCatalog);
       const selectedCategory = fallbackScores[0]?.name ?? "Uncategorized";
       const destinationFolder = categoryPathMap.get(selectedCategory) ?? categoryCatalog[0]?.folderPath ?? "";
       const suggestedNames = parseSuggestedNames(fileResult?.new_name);
