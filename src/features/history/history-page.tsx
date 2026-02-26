@@ -88,7 +88,7 @@ export function HistoryPage() {
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="w-[40%]">File Name</TableHead>
+                <TableHead className="w-[40%]">Item Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>AI Classification</TableHead>
               <TableHead>Status</TableHead>

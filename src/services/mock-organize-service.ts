@@ -64,21 +64,32 @@ export class MockOrganizePreviewFactory {
       },
     ];
 
-    return mockFiles.map((file) => {
+    return this.fromPaths(
+      mockFiles.map((file) => file.currentPath),
+      categoryCatalog,
+    );
+  }
+
+  static fromPaths(paths: string[], categoryCatalog: ManagedCategory[]): OrganizePreviewItem[] {
+    const enabledCategories = categoryCatalog.filter((category) => category.enabled);
+    const categoryNames = enabledCategories.map((category) => category.name);
+
+    return paths.map((currentPath, index) => {
+      const fileName = currentPath.split(/[\\/]/).pop() ?? `file-${index + 1}`;
       const topScores = buildTopScores(categoryNames.length ? categoryNames : ["Documents"]);
       const selectedCategory = topScores[0]?.name ?? "Documents";
       const matchedCategory = enabledCategories.find((category) => category.name === selectedCategory);
       const destinationRoot = matchedCategory?.folderPath ?? "/Users/sarun/Pictures/Documents";
 
       return {
-        id: file.id,
-        fileName: file.fileName,
-        currentPath: file.currentPath,
+        id: crypto.randomUUID(),
+        fileName,
+        currentPath,
         confidence: topScores[0]?.score ?? 0,
         selectedCategory,
         topScores,
         suggestedName: null,
-        destinationPath: `${destinationRoot}/${file.fileName}`,
+        destinationPath: `${destinationRoot}/${fileName}`,
       };
     });
   }

@@ -40,6 +40,7 @@ pub fn run() {
             commands::watch_folder,
             commands::move_file,
             commands::read_folder,
+            commands::pick_files_for_organize,
             commands::delete_file,
             commands::get_downloads_folder,
             commands::write_log,

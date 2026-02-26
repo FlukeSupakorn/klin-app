@@ -25,6 +25,16 @@ pub fn read_folder(input: ReadFolderDto) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub fn pick_files_for_organize() -> Result<Vec<String>, String> {
+    let selected = rfd::FileDialog::new().pick_files();
+    Ok(selected
+        .unwrap_or_default()
+        .into_iter()
+        .map(|path| path.to_string_lossy().to_string())
+        .collect())
+}
+
+#[tauri::command]
 pub fn delete_file(file_path: String) -> Result<(), String> {
     FileService::delete_file(file_path)
 }

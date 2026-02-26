@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { ArrowUpRight, BookOpenText, Star, Zap, Tags, GitBranch, History, ChevronRight, BarChart3, Clock, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { useCategoryStore } from "@/stores/use-category-store";
 import { useLogStore } from "@/stores/use-log-store";
@@ -33,6 +33,8 @@ export function DashboardPage() {
           </h2>
           <p className="text-muted-foreground mt-1">Real-time status of your AI-driven file organization.</p>
         </div>
+
+        <OrganizeFilesPanel />
 
         <div className="grid gap-6 md:grid-cols-2">
           <Link to="/settings">
