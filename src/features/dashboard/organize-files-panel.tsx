@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { FolderOpen, Sparkles, Upload } from "lucide-react";
+import { FileDropOverlay } from "@/features/dashboard/file-drop-overlay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +23,8 @@ export function OrganizeFilesPanel() {
   const [openSuggestionFor, setOpenSuggestionFor] = useState<string | null>(null);
   const [movedItemIds, setMovedItemIds] = useState<string[]>([]);
   const [openSettingsWindow, setOpenSettingsWindow] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const lastNativeDropAtRef = useRef(0);
 
   const openWithPaths = async (paths: string[]) => {
     if (paths.length === 0) {
@@ -44,6 +49,129 @@ export function OrganizeFilesPanel() {
     setModalOpen(true);
   };
 
+  useEffect(() => {
+    const appWindow = getCurrentWebviewWindow();
+    let unlistenNative: (() => void) | undefined;
+    let unlistenLegacyDrop: (() => void) | undefined;
+    let unlistenLegacyHover: (() => void) | undefined;
+    let unlistenLegacyCancelled: (() => void) | undefined;
+
+    const registerError = (label: string, error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[drag-drop] ${label}: ${message}`);
+    };
+
+    void appWindow
+      .onDragDropEvent((event) => {
+        if (event.payload.type === "over" || event.payload.type === "enter") {
+          setIsDraggingOver(true);
+          return;
+        }
+
+        if (event.payload.type === "leave") {
+          setIsDraggingOver(false);
+          return;
+        }
+
+        if (event.payload.type === "drop") {
+          setIsDraggingOver(false);
+          lastNativeDropAtRef.current = Date.now();
+          const paths = event.payload.paths;
+          if (paths && paths.length > 0) {
+            void openWithPaths(paths);
+          }
+        }
+      })
+      .then((fn) => {
+        unlistenNative = fn;
+      })
+      .catch((error) => {
+        registerError("onDragDropEvent", error);
+      });
+
+    void listen<string[]>("tauri://file-drop", (event) => {
+      const paths = Array.isArray(event.payload) ? event.payload : [];
+      setIsDraggingOver(false);
+      lastNativeDropAtRef.current = Date.now();
+      if (paths.length > 0) {
+        void openWithPaths(paths);
+      }
+    })
+      .then((fn) => {
+        unlistenLegacyDrop = fn;
+      })
+      .catch((error) => {
+        registerError("listen(tauri://file-drop)", error);
+      });
+
+    void listen("tauri://file-drop-hover", () => {
+      setIsDraggingOver(true);
+    })
+      .then((fn) => {
+        unlistenLegacyHover = fn;
+      })
+      .catch((error) => {
+        registerError("listen(tauri://file-drop-hover)", error);
+      });
+
+    void listen("tauri://file-drop-cancelled", () => {
+      setIsDraggingOver(false);
+    })
+      .then((fn) => {
+        unlistenLegacyCancelled = fn;
+      })
+      .catch((error) => {
+        registerError("listen(tauri://file-drop-cancelled)", error);
+      });
+
+    const onWindowDragEnter = (event: DragEvent) => {
+      const hasFiles = event.dataTransfer?.types.includes("Files");
+      if (!hasFiles) {
+        return;
+      }
+
+      event.preventDefault();
+      setIsDraggingOver(true);
+    };
+
+    const onWindowDragOver = (event: DragEvent) => {
+      const hasFiles = event.dataTransfer?.types.includes("Files");
+      if (!hasFiles) {
+        return;
+      }
+
+      event.preventDefault();
+      setIsDraggingOver(true);
+    };
+
+    const onWindowDragLeave = (event: DragEvent) => {
+      event.preventDefault();
+      setIsDraggingOver(false);
+    };
+
+    const onWindowDrop = (event: DragEvent) => {
+      event.preventDefault();
+      setIsDraggingOver(false);
+    };
+
+    window.addEventListener("dragenter", onWindowDragEnter);
+    window.addEventListener("dragover", onWindowDragOver);
+    window.addEventListener("dragleave", onWindowDragLeave);
+    window.addEventListener("drop", onWindowDrop);
+
+    return () => {
+      unlistenNative?.();
+      unlistenLegacyDrop?.();
+      unlistenLegacyHover?.();
+      unlistenLegacyCancelled?.();
+      window.removeEventListener("dragenter", onWindowDragEnter);
+      window.removeEventListener("dragover", onWindowDragOver);
+      window.removeEventListener("dragleave", onWindowDragLeave);
+      window.removeEventListener("drop", onWindowDrop);
+    };
+
+  }, []);
+
   const handleAddFiles = async () => {
     const selected = await tauriClient.pickFilesForOrganize();
     await openWithPaths(selected);
@@ -51,10 +179,22 @@ export function OrganizeFilesPanel() {
 
   const handleDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
     event.preventDefault();
-    const dropped = Array.from(event.dataTransfer.files).map((file) => {
+    if (Date.now() - lastNativeDropAtRef.current < 300) {
+      return;
+    }
+
+    const dropped = Array.from(event.dataTransfer.files)
+      .map((file) => {
       const fileWithPath = file as File & { path?: string };
-      return fileWithPath.path ?? `Dropped/${file.name}`;
-    });
+      return fileWithPath.path;
+      })
+      .filter((value): value is string => Boolean(value));
+
+    if (dropped.length === 0) {
+      setErrorMessage("Could not read dropped file paths. Try dropping directly into the app window or use Add Files.");
+      return;
+    }
+
     void openWithPaths(dropped);
   };
 
@@ -149,6 +289,8 @@ export function OrganizeFilesPanel() {
 
   return (
     <>
+      <FileDropOverlay visible={isDraggingOver} />
+
       <Card className="border-0 bg-muted/30 shadow-none">
         <CardContent className="p-0">
           <div
