@@ -60,17 +60,20 @@ export function OrganizeFilesPanel() {
   return (
     <>
       <Card className="border-0 bg-muted/30 shadow-none">
-        <CardHeader>
-          <CardTitle>Organize Files In Program</CardTitle>
-          <CardDescription>
-            Add files from your computer or drag files into this area to prepare organization with mocked AI recommendations.
-          </CardDescription>
-        </CardHeader>
         <CardContent>
           <div
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
-            className="rounded-2xl border border-dashed border-border bg-muted/30 p-14 text-center"
+            onClick={() => void handleAddFiles()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                void handleAddFiles();
+              }
+            }}
+            className="cursor-pointer rounded-2xl border border-dashed border-border bg-muted/30 p-14 text-center"
           >
             <div className="mb-3 flex justify-center gap-2 text-muted-foreground">
               <FolderOpen className="h-8 w-8" />
@@ -78,11 +81,6 @@ export function OrganizeFilesPanel() {
             </div>
             <p className="text-2xl font-semibold">Add Files to Get Started</p>
             <p className="mt-2 text-sm text-muted-foreground">Drag or click to add files</p>
-            <div className="mt-5 flex items-center justify-center gap-2">
-              <Button size="sm" onClick={() => void handleAddFiles()}>Add Files</Button>
-              <Button size="sm" variant="outline">Manage Categories</Button>
-              <Button size="sm" variant="outline">Quick Actions</Button>
-            </div>
           </div>
         </CardContent>
       </Card>
