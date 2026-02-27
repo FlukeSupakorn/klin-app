@@ -22,6 +22,10 @@ class TauriCommandClient implements TauriClient {
     return invoke("pick_files_for_organize");
   }
 
+  pickFolderForOrganize(): Promise<string | null> {
+    return invoke("pick_folder_for_organize");
+  }
+
   deleteFile(filePath: string): Promise<void> {
     return invoke("delete_file", { filePath });
   }

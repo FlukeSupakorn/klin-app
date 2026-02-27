@@ -35,6 +35,12 @@ pub fn pick_files_for_organize() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub fn pick_folder_for_organize() -> Result<Option<String>, String> {
+    let selected = rfd::FileDialog::new().pick_folder();
+    Ok(selected.map(|path| path.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
 pub fn delete_file(file_path: String) -> Result<(), String> {
     FileService::delete_file(file_path)
 }

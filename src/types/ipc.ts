@@ -25,6 +25,7 @@ export interface TauriClient {
   moveFile(input: MoveFileDto): Promise<void>;
   readFolder(input: ReadFolderDto): Promise<string[]>;
   pickFilesForOrganize(): Promise<string[]>;
+  pickFolderForOrganize(): Promise<string | null>;
   deleteFile(filePath: string): Promise<void>;
   watchFolder(input: WatchFolderDto): Promise<void>;
   getDownloadsFolder(): Promise<string>;
