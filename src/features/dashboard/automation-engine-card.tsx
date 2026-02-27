@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { theme } from "@/theme/theme";
 
 interface AutomationEngineCardProps {
   isRunning: boolean;
@@ -23,7 +24,9 @@ export function AutomationEngineCard({
             <div
               className={cn(
                 "flex h-14 w-14 items-center justify-center rounded-2xl",
-                isRunning ? "animate-pulse bg-green-500/10 text-green-600" : "bg-muted text-muted-foreground",
+                isRunning
+                  ? cn("animate-pulse", theme.status.successSurface, theme.status.successMutedText)
+                  : "bg-muted text-muted-foreground",
               )}
             >
               <Zap className={cn("h-7 w-7", isRunning && "fill-current")} />
@@ -48,7 +51,7 @@ export function AutomationEngineCard({
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-1000",
-                isRunning ? "w-full bg-green-500" : "w-0 bg-muted-foreground/30",
+                isRunning ? cn("w-full", theme.status.successText) : "w-0 bg-muted-foreground/30",
               )}
             />
           </div>

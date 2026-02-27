@@ -1,26 +1,18 @@
 import {
-  CalendarDays,
   ChevronDown,
   ChevronUp,
   Clock,
-  FileText,
-  FolderSync,
   Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { HistoryEntry, HistoryEntryType } from "@/features/history/history-types";
+import { theme } from "@/theme/theme";
+import type { HistoryEntry } from "@/features/history/history-types";
 import { HistoryCalendarDetails } from "@/features/history/history-calendar-details";
 import { HistoryOrganizeDetails } from "@/features/history/history-organize-details";
 import { HistorySummaryDetails } from "@/features/history/history-summary-details";
 import { formatTime, getFolderTail } from "@/features/history/history-utils";
-
-const ACTION_ICON: Record<HistoryEntryType, React.ComponentType<{ className?: string }>> = {
-  organize: FolderSync,
-  summary: FileText,
-  calendar: CalendarDays,
-};
 
 interface HistoryEntryCardProps {
   entry: HistoryEntry;
@@ -45,7 +37,8 @@ export function HistoryEntryCard({
   onUseScoreFolder,
   onOpenSummary,
 }: HistoryEntryCardProps) {
-  const Icon = ACTION_ICON[entry.type];
+  const actionTheme = theme.actions[entry.type];
+  const Icon = actionTheme.icon;
   const organizeEntry = entry.type === "organize" ? entry : null;
   const calendarEntry = entry.type === "calendar" ? entry : null;
   const isRenamed = organizeEntry ? organizeEntry.oldName !== organizeEntry.newName : false;
@@ -64,17 +57,18 @@ export function HistoryEntryCard({
       : entry.subtitle);
 
   return (
-    <Card className={cn("overflow-hidden transition-colors", isExpanded && "bg-muted/20")}>
+    <Card className={cn("relative overflow-hidden transition-colors", isExpanded && "bg-muted/20")}>
+      <span className={cn("pointer-events-none absolute bottom-0 left-0 top-0 w-1", actionTheme.accent)} />
       <button type="button" onClick={onToggleExpand} className="w-full text-left">
         <CardHeader className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="rounded-lg border border-border/60 bg-muted/30 p-2">
-                <Icon className="h-4 w-4" />
+              <div className={cn("rounded-lg border p-2", actionTheme.iconWrap)}>
+                <Icon className={cn("h-4 w-4", actionTheme.iconColor)} />
               </div>
               <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="uppercase">{entry.type}</Badge>
+                  <Badge variant="outline" className={cn("uppercase", actionTheme.badge)}>{entry.type}</Badge>
                   {entry.type === "organize" && (
                     <Badge variant="secondary" className="gap-1">
                       <Sparkles className="h-3 w-3" />

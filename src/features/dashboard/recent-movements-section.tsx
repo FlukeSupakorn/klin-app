@@ -1,20 +1,15 @@
-import { CalendarDays, ChevronRight, Clock, FileText, FolderSync } from "lucide-react";
+import { ChevronRight, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import type { HistoryEntry, HistoryEntryType } from "@/features/history/history-types";
+import { cn } from "@/lib/utils";
+import { theme } from "@/theme/theme";
+import type { HistoryEntry } from "@/features/history/history-types";
 import { formatTime, getFolderTail, getPathTail } from "@/features/history/history-utils";
 
 interface RecentMovementsSectionProps {
   recentEntries: HistoryEntry[];
   onOpenEntry: (entryId: string) => void;
 }
-
-const ACTION_ICON: Record<HistoryEntryType, React.ComponentType<{ className?: string }>> = {
-  organize: FolderSync,
-  summary: FileText,
-  calendar: CalendarDays,
-};
 
 export function RecentMovementsSection({ recentEntries, onOpenEntry }: RecentMovementsSectionProps) {
   const getEntryTitle = (entry: HistoryEntry): string => {
@@ -56,20 +51,19 @@ export function RecentMovementsSection({ recentEntries, onOpenEntry }: RecentMov
           </div>
         ) : (
           recentEntries.map((entry) => {
-            const Icon = ACTION_ICON[entry.type];
+            const actionTheme = theme.actions[entry.type];
+            const Icon = actionTheme.icon;
 
             return (
-            <Card key={entry.id} className="overflow-hidden border bg-muted/30 shadow-none transition-colors hover:bg-muted/40">
+            <Card key={entry.id} className="relative overflow-hidden border bg-muted/30 shadow-none transition-colors hover:bg-muted/40">
+              <span className={cn("pointer-events-none absolute bottom-0 left-0 top-0 w-1", actionTheme.accent)} />
               <button type="button" onClick={() => onOpenEntry(entry.id)} className="w-full text-left">
                 <CardContent className="p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="h-5 px-1.5 py-0 text-[10px] uppercase">
-                        {entry.type}
-                      </Badge>
-                      <span className="rounded-md border border-border/60 bg-background p-1.5">
-                        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className={cn("rounded-md border p-1.5", actionTheme.iconWrap)}>
+                        <Icon className={cn("h-3.5 w-3.5", actionTheme.iconColor)} />
                       </span>
                       <p className="max-w-[360px] truncate text-sm font-semibold" title={getEntryTitle(entry)}>
                         {getEntryTitle(entry)}
@@ -86,7 +80,7 @@ export function RecentMovementsSection({ recentEntries, onOpenEntry }: RecentMov
                         {formatTime(entry.timestamp)}
                       </span>
                       {entry.type === "organize" && (
-                        <span className="font-semibold text-primary">
+                        <span className={cn("font-semibold", actionTheme.emphasis)}>
                           {Math.round((entry.scores[0]?.score ?? 0) * 100)}%
                         </span>
                       )}

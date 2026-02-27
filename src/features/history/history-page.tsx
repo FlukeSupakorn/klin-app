@@ -4,6 +4,8 @@ import { History, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { theme } from "@/theme/theme";
 import type { HistoryEntry, HistoryEntryType } from "@/features/history/history-types";
 import { tauriClient } from "@/services/tauri-client";
 import { historyApiService } from "@/services/history-api-service";
@@ -187,8 +189,15 @@ export function HistoryPage() {
             {TYPE_FILTERS.map((filter) => (
               <Button
                 key={filter.value}
-                variant={typeFilter === filter.value ? "default" : "outline"}
+                variant="outline"
                 size="sm"
+                className={cn(
+                  filter.value === "all"
+                    ? (typeFilter === "all" ? "bg-foreground text-background hover:bg-foreground/90" : "")
+                    : typeFilter === filter.value
+                      ? theme.actions[filter.value].filterSelected
+                      : theme.actions[filter.value].filterIdle,
+                )}
                 onClick={() => setTypeFilter(filter.value)}
               >
                 {filter.label}

@@ -9,6 +9,7 @@ import { processAutomationJob } from "@/services/automation-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { cn } from "@/lib/utils";
+import { theme } from "@/theme/theme";
 
 export function AutomationPage() {
   const [newFolderPath, setNewFolderPath] = useState("");
@@ -58,7 +59,7 @@ export function AutomationPage() {
           <p className="text-muted-foreground">Configure background monitoring and file processing.</p>
         </div>
         <Card className="flex items-center gap-3 px-4 py-2 shadow-none">
-          <Zap className={cn("h-4 w-4", isRunning ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground")} />
+          <Zap className={cn("h-4 w-4", isRunning ? cn(theme.status.warningMutedText, "fill-current") : "text-muted-foreground")} />
           <div>
             <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Engine Status</p>
             <p className="text-lg font-semibold">{isRunning ? "Active" : "Idle"}</p>
@@ -74,7 +75,7 @@ export function AutomationPage() {
                 <CardTitle>Engine Control</CardTitle>
                 <CardDescription>Manage the background automation process.</CardDescription>
               </div>
-              <Badge variant={isRunning ? "default" : "outline"} className={cn(isRunning ? "bg-green-500 hover:bg-green-600" : "")}>
+              <Badge variant={isRunning ? "default" : "outline"} className={cn(isRunning ? theme.status.successBadge : "")}> 
                 {isRunning ? "Running" : "Stopped"}
               </Badge>
             </div>

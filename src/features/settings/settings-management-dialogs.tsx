@@ -8,6 +8,7 @@ import { categoryManagementService } from "@/services/category-management-servic
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useAutomationStore } from "@/stores/use-automation-store";
+import { theme } from "@/theme/theme";
 import type { ManagedCategory } from "@/types/domain";
 
 export type SettingsDialogSection = "default-folder" | "watched-folders" | "categories";
@@ -298,7 +299,7 @@ export function SettingsManagementDialogs({
                           <FolderOpen className="h-3 w-3" /> {category.folderPath}
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className={`h-2 w-2 rounded-full ${category.aiLearned ? "bg-emerald-500" : "bg-amber-400"}`} />
+                          <span className={`h-2 w-2 rounded-full ${category.aiLearned ? theme.status.aiLearnedDot : theme.status.warningDot}`} />
                           <span className="text-[11px]">{category.aiLearned ? "AI understood" : "AI learning"}</span>
                         </div>
                       </div>
@@ -344,9 +345,9 @@ export function SettingsManagementDialogs({
               </div>
               <div className="flex items-center gap-3 rounded-lg bg-muted/40 p-3 text-sm">
                 {formState.aiLearned ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <CheckCircle2 className={`h-4 w-4 ${theme.status.successMutedText}`} />
                 ) : (
-                  <FolderSearch className="h-4 w-4 text-amber-500" />
+                  <FolderSearch className={`h-4 w-4 ${theme.status.warningText}`} />
                 )}
                 {formState.aiLearned
                   ? "AI already understands this category."

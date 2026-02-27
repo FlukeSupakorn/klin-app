@@ -1,3 +1,5 @@
+import { theme } from "@/theme/theme";
+
 export interface NormalizedCalendarEvent {
   id: string;
   title: string;
@@ -73,7 +75,7 @@ export class CalendarApiError extends Error {
   }
 }
 
-const DEFAULT_EVENT_COLOR = "#3B82F6";
+const DEFAULT_EVENT_COLOR = theme.calendar.defaultEventColor;
 
 function getMonthBounds(month: Date) {
   const start = new Date(month.getFullYear(), month.getMonth(), 1, 0, 0, 0, 0);

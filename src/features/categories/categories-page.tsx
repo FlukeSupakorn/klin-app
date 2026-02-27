@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useCategoryStore } from "@/stores/use-category-store";
 import { cn } from "@/lib/utils";
+import { theme } from "@/theme/theme";
 
 export function CategoriesPage() {
   const [name, setName] = useState("");
@@ -22,7 +23,7 @@ export function CategoriesPage() {
         </div>
         <div className="flex gap-4">
           <Card className="flex items-center gap-3 px-4 py-2 shadow-none">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <CheckCircle2 className={cn("h-4 w-4", theme.status.successText)} />
             <div>
               <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Active</p>
               <p className="text-lg font-semibold">{activeCount}</p>
@@ -81,7 +82,10 @@ export function CategoriesPage() {
                     )}
                     <Badge 
                       variant={category.active ? "default" : "outline"}
-                      className={cn("text-[10px] uppercase font-bold", category.active ? "bg-green-500/10 text-green-600 border-green-500/20" : "")}
+                      className={cn(
+                        "text-[10px] uppercase font-bold",
+                        category.active ? cn(theme.status.successSurface, theme.status.successMutedText, theme.status.successBorder) : "",
+                      )}
                     >
                       {category.active ? "Active" : "Inactive"}
                     </Badge>
