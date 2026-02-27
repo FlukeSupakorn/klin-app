@@ -42,6 +42,12 @@ function formatTime(value: string) {
   });
 }
 
+function getPathTail(value: string) {
+  const normalized = value.replace(/\\/g, "/");
+  const parts = normalized.split("/").filter(Boolean);
+  return parts[parts.length - 1] ?? value;
+}
+
 function OrganizeDetails({
   entry,
   isShowAllScores,
@@ -52,6 +58,8 @@ function OrganizeDetails({
   onToggleScores: () => void;
 }) {
   const visibleScores = isShowAllScores ? entry.scores : entry.scores.slice(0, 3);
+  const isRenamed = entry.oldName !== entry.newName;
+  const isMoved = entry.fromPath !== entry.toPath;
 
   return (
     <div className="space-y-4">
@@ -68,7 +76,7 @@ function OrganizeDetails({
 
       <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
         <p className="text-xs text-muted-foreground">Rename</p>
-        <p className="font-medium">{entry.oldName} → {entry.newName}</p>
+        <p className="font-medium">{isRenamed ? `${entry.oldName} → ${entry.newName}` : "No rename"}</p>
       </div>
 
       <div className="rounded-xl border border-border/60 bg-background p-4">
@@ -131,7 +139,30 @@ function CalendarDetails({
   entry: Extract<HistoryEntry, { type: "calendar" }>;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
+          <p className="text-xs text-muted-foreground">Source File</p>
+          <p className="font-medium">{entry.sourceFileName}</p>
+        </div>
+        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
+          <p className="text-xs text-muted-foreground">Meeting Title</p>
+          <p className="font-medium">{entry.meetingTitle}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
+          <p className="text-xs text-muted-foreground">Meeting Time</p>
+          <p className="font-medium">{entry.meetingTime}</p>
+        </div>
+        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
+          <p className="text-xs text-muted-foreground">Meeting Location</p>
+          <p className="font-medium">{entry.meetingLocation}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
       <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
         <p className="text-xs text-muted-foreground">Found in File</p>
         <p className="font-medium">{entry.foundInFile ? "Yes" : "No"}</p>
@@ -139,6 +170,12 @@ function CalendarDetails({
       <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
         <p className="text-xs text-muted-foreground">Action</p>
         <p className="font-medium">{entry.actionLabel}</p>
+      </div>
+      </div>
+
+      <div className="rounded-xl border border-border/60 bg-background p-3 text-sm">
+        <p className="text-xs text-muted-foreground">Details</p>
+        <p className="font-medium">{entry.details}</p>
       </div>
     </div>
   );
@@ -153,6 +190,10 @@ export function HistoryPage() {
 
   const filteredRows = useMemo(() => {
     return mockHistoryEntries.filter((entry) => {
+      if (entry.type === "calendar" && !entry.foundInFile) {
+        return false;
+      }
+
       const byType = typeFilter === "all" || entry.type === typeFilter;
       const bySearch =
         search.length === 0 ||
@@ -170,11 +211,7 @@ export function HistoryPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-4xl font-semibold tracking-tight">History</h2>
-          <p className="text-muted-foreground">Mock timeline for organize, summary, and calendar actions.</p>
-        </div>
+      <div className="flex items-center justify-end">
         <Card className="flex items-center gap-3 px-4 py-2 shadow-none">
           <History className="h-4 w-4 text-primary" />
           <div>
@@ -232,6 +269,20 @@ export function HistoryPage() {
           filteredRows.map((entry) => {
             const isExpanded = expandedId === entry.id;
             const Icon = ACTION_ICON[entry.type];
+            const organizeEntry = entry.type === "organize" ? entry : null;
+            const calendarEntry = entry.type === "calendar" ? entry : null;
+            const isRenamed = organizeEntry ? organizeEntry.oldName !== organizeEntry.newName : false;
+            const isMoved = organizeEntry ? organizeEntry.fromPath !== organizeEntry.toPath : false;
+            const displayTitle = organizeEntry
+              ? (isRenamed ? `${organizeEntry.oldName} → ${organizeEntry.newName}` : organizeEntry.oldName)
+              : (calendarEntry ? calendarEntry.meetingTitle : entry.title);
+            const displaySubtitle = organizeEntry
+              ? (isMoved
+                ? `Move: ${getPathTail(organizeEntry.fromPath)} → ${getPathTail(organizeEntry.toPath)}`
+                : "No move")
+              : (calendarEntry
+                ? `From: ${calendarEntry.sourceFileName} · Meet: ${calendarEntry.meetingTime}`
+                : entry.subtitle);
 
             return (
               <Card key={entry.id} className={cn("overflow-hidden transition-colors", isExpanded && "bg-muted/20")}>
@@ -256,8 +307,8 @@ export function HistoryPage() {
                               </Badge>
                             )}
                           </div>
-                          <CardTitle className="truncate text-lg" title={entry.title}>{entry.title}</CardTitle>
-                          <p className="truncate text-sm text-muted-foreground" title={entry.subtitle}>{entry.subtitle}</p>
+                          <CardTitle className="truncate text-lg" title={displayTitle}>{displayTitle}</CardTitle>
+                          <p className="truncate text-sm text-muted-foreground" title={displaySubtitle}>{displaySubtitle}</p>
                         </div>
                       </div>
 

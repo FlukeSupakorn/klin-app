@@ -31,6 +31,11 @@ export interface SummaryHistoryEntry extends HistoryEntryBase {
 export interface CalendarHistoryEntry extends HistoryEntryBase {
   type: "calendar";
   foundInFile: boolean;
+  sourceFileName: string;
+  meetingTitle: string;
+  meetingTime: string;
+  meetingLocation: string;
+  details: string;
   actionLabel: string;
 }
 
@@ -71,10 +76,15 @@ export const MOCK_HISTORY_ENTRIES: HistoryEntry[] = [
   {
     id: "h-003",
     type: "calendar",
-    title: "Calendar intent detected from meeting notes",
-    subtitle: "Event candidate was extracted from file content",
+    title: "Product Roadmap Sync",
+    subtitle: "From notes.txt · Mar 1, 10:30 AM",
     timestamp: "2026-02-27T07:12:00.000Z",
     foundInFile: true,
+    sourceFileName: "notes.txt",
+    meetingTitle: "Product Roadmap Sync",
+    meetingTime: "Mar 1, 2026 · 10:30 AM",
+    meetingLocation: "Google Meet",
+    details: "Detected from meeting notes with agenda and attendees.",
     actionLabel: "Detected schedule details for follow-up meeting",
   },
   {
@@ -95,13 +105,38 @@ export const MOCK_HISTORY_ENTRIES: HistoryEntry[] = [
     ],
   },
   {
-    id: "h-005",
-    type: "calendar",
-    title: "Calendar scan completed",
-    subtitle: "No schedule details found in scanned document",
-    timestamp: "2026-02-26T19:30:00.000Z",
-    foundInFile: false,
-    actionLabel: "No calendar action generated",
+    id: "h-006",
+    type: "organize",
+    title: "team_minutes_march.docx",
+    subtitle: "Moved without rename",
+    timestamp: "2026-02-26T18:20:00.000Z",
+    fromPath: "C:/Users/supak/Downloads/team_minutes_march.docx",
+    toPath: "C:/Users/supak/Documents/KLIN/Meetings/team_minutes_march.docx",
+    oldName: "team_minutes_march.docx",
+    newName: "team_minutes_march.docx",
+    scores: [
+      { name: "Meetings", score: 0.89 },
+      { name: "Reports", score: 0.64 },
+      { name: "Operations", score: 0.47 },
+      { name: "Finance", score: 0.14 },
+    ],
+  },
+  {
+    id: "h-007",
+    type: "organize",
+    title: "product_brief_v2.pdf",
+    subtitle: "No move and no rename",
+    timestamp: "2026-02-26T17:05:00.000Z",
+    fromPath: "C:/Users/supak/Documents/KLIN/Product/product_brief_v2.pdf",
+    toPath: "C:/Users/supak/Documents/KLIN/Product/product_brief_v2.pdf",
+    oldName: "product_brief_v2.pdf",
+    newName: "product_brief_v2.pdf",
+    scores: [
+      { name: "Product", score: 0.78 },
+      { name: "Reports", score: 0.53 },
+      { name: "Marketing", score: 0.42 },
+      { name: "Meetings", score: 0.19 },
+    ],
   },
 ];
 

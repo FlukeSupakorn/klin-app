@@ -33,11 +33,6 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <div>
-        <h2 className="text-3xl font-semibold tracking-tight">Settings</h2>
-        <p className="text-muted-foreground">Manage app settings.</p>
-      </div>
-
       <Card className="border-0 bg-muted/40 shadow-none">
         <CardHeader>
           <CardTitle className="text-lg">Manage Settings</CardTitle>
