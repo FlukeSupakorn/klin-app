@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { History, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +18,7 @@ const TYPE_FILTERS: Array<{ label: string; value: "all" | HistoryEntryType }> = 
 ];
 
 export function HistoryPage() {
+  const location = useLocation();
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -26,6 +28,11 @@ export function HistoryPage() {
   const [scoreExpandedIds, setScoreExpandedIds] = useState<string[]>([]);
   const [selectedScoreByEntryId, setSelectedScoreByEntryId] = useState<Record<string, string>>({});
   const [openedSummaryPath, setOpenedSummaryPath] = useState<string | null>(null);
+
+  const expandedEntryIdFromNavState =
+    location.state && typeof location.state === "object" && "expandedEntryId" in location.state
+      ? String((location.state as { expandedEntryId?: string }).expandedEntryId ?? "")
+      : "";
 
   useEffect(() => {
     let isMounted = true;
@@ -60,6 +67,21 @@ export function HistoryPage() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!expandedEntryIdFromNavState) {
+      return;
+    }
+
+    const targetExists = historyEntries.some((entry) => entry.id === expandedEntryIdFromNavState);
+    if (!targetExists) {
+      return;
+    }
+
+    setTypeFilter("all");
+    setSearch("");
+    setExpandedId(expandedEntryIdFromNavState);
+  }, [expandedEntryIdFromNavState, historyEntries]);
 
   const appendDestinationChangeHistory = (
     previous: Extract<HistoryEntry, { type: "organize" }>,

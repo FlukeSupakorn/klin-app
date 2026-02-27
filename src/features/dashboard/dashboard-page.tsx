@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
 import { ActiveCategoriesCard } from "@/features/dashboard/active-categories-card";
 import { AutomationEngineCard } from "@/features/dashboard/automation-engine-card";
@@ -8,6 +9,8 @@ import { QuickNotesCard } from "@/features/dashboard/quick-notes-card";
 import { CategoryDistributionCard } from "@/features/dashboard/category-distribution-card";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { CalendarEventModal } from "@/features/calendar/event-modal";
+import type { HistoryEntry } from "@/features/history/history-types";
+import { historyApiService } from "@/services/history-api-service";
 import { useCalendarStore } from "@/features/calendar/use-calendar-store";
 import { useAuthStore } from "@/features/auth/use-auth-store";
 import { useAutomationStore } from "@/stores/use-automation-store";
@@ -16,6 +19,7 @@ import { useCategoryStore } from "@/stores/use-category-store";
 import { useLogStore } from "@/stores/use-log-store";
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const logs = useLogStore((state) => state.logs);
   const categories = useCategoryStore((state) => state.categories);
   const managedCategories = useCategoryManagementStore((state) => state.categories);
@@ -34,8 +38,8 @@ export function DashboardPage() {
   const calendarError = useCalendarStore((state) => state.error);
   const authToken = useAuthStore((state) => state.accessToken);
   const [openCategoryManager, setOpenCategoryManager] = useState(false);
+  const [recentHistoryEntries, setRecentHistoryEntries] = useState<HistoryEntry[]>([]);
 
-  const recentLogs = [...logs].reverse().slice(0, 5);
   const activeManagedCategories = managedCategories.filter((category) => category.enabled);
   const isGoogleConnected = Boolean(authToken);
 
@@ -47,6 +51,21 @@ export function DashboardPage() {
     void loadVisibleMonth(visibleMonth);
   }, [isGoogleConnected, loadVisibleMonth, visibleMonth]);
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const historyRows = await historyApiService.list();
+        const rows = historyRows
+          .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
+          .slice(0, 5);
+
+        setRecentHistoryEntries(rows);
+      } catch {
+        setRecentHistoryEntries([]);
+      }
+    })();
+  }, []);
+
   const openDateWithEvents = (date: Date, _eventCount: number) => {
     setSelectedDate(date);
     openDateModal(date);
@@ -55,6 +74,10 @@ export function DashboardPage() {
       setVisibleMonth(date);
       void loadVisibleMonth(date);
     }
+  };
+
+  const handleOpenRecentHistoryEntry = (entryId: string) => {
+    navigate("/history", { state: { expandedEntryId: entryId } });
   };
 
   return (
@@ -74,7 +97,10 @@ export function DashboardPage() {
           lastScanTime={lastScanTime}
         />
 
-        <RecentMovementsSection recentLogs={recentLogs} />
+        <RecentMovementsSection
+          recentEntries={recentHistoryEntries}
+          onOpenEntry={handleOpenRecentHistoryEntry}
+        />
       </section>
 
       <section className="space-y-6">

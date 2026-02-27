@@ -63,7 +63,7 @@ export function CustomCalendarCard({
     <>
       <Card className="rounded-3xl border-0 bg-muted/40 shadow-none">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-center">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={onPrevMonth}>
                 Prev
