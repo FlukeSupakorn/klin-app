@@ -26,6 +26,10 @@ class TauriCommandClient implements TauriClient {
     return invoke("pick_folder_for_organize");
   }
 
+  openExternalUrl(url: string): Promise<void> {
+    return invoke("open_external_url", { url });
+  }
+
   deleteFile(filePath: string): Promise<void> {
     return invoke("delete_file", { filePath });
   }

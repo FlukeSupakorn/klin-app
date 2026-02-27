@@ -42,6 +42,7 @@ pub fn run() {
             commands::read_folder,
             commands::pick_files_for_organize,
             commands::pick_folder_for_organize,
+            commands::open_external_url,
             commands::delete_file,
             commands::get_downloads_folder,
             commands::write_log,

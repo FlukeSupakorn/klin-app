@@ -28,7 +28,7 @@ export function DashboardPage() {
   const setSelectedDate = useCalendarStore((state) => state.setSelectedDate);
   const openDateModal = useCalendarStore((state) => state.openDateModal);
   const loadVisibleMonth = useCalendarStore((state) => state.loadVisibleMonth);
-  const getEventCountForDate = useCalendarStore((state) => state.getEventCountForDate);
+  const getEventsForDate = useCalendarStore((state) => state.getEventsForDate);
   const isLoadingMonth = useCalendarStore((state) => state.isLoadingMonth);
   const isCalendarOffline = useCalendarStore((state) => state.isOffline);
   const calendarError = useCalendarStore((state) => state.error);
@@ -47,15 +47,14 @@ export function DashboardPage() {
     void loadVisibleMonth(visibleMonth);
   }, [isGoogleConnected, loadVisibleMonth, visibleMonth]);
 
-  const openDateWithEvents = (date: Date) => {
+  const openDateWithEvents = (date: Date, _eventCount: number) => {
     setSelectedDate(date);
-    void (async () => {
-      if (isGoogleConnected) {
-        setVisibleMonth(date);
-        await loadVisibleMonth(date);
-      }
-      openDateModal(date);
-    })();
+    openDateModal(date);
+
+    if (isGoogleConnected) {
+      setVisibleMonth(date);
+      void loadVisibleMonth(date);
+    }
   };
 
   return (
@@ -86,7 +85,7 @@ export function DashboardPage() {
           isLoadingMonth={isLoadingMonth}
           isCalendarOffline={isCalendarOffline}
           calendarError={calendarError}
-          getEventCountForDate={getEventCountForDate}
+          getEventsForDate={getEventsForDate}
           onPrevMonth={() => {
             const previousMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
             setVisibleMonth(previousMonth);

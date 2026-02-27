@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import type { NormalizedCalendarEvent } from "@/features/calendar/google-calendar-service";
 import { cn } from "@/lib/utils";
 
 interface CustomCalendarCardProps {
@@ -10,10 +11,10 @@ interface CustomCalendarCardProps {
   isLoadingMonth: boolean;
   isCalendarOffline: boolean;
   calendarError: string | null;
-  getEventCountForDate: (date: Date) => number;
+  getEventsForDate: (date: Date) => NormalizedCalendarEvent[];
   onPrevMonth: () => void;
   onNextMonth: () => void;
-  onSelectDate: (date: Date) => void;
+  onSelectDate: (date: Date, eventCount: number) => void;
 }
 
 export function CustomCalendarCard({
@@ -23,7 +24,7 @@ export function CustomCalendarCard({
   isLoadingMonth,
   isCalendarOffline,
   calendarError,
-  getEventCountForDate,
+  getEventsForDate,
   onPrevMonth,
   onNextMonth,
   onSelectDate,
@@ -92,13 +93,14 @@ export function CustomCalendarCard({
                 selectedDate?.getMonth() === date.getMonth() &&
                 selectedDate?.getDate() === date.getDate();
 
-              const eventCount = getEventCountForDate(date);
+              const dayEvents = getEventsForDate(date);
+              const eventCount = dayEvents.length;
 
               return (
                 <button
                   key={date.toISOString()}
                   type="button"
-                  onClick={() => onSelectDate(date)}
+                  onClick={() => onSelectDate(date, eventCount)}
                   className={cn(
                     "relative h-10 rounded-lg text-sm transition-colors",
                     inCurrentMonth
@@ -109,12 +111,15 @@ export function CustomCalendarCard({
                 >
                   <span>{date.getDate()}</span>
                   {eventCount > 0 && (
-                    <span
-                      className={cn(
-                        "pointer-events-none absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full",
-                        isSelected ? "bg-primary-foreground" : "bg-primary",
-                      )}
-                    />
+                    <span className="pointer-events-none absolute inset-x-1 bottom-1 flex flex-wrap items-center justify-center gap-0.5">
+                      {dayEvents.map((event) => (
+                        <span
+                          key={event.id}
+                          className="h-1 w-1 rounded-full"
+                          style={{ backgroundColor: event.color }}
+                        />
+                      ))}
+                    </span>
                   )}
                 </button>
               );

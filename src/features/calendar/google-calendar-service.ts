@@ -27,6 +27,19 @@ interface GoogleCalendarListResponse {
   nextPageToken?: string;
 }
 
+interface GoogleCalendarColorDefinition {
+  background?: string;
+}
+
+interface GoogleCalendarColorsResponse {
+  event?: Record<string, GoogleCalendarColorDefinition>;
+}
+
+interface GoogleCalendarListEntry {
+  colorId?: string;
+  backgroundColor?: string;
+}
+
 interface GoogleApiErrorItem {
   reason?: string;
   message?: string;
@@ -60,19 +73,7 @@ export class CalendarApiError extends Error {
   }
 }
 
-const EVENT_COLORS: Record<string, string> = {
-  "1": "#7986CB",
-  "2": "#33B679",
-  "3": "#8E24AA",
-  "4": "#E67C73",
-  "5": "#F6BF26",
-  "6": "#F4511E",
-  "7": "#039BE5",
-  "8": "#616161",
-  "9": "#3F51B5",
-  "10": "#0B8043",
-  "11": "#D50000",
-};
+const DEFAULT_EVENT_COLOR = "#3B82F6";
 
 function getMonthBounds(month: Date) {
   const start = new Date(month.getFullYear(), month.getMonth(), 1, 0, 0, 0, 0);
@@ -96,7 +97,11 @@ function parseEventDate(value: GoogleCalendarEventDateTime | undefined): { date:
   return null;
 }
 
-function normalizeEvent(item: GoogleCalendarEventItem): NormalizedCalendarEvent | null {
+function normalizeEvent(
+  item: GoogleCalendarEventItem,
+  eventColors: Record<string, string>,
+  fallbackColor: string,
+): NormalizedCalendarEvent | null {
   const startParsed = parseEventDate(item.start);
   const endParsed = parseEventDate(item.end);
 
@@ -120,7 +125,7 @@ function normalizeEvent(item: GoogleCalendarEventItem): NormalizedCalendarEvent 
     title: item.summary?.trim() || "Untitled event",
     start: startParsed.date,
     end: endDate,
-    color: EVENT_COLORS[item.colorId ?? ""] ?? "#3B82F6",
+    color: eventColors[item.colorId ?? ""] ?? fallbackColor,
     htmlLink: item.htmlLink,
     isAllDay,
   };
@@ -131,9 +136,66 @@ function overlapsRange(event: NormalizedCalendarEvent, rangeStart: Date, rangeEn
 }
 
 class GoogleCalendarService {
+  private async fetchEventColors(accessToken: string): Promise<Record<string, string>> {
+    const response = await fetch("https://www.googleapis.com/calendar/v3/colors", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (response.status === 401) {
+      throw new CalendarTokenExpiredError();
+    }
+
+    if (!response.ok) {
+      return {};
+    }
+
+    const colorsPayload = (await response.json()) as GoogleCalendarColorsResponse;
+    const colorMap = Object.entries(colorsPayload.event ?? {}).reduce<Record<string, string>>((acc, [id, definition]) => {
+      if (typeof definition?.background === "string" && definition.background.length > 0) {
+        acc[id] = definition.background;
+      }
+
+      return acc;
+    }, {});
+
+    return colorMap;
+  }
+
+  private async fetchPrimaryCalendarColor(accessToken: string, eventColors: Record<string, string>): Promise<string> {
+    const response = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList/primary?colorRgbFormat=true", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (response.status === 401) {
+      throw new CalendarTokenExpiredError();
+    }
+
+    if (!response.ok) {
+      return DEFAULT_EVENT_COLOR;
+    }
+
+    const payload = (await response.json()) as GoogleCalendarListEntry;
+
+    if (typeof payload.backgroundColor === "string" && payload.backgroundColor.length > 0) {
+      return payload.backgroundColor;
+    }
+
+    if (typeof payload.colorId === "string" && payload.colorId.length > 0) {
+      return eventColors[payload.colorId] ?? DEFAULT_EVENT_COLOR;
+    }
+
+    return DEFAULT_EVENT_COLOR;
+  }
+
   async fetchMonthEvents(accessToken: string, visibleMonth: Date): Promise<NormalizedCalendarEvent[]> {
     const { start, end } = getMonthBounds(visibleMonth);
     const events: NormalizedCalendarEvent[] = [];
+    const eventColors = await this.fetchEventColors(accessToken);
+    const fallbackColor = await this.fetchPrimaryCalendarColor(accessToken, eventColors);
 
     let pageToken: string | undefined;
 
@@ -177,7 +239,7 @@ class GoogleCalendarService {
 
       const data = (await response.json()) as GoogleCalendarListResponse;
       const normalized = (data.items ?? [])
-        .map(normalizeEvent)
+        .map((item) => normalizeEvent(item, eventColors, fallbackColor))
         .filter((item): item is NormalizedCalendarEvent => Boolean(item))
         .filter((item) => overlapsRange(item, start, end));
 

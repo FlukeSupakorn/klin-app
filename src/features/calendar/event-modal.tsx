@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { googleAuthService } from "@/features/auth/google-auth-service";
 import { useAuthStore } from "@/features/auth/use-auth-store";
 import { useCalendarStore } from "@/features/calendar/use-calendar-store";
+import { tauriClient } from "@/services/tauri-client";
 
 function formatEventTime(start: Date, end: Date, isAllDay: boolean): string {
   if (isAllDay) {
@@ -29,18 +30,32 @@ export function CalendarEventModal() {
   const loggedIn = Boolean(accessToken) && !googleAuthService.isExpired(expiresAt);
   const events = selectedDate ? getEventsForDate(selectedDate) : [];
 
-  const openEvent = (link: string | undefined) => {
+  const getGoogleCalendarDayUrl = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `https://calendar.google.com/calendar/u/0/r/day/${year}/${month}/${day}`;
+  };
+
+  const openEvent = async (link: string | undefined) => {
     if (!loggedIn) {
       close();
       navigate("/settings");
       return;
     }
 
-    if (!link) {
+    const fallbackDayUrl = selectedDate ? getGoogleCalendarDayUrl(selectedDate) : null;
+    const targetUrl = link || fallbackDayUrl;
+
+    if (!targetUrl) {
       return;
     }
 
-    window.open(link, "_blank", "noopener,noreferrer");
+    try {
+      await tauriClient.openExternalUrl(targetUrl);
+    } catch {
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
+    }
   };
 
   return (
@@ -81,7 +96,9 @@ export function CalendarEventModal() {
                 <button
                   key={event.id}
                   type="button"
-                  onClick={() => openEvent(event.htmlLink)}
+                  onClick={() => {
+                    void openEvent(event.htmlLink);
+                  }}
                   className="w-full rounded-xl border border-border/60 bg-background p-3 text-left transition-colors hover:bg-muted/40"
                 >
                   <div className="flex items-center justify-between gap-3">

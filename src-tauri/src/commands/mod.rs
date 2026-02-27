@@ -41,6 +41,11 @@ pub fn pick_folder_for_organize() -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
+pub fn open_external_url(url: String) -> Result<(), String> {
+    open::that(url).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub fn delete_file(file_path: String) -> Result<(), String> {
     FileService::delete_file(file_path)
 }
