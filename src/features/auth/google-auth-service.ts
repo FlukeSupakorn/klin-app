@@ -3,11 +3,13 @@ const GOOGLE_IDENTITY_SCRIPT_URL = "https://accounts.google.com/gsi/client";
 export const GOOGLE_CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/userinfo.profile",
+  "https://www.googleapis.com/auth/userinfo.email",
 ] as const;
 
 export interface GoogleProfile {
   id: string;
   name: string;
+  email: string;
   picture?: string;
 }
 
@@ -27,6 +29,12 @@ interface GoogleTokenResponse {
 interface GoogleTokenClient {
   callback: (response: GoogleTokenResponse) => void;
   requestAccessToken: (options?: { prompt?: string }) => void;
+}
+
+interface PeopleApiProfileResponse {
+  names?: Array<{ displayName?: string }>;
+  emailAddresses?: Array<{ value?: string }>;
+  photos?: Array<{ url?: string; default?: boolean }>;
 }
 
 declare global {
@@ -149,26 +157,52 @@ class GoogleAuthService {
   }
 
   async fetchProfile(accessToken: string): Promise<GoogleProfile> {
-    const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
     });
 
-    if (!response.ok) {
+    if (!userInfoResponse.ok) {
       throw new Error("Failed to fetch Google profile");
     }
 
-    const data = (await response.json()) as {
+    const userInfo = (await userInfoResponse.json()) as {
       sub: string;
       name: string;
+      email?: string;
       picture?: string;
     };
 
+    let peoplePhoto: string | undefined;
+    let peopleName: string | undefined;
+    let peopleEmail: string | undefined;
+
+    try {
+      const peopleResponse = await fetch(
+        "https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses,photos",
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (peopleResponse.ok) {
+        const peopleData = (await peopleResponse.json()) as PeopleApiProfileResponse;
+        peoplePhoto = peopleData.photos?.[0]?.url;
+        peopleName = peopleData.names?.[0]?.displayName;
+        peopleEmail = peopleData.emailAddresses?.[0]?.value;
+      }
+    } catch {
+      peoplePhoto = undefined;
+    }
+
     return {
-      id: data.sub,
-      name: data.name,
-      picture: data.picture,
+      id: userInfo.sub,
+      name: peopleName ?? userInfo.name,
+      email: peopleEmail ?? userInfo.email ?? "",
+      picture: peoplePhoto ?? userInfo.picture,
     };
   }
 

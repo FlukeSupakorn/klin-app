@@ -41,6 +41,37 @@ pub fn pick_folder_for_organize() -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
+pub fn save_note_file(folder_path: String, file_name: String, content: String) -> Result<String, String> {
+    if folder_path.trim().is_empty() {
+        return Err("Folder path is required".to_string());
+    }
+
+    let sanitized_name = file_name
+        .chars()
+        .map(|ch| match ch {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '-',
+            _ => ch,
+        })
+        .collect::<String>();
+
+    let final_name = if sanitized_name.trim().is_empty() {
+        "Quick-Note"
+    } else {
+        sanitized_name.trim()
+    };
+
+    let full_path = PathBuf::from(folder_path).join(format!("{}.md", final_name));
+
+    if let Some(parent) = full_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+
+    std::fs::write(&full_path, content).map_err(|error| error.to_string())?;
+
+    Ok(full_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 pub fn open_external_url(url: String) -> Result<(), String> {
     open::that(url).map_err(|error| error.to_string())
 }

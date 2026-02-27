@@ -35,14 +35,27 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
 
     const restoredToken = get().accessToken;
     const restoredExpiry = get().expiresAt;
+    const restoredProfile = get().profile;
 
     if (restoredToken && restoredExpiry) {
       if (!googleAuthService.isExpired(restoredExpiry)) {
-        set({
-          initialized: true,
-          status: "authenticated",
-          error: null,
-        });
+        try {
+          const profile = await googleAuthService.fetchProfile(restoredToken);
+          set({
+            initialized: true,
+            status: "authenticated",
+            profile,
+            error: null,
+          });
+        } catch {
+          set({
+            initialized: true,
+            status: "authenticated",
+            profile: restoredProfile,
+            error: null,
+          });
+        }
+        return;
       } else {
         set({
           accessToken: null,

@@ -26,6 +26,7 @@ export interface TauriClient {
   readFolder(input: ReadFolderDto): Promise<string[]>;
   pickFilesForOrganize(): Promise<string[]>;
   pickFolderForOrganize(): Promise<string | null>;
+  saveNoteFile(input: { folderPath: string; fileName: string; content: string }): Promise<string>;
   openExternalUrl(url: string): Promise<void>;
   deleteFile(filePath: string): Promise<void>;
   watchFolder(input: WatchFolderDto): Promise<void>;

@@ -26,6 +26,10 @@ class TauriCommandClient implements TauriClient {
     return invoke("pick_folder_for_organize");
   }
 
+  saveNoteFile(input: { folderPath: string; fileName: string; content: string }): Promise<string> {
+    return invoke("save_note_file", input);
+  }
+
   openExternalUrl(url: string): Promise<void> {
     return invoke("open_external_url", { url });
   }
