@@ -58,6 +58,7 @@ declare global {
 class GoogleAuthService {
   private scriptPromise: Promise<void> | null = null;
   private tokenClient: GoogleTokenClient | null = null;
+  private activeErrorHandler: ((error: unknown) => void) | null = null;
 
   private async loadScript(): Promise<void> {
     if (window.google?.accounts?.oauth2) {
@@ -95,6 +96,7 @@ class GoogleAuthService {
         },
         error_callback: (err: unknown) => {
           console.error("Google Auth Error", err);
+          this.activeErrorHandler?.(err);
         }
       });
     }
@@ -116,25 +118,52 @@ class GoogleAuthService {
     const tokenClient = this.ensureTokenClient(clientId);
 
     const tokenResponse = await new Promise<GoogleTokenResponse>((resolve, reject) => {
+      let settled = false;
+
+      const settleReject = (error: unknown) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        this.activeErrorHandler = null;
+        reject(error instanceof Error ? error : new Error(String(error)));
+      };
+
+      const settleResolve = (response: GoogleTokenResponse) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        this.activeErrorHandler = null;
+        resolve(response);
+      };
+
       const timeout = setTimeout(() => {
-        reject(new Error("Google login timed out. Please check if a popup was blocked by your browser/system."));
+        settleReject(new Error("Google login timed out. Please check if a popup was blocked by your browser/system."));
       }, 60000);
+
+      this.activeErrorHandler = (err: unknown) => {
+        clearTimeout(timeout);
+        settleReject(err ?? new Error("Google sign-in failed"));
+      };
 
       tokenClient.callback = (response) => {
         clearTimeout(timeout);
         console.log("Google Auth Response received", response);
         
         if (response.error) {
-          reject(new Error(response.error_description ?? response.error ?? "Google sign-in failed"));
+          settleReject(new Error(response.error_description ?? response.error ?? "Google sign-in failed"));
           return;
         }
         
         if (!response.access_token) {
-          reject(new Error("No access token received from Google"));
+          settleReject(new Error("No access token received from Google"));
           return;
         }
         
-        resolve(response);
+        settleResolve(response);
       };
 
       try {
@@ -143,7 +172,7 @@ class GoogleAuthService {
       } catch (error) {
         clearTimeout(timeout);
         console.error("Failed to trigger Google Auth popup", error);
-        reject(error instanceof Error ? error : new Error("Failed to request access token"));
+        settleReject(error instanceof Error ? error : new Error("Failed to request access token"));
       }
     });
 
@@ -226,8 +255,8 @@ class GoogleAuthService {
   }
 
   getManualAuthUrl(clientId: string): string {
-    const redirectUri = window.location.origin.endsWith("/") 
-      ? window.location.origin 
+    const redirectUri = window.location.origin.endsWith("/")
+      ? window.location.origin
       : `${window.location.origin}/`;
 
     const params = new URLSearchParams({
@@ -242,10 +271,15 @@ class GoogleAuthService {
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
 
-  parseTokenFromUrl(): { accessToken: string; expiresAt: number } | null {
-    const hash = window.location.hash.substring(1);
-    if (!hash) return null;
+  parseTokenFromUrl(url?: string): { accessToken: string; expiresAt: number } | null {
+    const targetUrl = url ?? window.location.hash;
+    
+    if (!targetUrl) return null;
 
+    const hashIndex = targetUrl.indexOf("#");
+    if (hashIndex === -1) return null;
+
+    const hash = targetUrl.substring(hashIndex + 1);
     const params = new URLSearchParams(hash);
     const accessToken = params.get("access_token");
     const expiresIn = params.get("expires_in");

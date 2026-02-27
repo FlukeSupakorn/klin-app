@@ -4,6 +4,8 @@ import {
   googleAuthService,
   type GoogleProfile,
 } from "@/features/auth/google-auth-service";
+import { tauriClient } from "@/services/tauri-client";
+import { listen } from "@tauri-apps/api/event";
 
 interface AuthState {
   initialized: boolean;
@@ -16,6 +18,7 @@ interface AuthState {
   login: () => Promise<void>;
   ensureValidToken: () => Promise<string | null>;
   logout: () => Promise<void>;
+  handleDeepLinkCallback: (url: string) => Promise<void>;
 }
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
@@ -31,6 +34,15 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   initialize: async () => {
     if (get().initialized) {
       return;
+    }
+
+    try {
+      await listen<string>("deep-link://oauth-callback", (event) => {
+        console.log("Deep link OAuth callback received:", event.payload);
+        get().handleDeepLinkCallback(event.payload);
+      });
+    } catch (error) {
+      console.error("Failed to set up deep link listener:", error);
     }
 
     const restoredToken = get().accessToken;
@@ -120,8 +132,33 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
 
     set({ status: "loading", error: null });
 
-    const authUrl = googleAuthService.getManualAuthUrl(googleClientId);
-    window.location.href = authUrl;
+    try {
+      const token = await googleAuthService.requestAccessToken(googleClientId, "consent");
+
+      set({
+        status: "authenticated",
+        accessToken: token.accessToken,
+        expiresAt: token.expiresAt,
+        profile: token.profile,
+        error: null,
+      });
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Google sign-in failed";
+
+      const authUrl = googleAuthService.getManualAuthUrl(googleClientId);
+      try {
+        await tauriClient.openExternalUrl(authUrl);
+        set({
+          status: "loading",
+          error: null,
+        });
+        return;
+      } catch {
+        window.location.href = authUrl;
+        set({ status: "error", error: message });
+      }
+    }
   },
 
   ensureValidToken: async () => {
@@ -158,6 +195,38 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
       profile: null,
       error: null,
     });
+  },
+
+  handleDeepLinkCallback: async (url: string) => {
+    console.log("Processing deep link callback...", url);
+    
+    const callbackData = googleAuthService.parseTokenFromUrl(url);
+    if (!callbackData) {
+      set({
+        status: "error",
+        error: "Invalid OAuth callback - no token found",
+      });
+      return;
+    }
+
+    set({ status: "loading", error: null });
+
+    try {
+      const profile = await googleAuthService.fetchProfile(callbackData.accessToken);
+      set({
+        status: "authenticated",
+        accessToken: callbackData.accessToken,
+        expiresAt: callbackData.expiresAt,
+        profile,
+        error: null,
+      });
+      console.log("Successfully authenticated via deep link!");
+    } catch (error) {
+      set({
+        status: "error",
+        error: error instanceof Error ? error.message : "Failed to fetch profile after OAuth callback",
+      });
+    }
   },
 }), {
   name: "google-auth-session",
