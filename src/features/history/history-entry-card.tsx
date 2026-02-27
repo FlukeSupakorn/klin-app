@@ -10,7 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { HistoryEntry, HistoryEntryType } from "@/features/history/history-mock-data";
+import type { HistoryEntry, HistoryEntryType } from "@/features/history/history-types";
 import { HistoryCalendarDetails } from "@/features/history/history-calendar-details";
 import { HistoryOrganizeDetails } from "@/features/history/history-organize-details";
 import { HistorySummaryDetails } from "@/features/history/history-summary-details";

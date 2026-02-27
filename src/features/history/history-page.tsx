@@ -1,13 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { History, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import type { HistoryEntry, HistoryEntryType } from "@/features/history/history-types";
 import { tauriClient } from "@/services/tauri-client";
-import mockHistoryEntries, {
-  type HistoryEntry,
-  type HistoryEntryType,
-} from "@/features/history/history-mock-data";
+import { historyApiService } from "@/services/history-api-service";
 import { HistoryEntryCard } from "@/features/history/history-entry-card";
 import { getPathTail, joinPath } from "@/features/history/history-utils";
 
@@ -19,13 +17,49 @@ const TYPE_FILTERS: Array<{ label: string; value: "all" | HistoryEntryType }> = 
 ];
 
 export function HistoryPage() {
-  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>(mockHistoryEntries);
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | HistoryEntryType>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [scoreExpandedIds, setScoreExpandedIds] = useState<string[]>([]);
   const [selectedScoreByEntryId, setSelectedScoreByEntryId] = useState<Record<string, string>>({});
   const [openedSummaryPath, setOpenedSummaryPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadHistory = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const entries = await historyApiService.list();
+        if (!isMounted) {
+          return;
+        }
+
+        setHistoryEntries(entries);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setLoadError(error instanceof Error ? error.message : "Failed to load history");
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadHistory();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const appendDestinationChangeHistory = (
     previous: Extract<HistoryEntry, { type: "organize" }>,
@@ -159,7 +193,19 @@ export function HistoryPage() {
       )}
 
       <div className="space-y-3">
-        {filteredRows.length === 0 ? (
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-6 text-center text-sm text-muted-foreground">
+              Loading history...
+            </CardContent>
+          </Card>
+        ) : loadError ? (
+          <Card>
+            <CardContent className="p-6 text-center text-sm text-destructive">
+              {loadError}
+            </CardContent>
+          </Card>
+        ) : filteredRows.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center text-sm text-muted-foreground">
               No history rows found.
