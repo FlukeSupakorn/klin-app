@@ -152,10 +152,6 @@ export function HistoryPage() {
 
   const filteredRows = useMemo(() => {
     return historyEntries.filter((entry) => {
-      if (entry.type === "calendar" && !entry.foundInFile) {
-        return false;
-      }
-
       const byType = typeFilter === "all" || entry.type === typeFilter;
       const bySearch =
         search.length === 0 ||

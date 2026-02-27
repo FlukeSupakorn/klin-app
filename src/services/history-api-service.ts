@@ -132,6 +132,14 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
         const meetingLocation = "meetingLocation" in entry ? String(entry.meetingLocation ?? "") : "";
         const details = "details" in entry ? String(entry.details ?? "") : "";
         const actionLabel = "actionLabel" in entry ? String(entry.actionLabel ?? "") : "";
+        const attendees = "attendees" in entry && Array.isArray(entry.attendees)
+          ? entry.attendees.map((item: unknown) => String(item)).filter(Boolean)
+          : undefined;
+        const meetLink = "meetLink" in entry ? String(entry.meetLink ?? "") || undefined : undefined;
+        const organizer = "organizer" in entry ? String(entry.organizer ?? "") || undefined : undefined;
+        const timeZone = "timeZone" in entry ? String(entry.timeZone ?? "") || undefined : undefined;
+        const status = "status" in entry ? String(entry.status ?? "") || undefined : undefined;
+        const calendarId = "calendarId" in entry ? String(entry.calendarId ?? "") || undefined : undefined;
 
         return {
           id,
@@ -146,6 +154,12 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
           meetingLocation,
           details,
           actionLabel,
+          attendees,
+          meetLink,
+          organizer,
+          timeZone,
+          status,
+          calendarId,
         } satisfies HistoryEntry;
       }
 

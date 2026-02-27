@@ -207,24 +207,28 @@ class GoogleAuthService {
     let peopleName: string | undefined;
     let peopleEmail: string | undefined;
 
-    try {
-      const peopleResponse = await fetch(
-        "https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses,photos",
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
-      );
+    const needsPeopleApi = !userInfo.picture || !userInfo.name || !userInfo.email;
 
-      if (peopleResponse.ok) {
-        const peopleData = (await peopleResponse.json()) as PeopleApiProfileResponse;
-        peoplePhoto = peopleData.photos?.[0]?.url;
-        peopleName = peopleData.names?.[0]?.displayName;
-        peopleEmail = peopleData.emailAddresses?.[0]?.value;
+    if (needsPeopleApi) {
+      try {
+        const peopleResponse = await fetch(
+          "https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses,photos",
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          },
+        );
+
+        if (peopleResponse.ok) {
+          const peopleData = (await peopleResponse.json()) as PeopleApiProfileResponse;
+          peoplePhoto = peopleData.photos?.[0]?.url;
+          peopleName = peopleData.names?.[0]?.displayName;
+          peopleEmail = peopleData.emailAddresses?.[0]?.value;
+        }
+      } catch {
+        peoplePhoto = undefined;
       }
-    } catch {
-      peoplePhoto = undefined;
     }
 
     return {

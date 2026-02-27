@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Mail, SlidersHorizontal, UserCircle2 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { cn } from "@/lib/utils";
@@ -34,8 +33,8 @@ export function SettingsPage() {
   const profileInitial = (profile?.name?.trim()?.charAt(0) || "G").toUpperCase();
 
   return (
-    <div className="space-y-6 pb-10">
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/60 bg-background px-4 py-3">
+    <div className="space-y-5 pb-10">
+      <section className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
         <button
           type="button"
           onClick={() => {
@@ -85,55 +84,44 @@ export function SettingsPage() {
 
       {authError && <p className="text-xs text-destructive">{authError}</p>}
 
-      <Card className="border-0 bg-muted/40 shadow-none">
-        <CardHeader>
-          <CardTitle className="text-lg">Manage Settings</CardTitle>
-          <CardDescription>Default folder, watched folders, and categories.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" className="h-11 gap-2" onClick={() => setOpen(true)}>
-            <SlidersHorizontal className="h-4 w-4" /> Open Settings Window
-          </Button>
-        </CardContent>
-      </Card>
+      <section className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-4">
+        <h2 className="text-base font-semibold">Manage Settings</h2>
+        <Button variant="outline" className="h-10 gap-2" onClick={() => setOpen(true)}>
+          <SlidersHorizontal className="h-4 w-4" /> Open
+        </Button>
+      </section>
 
-      <Card className="border-0 bg-muted/40 shadow-none">
-        <CardHeader>
-          <CardTitle className="text-lg">Auto Organize</CardTitle>
-          <CardDescription />
-        </CardHeader>
-        <CardContent className="flex items-center justify-between gap-3">
-          <span className="text-sm font-medium">Auto Organize</span>
-          <button
-            type="button"
-            onClick={() => setAutoOrganizeEnabled((state) => !state)}
-            role="switch"
-            aria-pressed={autoOrganizeEnabled}
-            aria-checked={autoOrganizeEnabled}
+      <section className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Auto Organize</h2>
+        <button
+          type="button"
+          onClick={() => setAutoOrganizeEnabled((state) => !state)}
+          role="switch"
+          aria-pressed={autoOrganizeEnabled}
+          aria-checked={autoOrganizeEnabled}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-full border px-2 py-1 transition-colors",
+            autoOrganizeEnabled
+              ? "border-primary/40 bg-primary/10 text-primary"
+              : "border-border bg-background text-muted-foreground",
+          )}
+        >
+          <span
             className={cn(
-              "inline-flex items-center gap-2 rounded-full border px-2 py-1 transition-colors",
-              autoOrganizeEnabled
-                ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-border bg-background text-muted-foreground",
+              "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
+              autoOrganizeEnabled ? "bg-primary" : "bg-muted-foreground/30",
             )}
           >
             <span
               className={cn(
-                "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
-                autoOrganizeEnabled ? "bg-primary" : "bg-muted-foreground/30",
+                "h-4 w-4 rounded-full bg-background shadow transition-transform",
+                autoOrganizeEnabled ? "translate-x-4" : "translate-x-0.5",
               )}
-            >
-              <span
-                className={cn(
-                  "h-4 w-4 rounded-full bg-background shadow transition-transform",
-                  autoOrganizeEnabled ? "translate-x-4" : "translate-x-0.5",
-                )}
-              />
-            </span>
-            <span className="w-8 text-left text-xs font-semibold">{autoOrganizeEnabled ? "On" : "Off"}</span>
-          </button>
-        </CardContent>
-      </Card>
+            />
+          </span>
+          <span className="w-8 text-left text-xs font-semibold">{autoOrganizeEnabled ? "On" : "Off"}</span>
+        </button>
+      </section>
 
       <SettingsManagementDialogs
         open={open}

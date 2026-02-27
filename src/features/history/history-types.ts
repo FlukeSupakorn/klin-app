@@ -37,6 +37,12 @@ export interface CalendarHistoryEntry extends HistoryEntryBase {
   meetingLocation: string;
   details: string;
   actionLabel: string;
+  attendees?: string[];
+  meetLink?: string;
+  organizer?: string;
+  timeZone?: string;
+  status?: string;
+  calendarId?: string;
 }
 
 export type HistoryEntry = OrganizeHistoryEntry | SummaryHistoryEntry | CalendarHistoryEntry;
