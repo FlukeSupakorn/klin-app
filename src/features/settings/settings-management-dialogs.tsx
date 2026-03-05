@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, FolderOpen, CheckCircle2, FolderSearch, Trash2, FolderPlus } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckCircle2, FolderOpen, FolderPlus, FolderSearch, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { categoryManagementService } from "@/services/category-management-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useAutomationStore } from "@/stores/use-automation-store";
-import { theme } from "@/theme/theme";
+import { cn } from "@/lib/utils";
 import type { ManagedCategory } from "@/types/domain";
 
 export type SettingsDialogSection = "default-folder" | "watched-folders" | "categories";
@@ -34,18 +32,10 @@ const emptyForm: CategoryFormState = {
 interface SettingsManagementDialogsProps {
   open: boolean;
   sections: SettingsDialogSection[];
-  title?: string;
-  description?: string;
   onClose: () => void;
 }
 
-export function SettingsManagementDialogs({
-  open,
-  sections,
-  title = "Settings",
-  description = "Manage folders and categories.",
-  onClose,
-}: SettingsManagementDialogsProps) {
+export function SettingsManagementDialogs({ open, sections, onClose }: SettingsManagementDialogsProps) {
   const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
   const categories = useCategoryManagementStore((state) => state.categories);
   const setDefaultFolder = useCategoryManagementStore((state) => state.setDefaultFolder);
@@ -131,55 +121,61 @@ export function SettingsManagementDialogs({
     closeCategoryEditor();
   };
 
-  if (!open) {
-    return null;
-  }
+  if (!open) return null;
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4">
-        <Card className="w-full max-w-5xl">
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+        <div className="flex w-full max-w-2xl flex-col rounded-2xl border border-border bg-card shadow-2xl" style={{ maxHeight: "85vh" }}>
+          <div className="flex flex-shrink-0 items-center justify-between border-b border-border px-6 py-4">
             <div>
-              <CardTitle className="text-xl">{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Configuration</p>
+              <h2 className="font-syne text-xl font-black uppercase tracking-tight">Manage Settings</h2>
             </div>
-            <Button variant="outline" onClick={onClose}>Close</Button>
-          </CardHeader>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-          <CardContent className="max-h-[70vh] space-y-6 overflow-y-auto pr-1">
+          <div className="flex-1 space-y-4 overflow-y-auto p-6">
             {showDefaultFolder && (
-              <div className="rounded-2xl border border-border/60 p-4">
-                <h3 className="text-sm font-semibold">Default Folder</h3>
-                <p className="mb-3 text-xs text-muted-foreground">Base folder for categories.</p>
-                <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="space-y-3 rounded-lg border border-border bg-background p-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Default</p>
+                  <h3 className="font-black">Default Folder</h3>
+                </div>
+                <div className="flex gap-2">
                   <Input
                     value={draftDefaultFolder}
                     onChange={(event) => setDraftDefaultFolder(event.target.value)}
-                    className="bg-background"
+                    placeholder="Base path for categories"
+                    className="border-border bg-muted"
                   />
                   <Button
                     onClick={() => {
-                      if (!draftDefaultFolder.trim()) {
-                        return;
-                      }
+                      if (!draftDefaultFolder.trim()) return;
                       setDefaultFolder(draftDefaultFolder.trim());
                       categoryManagementService.syncToAutomationStores();
                     }}
                   >
-                    Change
+                    Save
                   </Button>
-                  <Badge variant="secondary">{enabledCount} enabled</Badge>
                 </div>
+                <p className="text-xs text-muted-foreground">{enabledCount} categor{enabledCount !== 1 ? "ies" : "y"} enabled</p>
               </div>
             )}
 
             {showWatchedFolders && (
-              <div className="rounded-2xl border border-border/60 p-4">
-                <h3 className="text-sm font-semibold">Watched Folders</h3>
-                <p className="mb-3 text-xs text-muted-foreground">Folders to watch.</p>
-
-                <div className="mb-3 grid gap-2 sm:grid-cols-2">
+              <div className="space-y-3 rounded-lg border border-border bg-background p-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Monitoring</p>
+                  <h3 className="font-black">Watched Folders</h3>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
                   <Button
                     variant="outline"
                     className="justify-start gap-2"
@@ -190,57 +186,50 @@ export function SettingsManagementDialogs({
                   <Button
                     variant="outline"
                     className="justify-start gap-2"
-                    onClick={() => addWatchedFolder("C:/Users/User/Desktop")}
+                    onClick={async () => {
+                      const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
+                      if (folder) addWatchedFolder(folder);
+                    }}
                   >
-                    <FolderPlus className="h-4 w-4" /> Add Desktop
+                    <FolderPlus className="h-4 w-4" /> Browse Folder
                   </Button>
                 </div>
-
-                <div className="mb-3 flex gap-2">
+                <div className="flex gap-2">
                   <Input
                     value={newWatchedFolderPath}
                     onChange={(event) => setNewWatchedFolderPath(event.target.value)}
-                    placeholder="Folder path"
-                    className="bg-muted/30"
+                    placeholder="Paste folder path"
+                    className="border-border bg-muted"
                   />
                   <Button
                     onClick={() => {
-                      if (!newWatchedFolderPath.trim()) {
-                        return;
-                      }
+                      if (!newWatchedFolderPath.trim()) return;
                       addWatchedFolder(newWatchedFolderPath.trim());
                       setNewWatchedFolderPath("");
                     }}
                   >
-                    Add Path
+                    Add
                   </Button>
                 </div>
-
-                <div className="space-y-3 max-h-[30vh] overflow-y-auto pr-1">
+                <div className="space-y-2">
                   {watchedFolders.length === 0 ? (
-                    <div className="rounded-2xl border-2 border-dashed py-10 text-center text-muted-foreground">
+                    <div className="rounded-lg border-2 border-dashed border-border py-8 text-center text-sm text-muted-foreground">
                       No folders being watched yet.
                     </div>
                   ) : (
                     watchedFolders.map((folder) => (
-                      <div key={folder} className="flex items-center justify-between rounded-xl border border-border/60 p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                            <FolderSearch className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="font-mono text-sm font-medium">{folder}</p>
-                            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Active Watch</p>
-                          </div>
+                      <div key={folder} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <FolderSearch className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                          <p className="truncate font-mono text-sm">{folder}</p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        <button
+                          type="button"
                           onClick={() => removeWatchedFolder(folder)}
-                          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          className="ml-3 flex-shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     ))
                   )}
@@ -249,58 +238,61 @@ export function SettingsManagementDialogs({
             )}
 
             {showCategories && (
-              <div className="rounded-2xl border border-border/60 p-4">
-                <div className="mb-3 flex items-center justify-between gap-4">
+              <div className="space-y-3 rounded-lg border border-border bg-background p-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold">Categories</h3>
-                    <p className="text-xs text-muted-foreground">Name, description, and folder.</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">AI Classification</p>
+                    <h3 className="font-black">Categories</h3>
                   </div>
-                  <Button className="gap-2" onClick={openAddModal}>
-                    <Plus className="h-4 w-4" /> Add New Category
+                  <Button className="h-8 gap-2 text-xs" onClick={openAddModal}>
+                    <Plus className="h-3.5 w-3.5" /> Add Category
                   </Button>
                 </div>
-
                 <div className="space-y-2">
                   {categories.map((category) => (
                     <div
                       key={category.id}
-                      className={`rounded-xl border border-border/60 p-4 transition-colors ${
-                        category.enabled ? "bg-background" : "bg-muted/40"
-                      }`}
+                      className={cn(
+                        "rounded-lg border border-border p-3 transition-colors",
+                        category.enabled ? "bg-muted/30" : "bg-muted/10 opacity-60",
+                      )}
                     >
-                      <div className="mb-2 flex items-start justify-between gap-4">
-                        <div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <h3 className={category.enabled ? "font-semibold" : "font-semibold text-muted-foreground"}>{category.name}</h3>
+                            <span className="text-sm font-black">{category.name}</span>
                             <button
                               type="button"
                               onClick={() => toggleCategoryEnabled(category)}
-                              className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                                category.enabled
-                                  ? "border-transparent bg-primary text-primary-foreground"
-                                  : "border-border bg-background text-muted-foreground"
-                              }`}
-                              aria-pressed={category.enabled}
-                              title="Toggle enabled state"
+                              className={cn(
+                                "rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest transition-colors",
+                                category.enabled ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+                              )}
                             >
                               {category.enabled ? "Enabled" : "Disabled"}
                             </button>
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{category.description}</p>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">{category.description}</p>
+                          <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <FolderOpen className="h-3 w-3" />
+                            <span className="truncate font-mono">{category.folderPath}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="gap-2" onClick={() => openEditModal(category)}>
-                            <Pencil className="h-3 w-3" /> Edit
-                          </Button>
-                        </div>
-                      </div>
-                      <div className={`flex items-center justify-between gap-2 text-xs ${category.enabled ? "text-primary" : "text-muted-foreground"}`}>
-                        <div className="flex items-center gap-2">
-                          <FolderOpen className="h-3 w-3" /> {category.folderPath}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`h-2 w-2 rounded-full ${category.aiLearned ? theme.status.aiLearnedDot : theme.status.warningDot}`} />
-                          <span className="text-[11px]">{category.aiLearned ? "AI understood" : "AI learning"}</span>
+                        <div className="flex flex-shrink-0 items-center gap-2">
+                          <span className={cn(
+                            "flex items-center gap-1 text-[10px] font-black uppercase tracking-widest",
+                            category.aiLearned ? "text-primary" : "text-muted-foreground",
+                          )}>
+                            <CheckCircle2 className="h-3 w-3" />
+                            {category.aiLearned ? "AI ready" : "Learning"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(category)}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -308,57 +300,68 @@ export function SettingsManagementDialogs({
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {modalMode && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/30 p-4">
-          <Card className="w-full max-w-2xl">
-            <CardHeader>
-              <CardTitle>{modalMode === "edit" ? "Edit Category" : "Add New Category"}</CardTitle>
-              <CardDescription>{modalMode === "edit" ? "Update category details." : "Create a new category."}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div>
-                <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Category Name</label>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</p>
+                <h2 className="font-syne text-lg font-black uppercase tracking-tight">
+                  {modalMode === "edit" ? "Edit Category" : "Add Category"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={closeCategoryEditor}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-4 p-6">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Name</label>
                 <Input
                   value={formState.name}
                   onChange={(event) => setFormState((state) => ({ ...state, name: event.target.value }))}
+                  className="border-border bg-muted"
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Description</label>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</label>
                 <textarea
                   value={formState.description}
                   onChange={(event) => setFormState((state) => ({ ...state, description: event.target.value }))}
-                  className="min-h-[120px] w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+                  className="min-h-[100px] w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none"
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Folder Path</label>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Folder Path</label>
                 <Input
                   value={formState.folderPath}
                   onChange={(event) => setFormState((state) => ({ ...state, folderPath: event.target.value }))}
+                  className="border-border bg-muted"
                 />
-                <p className="mt-1 text-xs text-primary">Resolved path: {formState.folderPath}</p>
+                <p className="font-mono text-[11px] text-primary">{formState.folderPath}</p>
               </div>
-              <div className="flex items-center gap-3 rounded-lg bg-muted/40 p-3 text-sm">
-                {formState.aiLearned ? (
-                  <CheckCircle2 className={`h-4 w-4 ${theme.status.successMutedText}`} />
-                ) : (
-                  <FolderSearch className={`h-4 w-4 ${theme.status.warningText}`} />
-                )}
-                {formState.aiLearned
-                  ? "AI already understands this category."
-                  : "AI learning this category • 72%"}
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs">
+                <CheckCircle2 className={cn("h-3.5 w-3.5", formState.aiLearned ? "text-primary" : "text-muted-foreground")} />
+                <span className={formState.aiLearned ? "text-foreground" : "text-muted-foreground"}>
+                  {formState.aiLearned ? "AI already understands this category." : "AI learning this category • 72%"}
+                </span>
               </div>
-              <div className="flex justify-between pt-2">
-                <Button variant="ghost" onClick={closeCategoryEditor}>Cancel</Button>
-                <Button onClick={handleSaveCategory}>{modalMode === "edit" ? "Save Changes" : "Add Category"}</Button>
+              <div className="flex justify-between pt-1">
+                <Button variant="outline" onClick={closeCategoryEditor}>Cancel</Button>
+                <Button onClick={handleSaveCategory}>
+                  {modalMode === "edit" ? "Save Changes" : "Add Category"}
+                </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       )}
     </>

@@ -7,8 +7,6 @@ import {
   LayoutGrid,
   Search,
   Settings,
-  SlidersHorizontal,
-  Tag,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,8 +18,6 @@ const navItems = [
   { to: "/history", label: "History", icon: History },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/notes", label: "Notes", icon: FileText },
-  { to: "/categories", label: "Categories", icon: Tag },
-  { to: "/rules", label: "Rules", icon: SlidersHorizontal },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

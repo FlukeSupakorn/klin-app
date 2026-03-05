@@ -3,8 +3,6 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { HistoryPage } from "@/features/history/history-page";
 import { SettingsPage } from "@/features/settings/settings-page";
-import { CategoriesPage } from "@/features/categories/categories-page";
-import { RulesPage } from "@/features/rules/rules-page";
 import { NotesPage } from "@/features/notes/notes-page";
 import { CalendarPage } from "@/features/calendar/calendar-page";
 import { DeveloperPage } from "@/features/developer/developer-page";
@@ -20,8 +18,6 @@ export const router = createBrowserRouter([
       { path: "history", element: <HistoryPage /> },
       { path: "calendar", element: <CalendarPage /> },
       { path: "notes", element: <NotesPage /> },
-      { path: "categories", element: <CategoriesPage /> },
-      { path: "rules", element: <RulesPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "developer", element: <DeveloperPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
