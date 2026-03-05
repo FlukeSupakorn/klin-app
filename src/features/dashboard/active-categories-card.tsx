@@ -1,5 +1,4 @@
-import { ArrowUpRight, Tags } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Tags } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ManagedCategory } from "@/types/domain";
 
@@ -23,39 +22,38 @@ export function ActiveCategoriesCard({
           onOpenCategoryManager();
         }
       }}
-      className="group cursor-pointer border-0 bg-muted/40 shadow-none transition-all hover:bg-muted/60"
+      className="group cursor-pointer border border-border bg-card shadow-none transition-all duration-150 hover:border-primary/30 hover:bg-muted"
     >
-      <CardContent className="p-6">
-        <div className="mb-6 flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-background text-primary">
-              <Tags className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase text-muted-foreground">Classification</p>
-              <h3 className="text-xl font-semibold">Active Categories</h3>
-            </div>
+      <CardContent className="p-5">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Categories</p>
+            <h3 className="mt-0.5 text-lg font-black text-foreground">Active</h3>
           </div>
-          <Badge variant="secondary" className="bg-background">
-            {activeManagedCategories.length} active
-          </Badge>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Tags className="h-5 w-5" />
+          </div>
         </div>
-        <div className="flex items-center justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            {activeManagedCategories.slice(0, 3).map((category) => (
-              <Badge key={category.id} variant="outline" className="bg-background text-xs">
-                {category.name}
-              </Badge>
-            ))}
-            {activeManagedCategories.length > 3 && (
-              <Badge variant="secondary" className="text-xs">
-                +{activeManagedCategories.length - 3} more
-              </Badge>
-            )}
-          </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-background transition-transform group-hover:-translate-y-1 group-hover:translate-x-1">
-            <ArrowUpRight className="h-5 w-5" />
-          </div>
+
+        <div className="mb-3 flex items-baseline gap-2">
+          <span className="text-4xl font-black text-primary">{activeManagedCategories.length}</span>
+          <span className="text-sm font-bold text-muted-foreground">categories</span>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {activeManagedCategories.slice(0, 4).map((category) => (
+            <span
+              key={category.id}
+              className="rounded-lg bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground"
+            >
+              {category.name}
+            </span>
+          ))}
+          {activeManagedCategories.length > 4 && (
+            <span className="rounded-lg bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+              +{activeManagedCategories.length - 4}
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>

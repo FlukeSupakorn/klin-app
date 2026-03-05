@@ -5,7 +5,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { theme } from "@/theme/theme";
 import type { HistoryEntry } from "@/features/history/history-types";
@@ -57,10 +56,10 @@ export function HistoryEntryCard({
       : entry.subtitle);
 
   return (
-    <Card className={cn("relative overflow-hidden transition-colors", isExpanded && "bg-muted/20")}>
+    <div className={cn("relative overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-border/80", isExpanded && "border-primary/20 bg-card")}>
       <span className={cn("pointer-events-none absolute bottom-0 left-0 top-0 w-1", actionTheme.accent)} />
       <button type="button" onClick={onToggleExpand} className="w-full text-left">
-        <CardHeader className="p-4">
+        <div className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
               <div className={cn("rounded-lg border p-2", actionTheme.iconWrap)}>
@@ -80,7 +79,7 @@ export function HistoryEntryCard({
                 {organizeEntry ? (
                   <>
                     <div className="min-w-0">
-                      <CardTitle className="truncate text-lg" title={displayTitle}>
+                      <p className="truncate text-base font-bold" title={displayTitle}>
                         {isRenamed ? (
                           <>
                             <span className="font-normal text-foreground/70">{organizeEntry.oldName}</span>
@@ -90,7 +89,7 @@ export function HistoryEntryCard({
                         ) : (
                           organizeEntry.oldName
                         )}
-                      </CardTitle>
+                      </p>
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm text-foreground/80" title={displaySubtitle}>
@@ -109,7 +108,7 @@ export function HistoryEntryCard({
                   </>
                 ) : (
                   <>
-                    <CardTitle className="truncate text-lg" title={displayTitle}>{displayTitle}</CardTitle>
+                    <p className="truncate text-base font-bold" title={displayTitle}>{displayTitle}</p>
                     <p className="truncate text-sm text-muted-foreground" title={displaySubtitle}>{displaySubtitle}</p>
                   </>
                 )}
@@ -124,11 +123,11 @@ export function HistoryEntryCard({
               {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </div>
           </div>
-        </CardHeader>
+        </div>
       </button>
 
       {isExpanded && (
-        <CardContent className="border-t border-border/50 p-4">
+        <div className="border-t border-border/50 p-4">
           {entry.type === "organize" && (
             <HistoryOrganizeDetails
               entry={entry}
@@ -145,8 +144,8 @@ export function HistoryEntryCard({
           )}
 
           {entry.type === "calendar" && <HistoryCalendarDetails entry={entry} />}
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </div>
   );
 }

@@ -1,9 +1,7 @@
-import { ChevronRight, Zap } from "lucide-react";
+import { Zap } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { theme } from "@/theme/theme";
 
 interface AutomationEngineCardProps {
   isRunning: boolean;
@@ -17,45 +15,53 @@ export function AutomationEngineCard({
   lastScanTime,
 }: AutomationEngineCardProps) {
   return (
-    <Card className="overflow-hidden border-0 bg-muted/40 shadow-none">
-      <CardContent className="p-0">
-        <div className="flex items-center justify-between p-6">
-          <div className="flex items-center gap-4">
-            <div
-              className={cn(
-                "flex h-14 w-14 items-center justify-center rounded-2xl",
-                isRunning
-                  ? cn("animate-pulse", theme.status.successSurface, theme.status.successMutedText)
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              <Zap className={cn("h-7 w-7", isRunning && "fill-current")} />
-            </div>
-            <div>
-              <h3 className="text-2xl font-semibold">Automation Engine</h3>
-              <p className="text-sm text-muted-foreground">{isRunning ? "Watching folders" : "Paused"}</p>
-            </div>
+    <Card className="border border-border bg-card shadow-none">
+      <CardContent className="p-5">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Automation</p>
+            <h3 className="mt-0.5 text-lg font-black text-foreground">Engine</h3>
           </div>
-          <Link to="/settings">
-            <Button variant="outline" className="gap-2 rounded-full">
-              Manage Watched Folders <ChevronRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
-        <div className="px-6 pb-6 pt-0">
-          <div className="mb-3 flex items-center justify-between text-xs font-bold uppercase text-muted-foreground">
-            <span>Folders Watched: {watchedFoldersCount}</span>
-            <span>Last Scan: {lastScanTime ? new Date(lastScanTime).toLocaleTimeString() : "Never"}</span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-background">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all duration-1000",
-                isRunning ? cn("w-full", theme.status.successText) : "w-0 bg-muted-foreground/30",
-              )}
-            />
+          <div className={cn(
+            "flex h-10 w-10 items-center justify-center rounded-xl transition-all",
+            isRunning ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+          )}>
+            <Zap className={cn("h-5 w-5", isRunning && "fill-primary")} />
           </div>
         </div>
+
+        <div className="mb-4 flex items-center gap-2">
+          <span className={cn(
+            "inline-block h-2 w-2 rounded-full",
+            isRunning ? "animate-pulse bg-primary" : "bg-muted-foreground/40",
+          )} />
+          <span className={cn(
+            "text-sm font-bold",
+            isRunning ? "text-primary" : "text-muted-foreground",
+          )}>
+            {isRunning ? "Running" : "Paused"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-muted px-3 py-2">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Folders</p>
+            <p className="text-xl font-black text-secondary">{watchedFoldersCount}</p>
+          </div>
+          <div className="rounded-xl bg-muted px-3 py-2">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Last Scan</p>
+            <p className="truncate text-xs font-bold text-foreground">
+              {lastScanTime ? new Date(lastScanTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Never"}
+            </p>
+          </div>
+        </div>
+
+        <Link
+          to="/automation"
+          className="mt-3 block text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground transition-colors hover:text-primary"
+        >
+          Manage →
+        </Link>
       </CardContent>
     </Card>
   );

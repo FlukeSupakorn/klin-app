@@ -1,8 +1,8 @@
-import { ChevronRight, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
+import { ChevronRight, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { theme } from "@/theme/theme";
+import { Card, CardContent } from "@/components/ui/card";
 import type { HistoryEntry } from "@/features/history/history-types";
 import { formatTime, getFolderTail, getPathTail } from "@/features/history/history-utils";
 
@@ -55,45 +55,45 @@ export function RecentMovementsSection({ recentEntries, onOpenEntry }: RecentMov
             const Icon = actionTheme.icon;
 
             return (
-            <Card key={entry.id} className="relative overflow-hidden border bg-muted/30 shadow-none transition-colors hover:bg-muted/40">
-              <span className={cn("pointer-events-none absolute bottom-0 left-0 top-0 w-1", actionTheme.accent)} />
-              <button type="button" onClick={() => onOpenEntry(entry.id)} className="w-full text-left">
-                <CardContent className="p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className={cn("rounded-md border p-1.5", actionTheme.iconWrap)}>
-                        <Icon className={cn("h-3.5 w-3.5", actionTheme.iconColor)} />
-                      </span>
-                      <p className="max-w-[360px] truncate text-sm font-semibold" title={getEntryTitle(entry)}>
-                        {getEntryTitle(entry)}
-                      </p>
-                    </div>
+              <Card key={entry.id} className="relative overflow-hidden border bg-muted/30 shadow-none transition-colors hover:bg-muted/40">
+                <span className={cn("pointer-events-none absolute bottom-0 left-0 top-0 w-1", actionTheme.accent)} />
+                <button type="button" onClick={() => onOpenEntry(entry.id)} className="w-full text-left">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className={cn("rounded-md border p-1.5", actionTheme.iconWrap)}>
+                            <Icon className={cn("h-3.5 w-3.5", actionTheme.iconColor)} />
+                          </span>
+                          <p className="max-w-[360px] truncate text-sm font-semibold" title={getEntryTitle(entry)}>
+                            {getEntryTitle(entry)}
+                          </p>
+                        </div>
 
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <span className="truncate max-w-[420px]" title={getEntrySubtitle(entry)}>{getEntrySubtitle(entry)}</span>
-                    </div>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="truncate max-w-[420px]" title={getEntrySubtitle(entry)}>{getEntrySubtitle(entry)}</span>
+                        </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatTime(entry.timestamp)}
-                      </span>
-                      {entry.type === "organize" && (
-                        <span className={cn("font-semibold", actionTheme.emphasis)}>
-                          {Math.round((entry.scores[0]?.score ?? 0) * 100)}%
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatTime(entry.timestamp)}
+                          </span>
+                          {entry.type === "organize" && (
+                            <span className={cn("font-semibold", actionTheme.emphasis)}>
+                              {Math.round((entry.scores[0]?.score ?? 0) * 100)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground">
-                    <ChevronRight className="h-4 w-4" />
-                  </div>
-                </div>
-                </CardContent>
-              </button>
-            </Card>
+                      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground">
+                        <ChevronRight className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </button>
+              </Card>
             );
           })
         )}

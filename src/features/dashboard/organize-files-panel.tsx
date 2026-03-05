@@ -291,7 +291,7 @@ export function OrganizeFilesPanel() {
     <>
       <FileDropOverlay visible={isDraggingOver} />
 
-      <Card className="border-0 bg-muted/30 shadow-none">
+      <Card className="border border-border bg-card shadow-none">
         <CardContent className="p-0">
           <div
             onDragOver={(event) => event.preventDefault()}
@@ -305,21 +305,24 @@ export function OrganizeFilesPanel() {
                 void handleAddFiles();
               }
             }}
-            className="flex min-h-[320px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/30 px-8 py-16 text-center"
+            className="flex min-h-[320px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-muted/20 px-8 py-16 text-center transition-all duration-150 hover:border-primary/40 hover:bg-primary/5"
           >
-            <div className="mb-3 flex justify-center gap-2 text-muted-foreground">
-              <FolderOpen className="h-8 w-8" />
-              <Upload className="h-8 w-8" />
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+              <Upload className="h-8 w-8 text-primary" />
             </div>
-            <p className="text-2xl font-semibold">Add Files to Get Started</p>
-            <p className="mt-2 text-sm text-muted-foreground">Drag or click to add files</p>
+            <p className="text-lg font-black text-foreground">Organize Files</p>
+            <p className="mt-1 text-sm text-muted-foreground">Drag files here or click to select</p>
+            <div className="mt-4 flex items-center gap-2">
+              <FolderOpen className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-bold text-muted-foreground">AI-powered categorization</span>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4">
-          <Card className="h-[80vh] w-full max-w-5xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <Card className="h-[80vh] w-full max-w-5xl overflow-hidden border border-border bg-card">
             <CardHeader>
               <CardTitle>Files to organize</CardTitle>
               <CardDescription>

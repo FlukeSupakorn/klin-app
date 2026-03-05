@@ -2,10 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { History, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { theme } from "@/theme/theme";
 import type { HistoryEntry, HistoryEntryType } from "@/features/history/history-types";
 import { tauriClient } from "@/services/tauri-client";
 import { historyApiService } from "@/services/history-api-service";
@@ -169,75 +167,67 @@ export function HistoryPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <Card className="border-0 bg-muted/40 shadow-none">
-        <CardContent className="space-y-4 p-4">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by title or detail..."
-              className="bg-background pl-9"
-            />
-          </div>
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Activity</p>
+        <h2 className="font-syne text-2xl font-black uppercase tracking-tight">History</h2>
+      </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {TYPE_FILTERS.map((filter) => (
-              <Button
-                key={filter.value}
-                variant="outline"
-                size="sm"
-                className={cn(
-                  filter.value === "all"
-                    ? (typeFilter === "all" ? "bg-foreground text-background hover:bg-foreground/90" : "")
-                    : typeFilter === filter.value
-                      ? theme.actions[filter.value].filterSelected
-                      : theme.actions[filter.value].filterIdle,
-                )}
-                onClick={() => setTypeFilter(filter.value)}
-              >
-                {filter.label}
-              </Button>
-            ))}
+      <div className="space-y-3">
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by title or detail..."
+            className="border-border bg-muted/50 pl-9 focus:border-primary/50"
+          />
+        </div>
 
-            <div className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border/60 bg-background px-2.5 py-1.5 text-xs font-semibold">
-              <History className="h-3.5 w-3.5 text-primary" />
-              <span className="text-muted-foreground">{historyEntries.length}</span>
-            </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {TYPE_FILTERS.map((filter) => (
+            <button
+              key={filter.value}
+              onClick={() => setTypeFilter(filter.value)}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors",
+                typeFilter === filter.value
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {filter.label}
+            </button>
+          ))}
+
+          <div className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-muted px-3 py-1.5 text-[10px] font-black uppercase tracking-widest">
+            <History className="h-3 w-3 text-primary" />
+            <span className="text-muted-foreground">{historyEntries.length} entries</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {openedSummaryPath && (
-        <Card className="border-0 bg-primary/10 shadow-none">
-          <CardContent className="flex items-center justify-between gap-4 p-3 text-sm">
-            <p className="truncate">Mock open summary file: {openedSummaryPath}</p>
-            <Button variant="ghost" size="sm" onClick={() => setOpenedSummaryPath(null)}>
-              Dismiss
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-primary/20 bg-primary/10 p-3 text-sm">
+          <p className="truncate text-primary">Mock open summary file: {openedSummaryPath}</p>
+          <Button variant="ghost" size="sm" onClick={() => setOpenedSummaryPath(null)}>
+            Dismiss
+          </Button>
+        </div>
       )}
 
       <div className="space-y-3">
         {isLoading ? (
-          <Card>
-            <CardContent className="p-6 text-center text-sm text-muted-foreground">
-              Loading history...
-            </CardContent>
-          </Card>
+          <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+            Loading history...
+          </div>
         ) : loadError ? (
-          <Card>
-            <CardContent className="p-6 text-center text-sm text-destructive">
-              {loadError}
-            </CardContent>
-          </Card>
+          <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-6 text-center text-sm text-destructive">
+            {loadError}
+          </div>
         ) : filteredRows.length === 0 ? (
-          <Card>
-            <CardContent className="p-6 text-center text-sm text-muted-foreground">
-              No history rows found.
-            </CardContent>
-          </Card>
+          <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+            No history rows found.
+          </div>
         ) : (
           filteredRows.map((entry) => {
             const isExpanded = expandedId === entry.id;

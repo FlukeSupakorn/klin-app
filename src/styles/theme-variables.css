@@ -1,17 +1,29 @@
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222 47% 11%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
-  --border: 214 24% 89%;
-  --muted: 214 26% 93%;
-  --muted-foreground: 215 18% 40%;
+  --background: 0 0% 4%;
+  --foreground: 0 0% 96%;
+  --card: 0 0% 9%;
+  --card-foreground: 0 0% 96%;
+  --primary: 75 100% 44%;
+  --primary-foreground: 0 0% 5%;
+  --secondary: 27 96% 53%;
+  --secondary-foreground: 0 0% 5%;
+  --border: 0 0% 16%;
+  --muted: 0 0% 13%;
+  --muted-foreground: 0 0% 55%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 0 0% 96%;
+  --accent: 75 100% 44%;
+  --accent-foreground: 0 0% 5%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 96%;
+  --input: 0 0% 16%;
+  --ring: 75 100% 44%;
 
   --radius: 0.75rem;
+  --sidebar-width: 64px;
 
-  --font-sans: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: "Inter", "Segoe UI", sans-serif;
+  --font-display: "Inter", "Segoe UI", sans-serif;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-base: 1rem;

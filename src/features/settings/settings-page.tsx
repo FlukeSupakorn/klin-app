@@ -33,66 +33,82 @@ export function SettingsPage() {
   const profileInitial = (profile?.name?.trim()?.charAt(0) || "G").toUpperCase();
 
   return (
-    <div className="space-y-5 pb-10">
-      <section className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-4">
-        <button
-          type="button"
-          onClick={() => {
-            if (!isLoggedIn) {
-              void login();
-            }
-          }}
-          className={cn(
-            "flex min-w-0 items-center gap-3 text-left transition-opacity",
-            !isLoggedIn && "hover:opacity-90",
-          )}
-          disabled={isLoggedIn || authStatus === "loading"}
-        >
-          {isLoggedIn && profile?.picture ? (
-            <img
-              src={profile.picture}
-              alt={profile.name}
-              className="h-12 w-12 rounded-full border border-border/60 object-cover"
-            />
-          ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border/60 bg-muted/30 text-sm font-semibold text-foreground">
-              {isLoggedIn ? profileInitial : <UserCircle2 className="h-6 w-6 text-muted-foreground" />}
+    <div className="space-y-6 pb-10">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Configuration</p>
+        <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Settings</h2>
+      </div>
+
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">
+        <div className="flex items-center gap-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Google Account</p>
+        </div>
+        <div className="flex w-full items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              if (!isLoggedIn) {
+                void login();
+              }
+            }}
+            className={cn(
+              "flex min-w-0 items-center gap-3 text-left transition-opacity",
+              !isLoggedIn && "hover:opacity-90",
+            )}
+            disabled={isLoggedIn || authStatus === "loading"}
+          >
+            {isLoggedIn && profile?.picture ? (
+              <img
+                src={profile.picture}
+                alt={profile.name}
+                className="h-12 w-12 rounded-full border-2 border-primary/30 object-cover"
+              />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted text-sm font-semibold text-foreground">
+                {isLoggedIn ? profileInitial : <UserCircle2 className="h-6 w-6 text-muted-foreground" />}
+              </div>
+            )}
+
+            <div className="min-w-0">
+              <p className="truncate font-bold">
+                {isLoggedIn ? (profile?.name ?? "Google account") : "Not connected"}
+              </p>
+              <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                <Mail className="h-3 w-3" />
+                {isLoggedIn ? (profile?.email || "No email available") : "Connect to Google to show profile"}
+              </p>
             </div>
-          )}
+          </button>
 
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">
-              {isLoggedIn ? (profile?.name ?? "Google account") : "Not connected"}
-            </p>
-            <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
-              <Mail className="h-3 w-3" />
-              {isLoggedIn ? (profile?.email || "No email available") : "Connect to Google to show profile"}
-            </p>
+          <div className="flex items-center gap-2">
+            {isLoggedIn ? (
+              <Button variant="outline" onClick={() => void logout()}>Disconnect</Button>
+            ) : (
+              <Button onClick={() => void login()} disabled={authStatus === "loading"}>
+                {authStatus === "loading" ? "Connecting..." : "Connect Google"}
+              </Button>
+            )}
           </div>
-        </button>
-
-        <div className="flex items-center gap-2">
-          {isLoggedIn ? (
-            <Button variant="outline" onClick={() => void logout()}>Disconnect</Button>
-          ) : (
-            <Button onClick={() => void login()} disabled={authStatus === "loading"}>
-              {authStatus === "loading" ? "Connecting..." : "Connect Google"}
-            </Button>
-          )}
         </div>
       </section>
 
       {authError && <p className="text-xs text-destructive">{authError}</p>}
 
-      <section className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-4">
-        <h2 className="text-base font-semibold">Manage Settings</h2>
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Configuration</p>
+          <h3 className="font-bold">Manage Settings</h3>
+        </div>
         <Button variant="outline" className="h-10 gap-2" onClick={() => setOpen(true)}>
           <SlidersHorizontal className="h-4 w-4" /> Open
         </Button>
       </section>
 
-      <section className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-base font-semibold">Auto Organize</h2>
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Automation</p>
+          <h3 className="font-bold">Auto Organize</h3>
+        </div>
         <button
           type="button"
           onClick={() => setAutoOrganizeEnabled((state) => !state)}
@@ -103,7 +119,7 @@ export function SettingsPage() {
             "inline-flex items-center gap-2 rounded-full border px-2 py-1 transition-colors",
             autoOrganizeEnabled
               ? "border-primary/40 bg-primary/10 text-primary"
-              : "border-border bg-background text-muted-foreground",
+              : "border-border bg-muted text-muted-foreground",
           )}
         >
           <span
@@ -119,7 +135,7 @@ export function SettingsPage() {
               )}
             />
           </span>
-          <span className="w-8 text-left text-xs font-semibold">{autoOrganizeEnabled ? "On" : "Off"}</span>
+          <span className="w-8 text-left text-xs font-black uppercase tracking-widest">{autoOrganizeEnabled ? "On" : "Off"}</span>
         </button>
       </section>
 

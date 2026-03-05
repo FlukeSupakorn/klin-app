@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Zap, Play, Square, Settings2, FolderPlus, FolderSearch, Clock, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AsyncProcessingQueue } from "@/services/automation-queue";
@@ -9,7 +8,6 @@ import { processAutomationJob } from "@/services/automation-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { cn } from "@/lib/utils";
-import { theme } from "@/theme/theme";
 
 export function AutomationPage() {
   const [newFolderPath, setNewFolderPath] = useState("");
@@ -52,165 +50,159 @@ export function AutomationPage() {
 
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-6 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-4xl font-semibold tracking-tight">Automation</h2>
-          <p className="text-muted-foreground">Configure background monitoring and file processing.</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Engine</p>
+          <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Automation</h2>
         </div>
-        <Card className="flex items-center gap-3 px-4 py-2 shadow-none">
-          <Zap className={cn("h-4 w-4", isRunning ? cn(theme.status.warningMutedText, "fill-current") : "text-muted-foreground")} />
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2">
+          <Zap className={cn("h-4 w-4", isRunning ? "text-primary fill-current" : "text-muted-foreground")} />
           <div>
-            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Engine Status</p>
-            <p className="text-lg font-semibold">{isRunning ? "Active" : "Idle"}</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Status</p>
+            <p className="text-sm font-black">{isRunning ? "Active" : "Idle"}</p>
           </div>
-        </Card>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2 border-0 bg-muted/40 shadow-none">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Engine Control</CardTitle>
-                <CardDescription>Manage the background automation process.</CardDescription>
-              </div>
-              <Badge variant={isRunning ? "default" : "outline"} className={cn(isRunning ? theme.status.successBadge : "")}> 
-                {isRunning ? "Running" : "Stopped"}
-              </Badge>
+        <div className="lg:col-span-2 rounded-lg border border-border bg-card p-5 space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Control</p>
+              <h3 className="font-black">Engine Control</h3>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex flex-wrap gap-4">
-              <Button 
-                size="lg"
-                onClick={() => setRunning(!isRunning)} 
-                variant={isRunning ? "destructive" : "default"}
-                className="gap-2 min-w-[180px]"
-              >
-                {isRunning ? <><Square className="h-4 w-4 fill-current" /> Stop Engine</> : <><Play className="h-4 w-4 fill-current" /> Start Engine</>}
-              </Button>
-              <Button 
-                size="lg"
-                variant="outline" 
-                onClick={() => void runScanCycle()}
-                className="gap-2"
-                disabled={watchedFolders.length === 0}
-              >
-                <RefreshCw className="h-4 w-4" /> Trigger Manual Scan
-              </Button>
-            </div>
+            <Badge variant={isRunning ? "default" : "outline"} className={cn(isRunning ? "bg-primary/15 text-primary border-primary/30" : "")}>
+              {isRunning ? "Running" : "Stopped"}
+            </Badge>
+          </div>
 
-            <div className="flex items-center gap-6 pt-4 border-t border-border/50">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
-                  <Settings2 className="h-3 w-3" /> Concurrency Limit
-                </label>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={concurrencyLimit}
-                    onChange={(event) => setConcurrencyLimit(Number(event.target.value) || 1)}
-                    className="w-20 bg-background"
-                  />
-                  <span className="text-sm text-muted-foreground italic">Simultaneous file processing</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-3 w-3" /> Last Scan
-                </label>
-                <p className="text-sm font-medium h-10 flex items-center">
-                  {lastScanTime ? new Date(lastScanTime).toLocaleTimeString() : "Never"}
-                </p>
+          <div className="flex flex-wrap gap-4">
+            <Button
+              size="lg"
+              onClick={() => setRunning(!isRunning)}
+              variant={isRunning ? "destructive" : "default"}
+              className="min-w-[180px] gap-2"
+            >
+              {isRunning ? <><Square className="h-4 w-4 fill-current" /> Stop Engine</> : <><Play className="h-4 w-4 fill-current" /> Start Engine</>}
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => void runScanCycle()}
+              className="gap-2"
+              disabled={watchedFolders.length === 0}
+            >
+              <RefreshCw className="h-4 w-4" /> Manual Scan
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-8 border-t border-border pt-4">
+            <div className="space-y-2">
+              <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <Settings2 className="h-3 w-3" /> Concurrency
+              </label>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={concurrencyLimit}
+                  onChange={(event) => setConcurrencyLimit(Number(event.target.value) || 1)}
+                  className="w-20 border-border bg-muted"
+                />
+                <span className="text-xs text-muted-foreground">Simultaneous files</span>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <Clock className="h-3 w-3" /> Last Scan
+              </label>
+              <p className="flex h-10 items-center text-sm font-bold">
+                {lastScanTime ? new Date(lastScanTime).toLocaleTimeString() : "Never"}
+              </p>
+            </div>
+          </div>
+        </div>
 
-        <Card className="border-0 bg-primary/5 shadow-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FolderSearch className="h-5 w-5 text-primary" /> Quick Add
-            </CardTitle>
-            <CardDescription>Add common system folders to watch.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button 
-              variant="secondary" 
-              className="w-full justify-start gap-3 bg-background" 
-              onClick={async () => addWatchedFolder(await tauriClient.getDownloadsFolder())}
-            >
-              <FolderPlus className="h-4 w-4 text-primary" /> Downloads Folder
-            </Button>
-            <Button 
-              variant="secondary" 
-              className="w-full justify-start gap-3 bg-background"
-              onClick={async () => addWatchedFolder("C:/Users/User/Desktop")}
-            >
-              <FolderPlus className="h-4 w-4 text-primary" /> Desktop Folder
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-5 space-y-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Shortcuts</p>
+            <h3 className="flex items-center gap-2 font-black">
+              <FolderSearch className="h-4 w-4 text-primary" /> Quick Add
+            </h3>
+          </div>
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-3 border-border bg-card hover:border-primary/30"
+            onClick={async () => addWatchedFolder(await tauriClient.getDownloadsFolder())}
+          >
+            <FolderPlus className="h-4 w-4 text-primary" /> Downloads Folder
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-3 border-border bg-card hover:border-primary/30"
+            onClick={async () => addWatchedFolder("C:/Users/User/Desktop")}
+          >
+            <FolderPlus className="h-4 w-4 text-primary" /> Desktop Folder
+          </Button>
+        </div>
       </div>
 
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle>Watched Folders</CardTitle>
-          <CardDescription>The engine monitors these locations for new files to classify.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input 
-              value={newFolderPath} 
-              onChange={(e) => setNewFolderPath(e.target.value)}
-              placeholder="Enter folder path manually..." 
-              className="bg-muted/30"
-            />
-            <Button 
-              onClick={() => {
-                if (!newFolderPath.trim()) return;
-                addWatchedFolder(newFolderPath.trim());
-                setNewFolderPath("");
-              }}
-            >
-              Add Path
-            </Button>
-          </div>
+      <div className="rounded-lg border border-border bg-card p-5 space-y-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Monitoring</p>
+          <h3 className="font-black">Watched Folders</h3>
+        </div>
 
-          <div className="space-y-3">
-            {watchedFolders.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground border-2 border-dashed rounded-3xl">
-                No folders being watched yet.
-              </div>
-            ) : (
-              watchedFolders.map((folder) => (
-                <div key={folder} className="group flex items-center justify-between rounded-2xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-sm">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                      <FolderSearch className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-mono text-sm font-medium">{folder}</p>
-                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Active Watch</p>
-                    </div>
+        <div className="flex gap-2">
+          <Input
+            value={newFolderPath}
+            onChange={(e) => setNewFolderPath(e.target.value)}
+            placeholder="Enter folder path..."
+            className="border-border bg-muted"
+          />
+          <Button
+            onClick={() => {
+              if (!newFolderPath.trim()) return;
+              addWatchedFolder(newFolderPath.trim());
+              setNewFolderPath("");
+            }}
+          >
+            Add
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {watchedFolders.length === 0 ? (
+            <div className="rounded-lg border-2 border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+              No folders being watched yet.
+            </div>
+          ) : (
+            watchedFolders.map((folder) => (
+              <div key={folder} className="group flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3 transition-colors hover:border-primary/30">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+                    <FolderSearch className="h-4 w-4" />
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => removeWatchedFolder(folder)}
-                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div>
+                    <p className="font-mono text-sm font-medium">{folder}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Active Watch</p>
+                  </div>
                 </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeWatchedFolder(folder)}
+                  className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
