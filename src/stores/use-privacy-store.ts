@@ -2,28 +2,28 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 interface PrivacyStoreState {
-  exclusionPatterns: string[];
-  addPattern: (pattern: string) => void;
-  removePattern: (pattern: string) => void;
-  isExcluded: (path: string) => boolean;
+  lockedPaths: string[];
+  lockPath: (path: string) => void;
+  unlockPath: (path: string) => void;
+  isLocked: (path: string) => boolean;
 }
 
 export const usePrivacyStore = create<PrivacyStoreState>()(
   persist(
     (set, get) => ({
-      exclusionPatterns: ["password", ".key", "secret"],
-      addPattern: (pattern) =>
+      lockedPaths: [],
+      lockPath: (path) =>
         set((state) => ({
-          exclusionPatterns: state.exclusionPatterns.includes(pattern)
-            ? state.exclusionPatterns
-            : [...state.exclusionPatterns, pattern],
+          lockedPaths: state.lockedPaths.includes(path)
+            ? state.lockedPaths
+            : [...state.lockedPaths, path],
         })),
-      removePattern: (pattern) =>
+      unlockPath: (path) =>
         set((state) => ({
-          exclusionPatterns: state.exclusionPatterns.filter((item) => item !== pattern),
+          lockedPaths: state.lockedPaths.filter((item) => item !== path),
         })),
-      isExcluded: (path) =>
-        get().exclusionPatterns.some((pattern) => path.toLowerCase().includes(pattern.toLowerCase())),
+      isLocked: (path) =>
+        get().lockedPaths.some((locked) => path === locked || path.startsWith(locked + "/") || path.startsWith(locked + "\\\\") ),
     }),
     {
       name: "klin-privacy-store",

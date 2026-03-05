@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Mail, RefreshCw, SlidersHorizontal, UserCircle2 } from "lucide-react";
+import { FileX2, FolderLock, Mail, RefreshCw, ShieldCheck, SlidersHorizontal, UserCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import { AsyncProcessingQueue } from "@/services/automation-queue";
 import { processAutomationJob } from "@/services/automation-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useAutomationStore } from "@/stores/use-automation-store";
+import { usePrivacyStore } from "@/stores/use-privacy-store";
 
 export function SettingsPage() {
   const [open, setOpen] = useState(false);
@@ -19,6 +20,20 @@ export function SettingsPage() {
   const concurrencyLimit = useAutomationStore((state) => state.concurrencyLimit);
   const setLastScanTime = useAutomationStore((state) => state.setLastScanTime);
   const queueRef = useRef(new AsyncProcessingQueue(concurrencyLimit));
+
+  const lockedPaths = usePrivacyStore((state) => state.lockedPaths);
+  const lockPath = usePrivacyStore((state) => state.lockPath);
+  const unlockPath = usePrivacyStore((state) => state.unlockPath);
+
+  const handleLockFiles = async () => {
+    const files = await tauriClient.pickFilesForOrganize().catch(() => []);
+    files.forEach((f) => lockPath(f));
+  };
+
+  const handleLockFolder = async () => {
+    const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
+    if (folder) lockPath(folder);
+  };
 
   const runScanCycle = async () => {
     if (watchedFolders.length === 0 || isScanning) return;
@@ -187,6 +202,51 @@ export function SettingsPage() {
             <RefreshCw className={cn("h-3.5 w-3.5", isScanning && "animate-spin")} />
             {isScanning ? "Scanning..." : "Scan Now"}
           </Button>
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Security</p>
+            <h3 className="font-bold">Locked Paths</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="h-9 gap-2" onClick={() => void handleLockFiles()}>
+              <FileX2 className="h-3.5 w-3.5" /> Lock File
+            </Button>
+            <Button variant="outline" className="h-9 gap-2" onClick={() => void handleLockFolder()}>
+              <FolderLock className="h-3.5 w-3.5" /> Lock Folder
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 w-fit">
+          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            {lockedPaths.length} locked path{lockedPaths.length !== 1 ? "s" : ""} — blocked from AI
+          </span>
+        </div>
+
+        <div className="space-y-2">
+          {lockedPaths.length === 0 ? (
+            <div className="rounded-lg border-2 border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+              No locked paths. Files and folders added here will never be sent to AI.
+            </div>
+          ) : (
+            lockedPaths.map((p) => (
+              <div key={p} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                <span className="min-w-0 truncate font-mono text-foreground" title={p}>{p}</span>
+                <button
+                  type="button"
+                  onClick={() => unlockPath(p)}
+                  className="ml-3 flex-shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </section>
 

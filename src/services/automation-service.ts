@@ -9,17 +9,13 @@ import type { AutomationJob, AutomationLog } from "@/types/domain";
 
 const scorer = ScoringStrategyFactory.create("mock");
 
-function shouldExclude(filePath: string, patterns: string[]) {
-  return patterns.some((pattern) => filePath.toLowerCase().includes(pattern.toLowerCase()));
-}
-
 export async function processAutomationJob(job: AutomationJob): Promise<void> {
   const start = performance.now();
   const categoryStore = useCategoryStore.getState();
   const ruleStore = useRuleStore.getState();
   const privacyStore = usePrivacyStore.getState();
 
-  if (shouldExclude(job.filePath, privacyStore.exclusionPatterns)) {
+  if (privacyStore.isLocked(job.filePath)) {
     return;
   }
 

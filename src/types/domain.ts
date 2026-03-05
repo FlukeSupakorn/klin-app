@@ -47,7 +47,7 @@ export interface AutomationLog {
 }
 
 export interface PrivacyConfig {
-  exclusionPatterns: string[];
+  lockedPaths: string[];
 }
 
 export interface AutomationJob {

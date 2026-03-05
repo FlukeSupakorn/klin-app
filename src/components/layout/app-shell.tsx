@@ -3,15 +3,12 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   CalendarDays,
   FileText,
-  HeartPulse,
   History,
   LayoutGrid,
   Plus,
   Settings,
-  ShieldCheck,
   SlidersHorizontal,
   Tag,
-  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bootstrapAppData } from "@/services/bootstrap-service";
@@ -22,11 +19,8 @@ const navItems = [
   { to: "/history", label: "History", icon: History },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/notes", label: "Notes", icon: FileText },
-  { to: "/automation", label: "Automation", icon: Zap },
   { to: "/categories", label: "Categories", icon: Tag },
   { to: "/rules", label: "Rules", icon: SlidersHorizontal },
-  { to: "/file-health", label: "File Health", icon: HeartPulse },
-  { to: "/privacy", label: "Privacy", icon: ShieldCheck },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -35,11 +29,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/history": "History",
   "/calendar": "Calendar",
   "/notes": "Notes",
-  "/automation": "Automation",
   "/categories": "Categories",
   "/rules": "Rules",
-  "/file-health": "File Health",
-  "/privacy": "Privacy",
   "/settings": "Settings",
 };
 
