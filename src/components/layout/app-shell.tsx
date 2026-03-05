@@ -1,14 +1,15 @@
-import { useEffect } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { NavLink, Outlet } from "react-router-dom";
 import {
   CalendarDays,
   FileText,
   History,
   LayoutGrid,
-  Plus,
+  Search,
   Settings,
   SlidersHorizontal,
   Tag,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bootstrapAppData } from "@/services/bootstrap-service";
@@ -24,34 +25,32 @@ const navItems = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-const PAGE_TITLES: Record<string, string> = {
-  "/": "Dashboard",
-  "/history": "History",
-  "/calendar": "Calendar",
-  "/notes": "Notes",
-  "/categories": "Categories",
-  "/rules": "Rules",
-  "/settings": "Settings",
-};
-
 export function AppShell() {
   const initializeAuth = useAuthStore((state) => state.initialize);
-  const location = useLocation();
-  const pageTitle = PAGE_TITLES[location.pathname] ?? "Klin";
+  const profile = useAuthStore((state) => state.profile);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void initializeAuth();
     void bootstrapAppData().catch(() => undefined);
   }, [initializeAuth]);
 
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.focus();
+  }, [searchOpen]);
+
+  const profileInitial = (profile?.name?.trim()?.charAt(0) || "K").toUpperCase();
+
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
-      <aside className="flex h-full w-16 flex-shrink-0 flex-col items-center border-r border-border bg-background py-4">
-        <div className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-          <span className="text-sm font-black text-primary-foreground tracking-tight">KL</span>
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
+      <header className="flex h-16 flex-shrink-0 items-center gap-3 px-6">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary">
+          <span className="text-sm font-black tracking-tight text-primary-foreground">KL</span>
         </div>
 
-        <nav className="flex flex-1 flex-col items-center gap-1">
+        <nav className="flex items-center gap-1.5">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -60,47 +59,69 @@ export function AppShell() {
               title={item.label}
               className={({ isActive }) =>
                 cn(
-                  "group relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-150",
+                  "group flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-150",
                   isActive
-                    ? "bg-primary/15 text-primary"
+                    ? "bg-card border border-border shadow-sm"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )
               }
             >
               {({ isActive }) => (
-                <>
-                  {isActive && (
-                    <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r-full bg-primary" />
+                <item.icon
+                  className={cn(
+                    "h-[17px] w-[17px] transition-transform duration-150 group-hover:scale-110",
+                    isActive ? "text-primary" : "",
                   )}
-                  <item.icon className="h-[18px] w-[18px] transition-transform duration-150 group-hover:scale-110" />
-                </>
+                />
               )}
             </NavLink>
           ))}
         </nav>
 
-        <button
-          type="button"
-          title="Quick Action"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform duration-150 hover:scale-110"
-        >
-          <Plus className="h-5 w-5" />
-        </button>
-      </aside>
-
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-14 flex-shrink-0 items-center justify-between border-b border-border bg-card px-6">
-          <h1 className="text-base font-black uppercase tracking-widest text-foreground">
-            {pageTitle}
-          </h1>
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-muted" />
+        <div className="ml-2 flex items-center">
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-xl border border-border bg-card transition-all duration-200",
+              searchOpen ? "w-52 px-3 py-2" : "h-9 w-9 justify-center",
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                if (searchOpen) {
+                  setSearchOpen(false);
+                  setSearchQuery("");
+                } else {
+                  setSearchOpen(true);
+                }
+              }}
+              className="flex-shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {searchOpen ? <X className="h-[17px] w-[17px]" /> : <Search className="h-[17px] w-[17px]" />}
+            </button>
+            {searchOpen && (
+              <input
+                ref={searchRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search…"
+                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
+            )}
           </div>
-        </header>
-        <main className="flex-1 overflow-y-auto p-6">
-          <Outlet />
-        </main>
-      </div>
+        </div>
+
+        <div className="flex-1" />
+
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-black text-foreground">
+          {profileInitial}
+        </div>
+      </header>
+
+      <main className="flex-1 overflow-y-auto p-6">
+        <Outlet />
+      </main>
     </div>
   );
 }

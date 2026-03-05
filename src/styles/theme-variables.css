@@ -1,22 +1,22 @@
 :root {
-  --background: 0 0% 4%;
+  --background: 0 0% 3%;
   --foreground: 0 0% 96%;
-  --card: 0 0% 9%;
+  --card: 0 0% 13%;
   --card-foreground: 0 0% 96%;
   --primary: 75 100% 44%;
   --primary-foreground: 0 0% 5%;
   --secondary: 27 96% 53%;
   --secondary-foreground: 0 0% 5%;
-  --border: 0 0% 16%;
-  --muted: 0 0% 13%;
+  --border: 0 0% 21%;
+  --muted: 0 0% 18%;
   --muted-foreground: 0 0% 55%;
-  --popover: 0 0% 9%;
+  --popover: 0 0% 13%;
   --popover-foreground: 0 0% 96%;
   --accent: 75 100% 44%;
   --accent-foreground: 0 0% 5%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 96%;
-  --input: 0 0% 16%;
+  --input: 0 0% 21%;
   --ring: 75 100% 44%;
 
   --radius: 0.75rem;
