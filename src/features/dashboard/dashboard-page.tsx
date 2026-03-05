@@ -1,26 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
-import { ActiveCategoriesCard } from "@/features/dashboard/active-categories-card";
-import { AutomationEngineCard } from "@/features/dashboard/automation-engine-card";
+import { WatcherOverviewCard } from "@/features/dashboard/watcher-overview-card";
 import { RecentMovementsSection } from "@/features/dashboard/recent-movements-section";
-import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import type { HistoryEntry } from "@/features/history/history-types";
 import { historyApiService } from "@/services/history-api-service";
-import { useAutomationStore } from "@/stores/use-automation-store";
-import { useCategoryManagementStore } from "@/stores/use-category-management-store";
-import { FileText, CalendarDays, ArrowRight } from "lucide-react";
+import { FileText, ArrowRight } from "lucide-react";
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const managedCategories = useCategoryManagementStore((state) => state.categories);
-  const watchedFolders = useAutomationStore((state) => state.watchedFolders);
-  const isRunning = useAutomationStore((state) => state.isRunning);
-  const lastScanTime = useAutomationStore((state) => state.lastScanTime);
-  const [openCategoryManager, setOpenCategoryManager] = useState(false);
   const [recentHistoryEntries, setRecentHistoryEntries] = useState<HistoryEntry[]>([]);
-
-  const activeManagedCategories = managedCategories.filter((category) => category.enabled);
 
   useEffect(() => {
     void (async () => {
@@ -51,16 +40,7 @@ export function DashboardPage() {
       </section>
 
       <section className="space-y-5">
-        <AutomationEngineCard
-          isRunning={isRunning}
-          watchedFoldersCount={watchedFolders.length}
-          lastScanTime={lastScanTime}
-        />
-
-        <ActiveCategoriesCard
-          activeManagedCategories={activeManagedCategories}
-          onOpenCategoryManager={() => setOpenCategoryManager(true)}
-        />
+        <WatcherOverviewCard />
 
         <Link to="/notes" className="block">
           <div className="group flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 transition-all duration-150 hover:border-primary/30 hover:bg-muted/60">
@@ -98,13 +78,7 @@ export function DashboardPage() {
         </Link>
       </section>
 
-      <SettingsManagementDialogs
-        open={openCategoryManager}
-        sections={["categories"]}
-        title="Manage Categories"
-        description="Edit your categories."
-        onClose={() => setOpenCategoryManager(false)}
-      />
+
     </div>
   );
 }

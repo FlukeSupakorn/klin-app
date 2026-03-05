@@ -1,14 +1,43 @@
-import { useEffect, useMemo, useState } from "react";
-import { Mail, SlidersHorizontal, UserCircle2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Mail, RefreshCw, SlidersHorizontal, UserCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { cn } from "@/lib/utils";
 import { googleAuthService } from "@/features/auth/google-auth-service";
 import { useAuthStore } from "@/features/auth/use-auth-store";
+import { AsyncProcessingQueue } from "@/services/automation-queue";
+import { processAutomationJob } from "@/services/automation-service";
+import { tauriClient } from "@/services/tauri-client";
+import { useAutomationStore } from "@/stores/use-automation-store";
 
 export function SettingsPage() {
   const [open, setOpen] = useState(false);
   const [autoOrganizeEnabled, setAutoOrganizeEnabled] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+
+  const watchedFolders = useAutomationStore((state) => state.watchedFolders);
+  const concurrencyLimit = useAutomationStore((state) => state.concurrencyLimit);
+  const setLastScanTime = useAutomationStore((state) => state.setLastScanTime);
+  const queueRef = useRef(new AsyncProcessingQueue(concurrencyLimit));
+
+  const runScanCycle = async () => {
+    if (watchedFolders.length === 0 || isScanning) return;
+    setIsScanning(true);
+    try {
+      const scanned = await Promise.all(
+        watchedFolders.map((folderPath) => tauriClient.readFolder({ folderPath }).catch(() => [])),
+      );
+      scanned.flat().forEach((filePath) => {
+        const fileName = filePath.split(/[\/\\]/).pop() ?? filePath;
+        queueRef.current.enqueue(async () => {
+          await processAutomationJob({ filePath, fileName, contentPreview: "" });
+        });
+      });
+      setLastScanTime(new Date().toISOString());
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   const authStatus = useAuthStore((state) => state.status);
   const authError = useAuthStore((state) => state.error);
@@ -104,39 +133,61 @@ export function SettingsPage() {
         </Button>
       </section>
 
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Automation</p>
-          <h3 className="font-bold">Auto Organize</h3>
-        </div>
-        <button
-          type="button"
-          onClick={() => setAutoOrganizeEnabled((state) => !state)}
-          role="switch"
-          aria-pressed={autoOrganizeEnabled}
-          aria-checked={autoOrganizeEnabled}
-          className={cn(
-            "inline-flex items-center gap-2 rounded-full border px-2 py-1 transition-colors",
-            autoOrganizeEnabled
-              ? "border-primary/40 bg-primary/10 text-primary"
-              : "border-border bg-muted text-muted-foreground",
-          )}
-        >
-          <span
+      <section className="space-y-4 rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Automation</p>
+            <h3 className="font-bold">Auto Organize</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAutoOrganizeEnabled((state) => !state)}
+            role="switch"
+            aria-pressed={autoOrganizeEnabled}
+            aria-checked={autoOrganizeEnabled}
             className={cn(
-              "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
-              autoOrganizeEnabled ? "bg-primary" : "bg-muted-foreground/30",
+              "inline-flex items-center gap-2 rounded-full border px-2 py-1 transition-colors",
+              autoOrganizeEnabled
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-border bg-muted text-muted-foreground",
             )}
           >
             <span
               className={cn(
-                "h-4 w-4 rounded-full bg-background shadow transition-transform",
-                autoOrganizeEnabled ? "translate-x-4" : "translate-x-0.5",
+                "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
+                autoOrganizeEnabled ? "bg-primary" : "bg-muted-foreground/30",
               )}
-            />
-          </span>
-          <span className="w-8 text-left text-xs font-black uppercase tracking-widest">{autoOrganizeEnabled ? "On" : "Off"}</span>
-        </button>
+            >
+              <span
+                className={cn(
+                  "h-4 w-4 rounded-full bg-background shadow transition-transform",
+                  autoOrganizeEnabled ? "translate-x-4" : "translate-x-0.5",
+                )}
+              />
+            </span>
+            <span className="w-8 text-left text-xs font-black uppercase tracking-widest">{autoOrganizeEnabled ? "On" : "Off"}</span>
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-border pt-4">
+          <div>
+            <p className="text-xs font-bold">Manual Scan</p>
+            <p className="text-xs text-muted-foreground">
+              {watchedFolders.length === 0
+                ? "Add watched folders first"
+                : `Scan ${watchedFolders.length} folder${watchedFolders.length !== 1 ? "s" : ""} now`}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            className="h-9 gap-2"
+            onClick={() => void runScanCycle()}
+            disabled={isScanning || watchedFolders.length === 0}
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", isScanning && "animate-spin")} />
+            {isScanning ? "Scanning..." : "Scan Now"}
+          </Button>
+        </div>
       </section>
 
       <SettingsManagementDialogs
