@@ -42,12 +42,12 @@ export function AppShell() {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
-      <header className="flex h-16 flex-shrink-0 items-center gap-3 px-6">
+      <header className="flex h-20 flex-shrink-0 items-center gap-4 px-8 lg:px-10">
         <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center">
           <img src={klinLogo} alt="KLIN" className="h-10 w-10 object-contain" />
         </div>
 
-        <nav className="flex items-center gap-1.5">
+        <nav className="flex items-center gap-2">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -56,20 +56,23 @@ export function AppShell() {
               title={item.label}
               className={({ isActive }) =>
                 cn(
-                  "group flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-150",
+                  "group flex h-11 items-center justify-center gap-2 rounded-full px-4 transition-all duration-150",
                   isActive
-                    ? "bg-card border border-border shadow-sm"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )
               }
             >
               {({ isActive }) => (
-                <item.icon
-                  className={cn(
-                    "h-[17px] w-[17px] transition-transform duration-150 group-hover:scale-110",
-                    isActive ? "text-primary" : "",
-                  )}
-                />
+                <>
+                  <item.icon
+                    className={cn(
+                      "h-4 w-4 transition-transform duration-150 group-hover:scale-105",
+                      isActive ? "text-primary-foreground" : "",
+                    )}
+                  />
+                  <span className="text-xs font-semibold leading-none">{item.label}</span>
+                </>
               )}
             </NavLink>
           ))}
@@ -78,8 +81,8 @@ export function AppShell() {
         <div className="ml-2 flex items-center">
           <div
             className={cn(
-              "flex items-center gap-2 rounded-xl border border-border bg-card transition-all duration-200",
-              searchOpen ? "w-52 px-3 py-2" : "h-9 w-9 justify-center",
+              "flex items-center gap-2 rounded-full bg-muted transition-all duration-200",
+              searchOpen ? "h-11 w-56 px-4" : "h-11 w-11 justify-center",
             )}
           >
             <button
@@ -128,7 +131,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto px-8 py-6 lg:px-10">
         <Outlet />
       </main>
     </div>
