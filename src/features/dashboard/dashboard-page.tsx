@@ -30,14 +30,14 @@ export function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-7 pb-12">
       <div>
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Home</p>
         <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Dashboard</h2>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
-      <section className="space-y-5">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]">
+      <section className="space-y-6">
         <OrganizeFilesPanel />
         <RecentMovementsSection
           recentEntries={recentHistoryEntries}
@@ -45,18 +45,18 @@ export function DashboardPage() {
         />
       </section>
 
-      <section className="space-y-5">
+      <section className="space-y-6">
         <WatcherOverviewCard />
 
         <Link to="/notes" className="block">
-          <div className="group flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 transition-all duration-150 hover:border-primary/30 hover:bg-muted/60">
+          <div className="group flex items-center justify-between rounded-2xl bg-card px-6 py-5 shadow-sm ring-1 ring-border/70 transition-all duration-150 hover:bg-accent/70">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/15 text-primary">
                 <FileText className="h-4 w-4" />
               </div>
               <div>
                 <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Quick Access</p>
-                <p className="text-sm font-bold text-foreground">Notes</p>
+                <p className="text-sm font-semibold text-foreground">Notes</p>
               </div>
             </div>
             <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform duration-150 group-hover:translate-x-1 group-hover:text-primary" />
@@ -64,9 +64,9 @@ export function DashboardPage() {
         </Link>
 
         <Link to="/calendar" className="block">
-          <div className="group flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 transition-all duration-150 hover:border-primary/30 hover:bg-muted/60">
+          <div className="group flex items-center justify-between rounded-2xl bg-card px-6 py-5 shadow-sm ring-1 ring-border/70 transition-all duration-150 hover:bg-accent/70">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary/10 text-secondary">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-secondary/15 text-secondary">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                   <line x1="16" y1="2" x2="16" y2="6" />
@@ -76,7 +76,7 @@ export function DashboardPage() {
               </div>
               <div>
                 <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Quick Access</p>
-                <p className="text-sm font-bold text-foreground">Calendar</p>
+                <p className="text-sm font-semibold text-foreground">Calendar</p>
               </div>
             </div>
             <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform duration-150 group-hover:translate-x-1 group-hover:text-secondary" />

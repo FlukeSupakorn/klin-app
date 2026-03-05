@@ -77,13 +77,13 @@ export function SettingsPage() {
   const profileInitial = (profile?.name?.trim()?.charAt(0) || "G").toUpperCase();
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-7 pb-12">
       <div>
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Configuration</p>
         <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Settings</h2>
       </div>
 
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card p-4">
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">
         <div className="flex items-center gap-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Google Account</p>
         </div>
@@ -114,7 +114,7 @@ export function SettingsPage() {
             )}
 
             <div className="min-w-0">
-              <p className="truncate font-bold">
+              <p className="truncate font-semibold">
                 {isLoggedIn ? (profile?.name ?? "Google account") : "Not connected"}
               </p>
               <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
@@ -138,21 +138,21 @@ export function SettingsPage() {
 
       {authError && <p className="text-xs text-destructive">{authError}</p>}
 
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Configuration</p>
-          <h3 className="font-bold">Manage Settings</h3>
+            <h3 className="font-semibold">Manage Settings</h3>
         </div>
         <Button variant="outline" className="h-10 gap-2" onClick={() => setOpen(true)}>
           <SlidersHorizontal className="h-4 w-4" /> Open
         </Button>
       </section>
 
-      <section className="space-y-4 rounded-lg border border-border bg-card p-4">
+      <section className="space-y-5 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Automation</p>
-            <h3 className="font-bold">Auto Organize</h3>
+            <h3 className="font-semibold">Auto Organize</h3>
           </div>
           <button
             type="button"
@@ -161,10 +161,10 @@ export function SettingsPage() {
             aria-pressed={autoOrganizeEnabled}
             aria-checked={autoOrganizeEnabled}
             className={cn(
-              "inline-flex items-center gap-2 rounded-full border px-2 py-1 transition-colors",
+              "inline-flex items-center gap-2 rounded-full px-2 py-1 transition-colors",
               autoOrganizeEnabled
-                ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-border bg-muted text-muted-foreground",
+                ? "bg-primary/15 text-primary"
+                : "bg-muted text-muted-foreground",
             )}
           >
             <span
@@ -184,9 +184,9 @@ export function SettingsPage() {
           </button>
         </div>
 
-        <div className="flex items-center justify-between border-t border-border pt-4">
+        <div className="flex items-center justify-between border-t border-border/70 pt-4">
           <div>
-            <p className="text-xs font-bold">Manual Scan</p>
+            <p className="text-xs font-semibold">Manual Scan</p>
             <p className="text-xs text-muted-foreground">
               {watchedFolders.length === 0
                 ? "Add watched folders first"
@@ -205,11 +205,11 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <section className="space-y-4 rounded-lg border border-border bg-card p-4">
+      <section className="space-y-5 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Security</p>
-            <h3 className="font-bold">Locked Paths</h3>
+            <h3 className="font-semibold">Locked Paths</h3>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" className="h-9 gap-2" onClick={() => void handleLockFiles()}>
