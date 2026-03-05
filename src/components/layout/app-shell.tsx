@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { bootstrapAppData } from "@/services/bootstrap-service";
 import { useAuthStore } from "@/features/auth/use-auth-store";
+import klinLogo from "@/assets/klin-logo.svg";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutGrid },
@@ -42,8 +43,8 @@ export function AppShell() {
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
       <header className="flex h-16 flex-shrink-0 items-center gap-3 px-6">
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary">
-          <span className="text-sm font-black tracking-tight text-primary-foreground">KL</span>
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center">
+          <img src={klinLogo} alt="KLIN" className="h-10 w-10 object-contain" />
         </div>
 
         <nav className="flex items-center gap-1.5">
@@ -110,8 +111,20 @@ export function AppShell() {
 
         <div className="flex-1" />
 
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-black text-foreground">
-          {profileInitial}
+        <div className="flex flex-shrink-0 items-center gap-3">
+          {profile && (
+            <div className="text-right">
+              <p className="text-sm font-semibold leading-none text-foreground">{profile.name}</p>
+              <p className="mt-0.5 text-[11px] font-black leading-none text-muted-foreground">{profile.email}</p>
+            </div>
+          )}
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-black text-foreground ring-2 ring-border">
+            {profile?.picture ? (
+              <img src={profile.picture} alt={profile.name ?? "Profile"} className="h-full w-full rounded-full object-cover" />
+            ) : (
+              profileInitial
+            )}
+          </div>
         </div>
       </header>
 

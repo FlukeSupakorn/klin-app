@@ -1,23 +1,24 @@
-:root {
-  --background: 0 0% 3%;
-  --foreground: 0 0% 96%;
-  --card: 0 0% 13%;
-  --card-foreground: 0 0% 96%;
-  --primary: 75 100% 44%;
-  --primary-foreground: 0 0% 5%;
-  --secondary: 27 96% 53%;
-  --secondary-foreground: 0 0% 5%;
-  --border: 0 0% 21%;
-  --muted: 0 0% 18%;
-  --muted-foreground: 0 0% 55%;
-  --popover: 0 0% 13%;
-  --popover-foreground: 0 0% 96%;
-  --accent: 75 100% 44%;
-  --accent-foreground: 0 0% 5%;
+﻿:root {
+  /* Light blue theme - matches KLIN logo gradient */
+  --background: 216 100% 98%;
+  --foreground: 0 0% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 10%;
+  --primary: 211 84% 56%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 197 86% 64%;
+  --secondary-foreground: 0 0% 10%;
+  --border: 214 47% 91%;
+  --muted: 214 60% 96%;
+  --muted-foreground: 207 12% 59%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 10%;
+  --accent: 214 100% 95%;
+  --accent-foreground: 211 84% 56%;
   --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 96%;
-  --input: 0 0% 21%;
-  --ring: 75 100% 44%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 214 60% 96%;
+  --ring: 211 84% 56%;
 
   --radius: 0.75rem;
   --sidebar-width: 64px;
