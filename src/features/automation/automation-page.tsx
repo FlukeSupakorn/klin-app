@@ -142,9 +142,12 @@ export function AutomationPage() {
           <Button
             variant="outline"
             className="w-full justify-start gap-3 border-border bg-card hover:border-primary/30"
-            onClick={async () => addWatchedFolder("C:/Users/User/Desktop")}
+            onClick={async () => {
+              const picked = await tauriClient.pickFolderForOrganize();
+              if (picked) addWatchedFolder(picked);
+            }}
           >
-            <FolderPlus className="h-4 w-4 text-primary" /> Desktop Folder
+            <FolderPlus className="h-4 w-4 text-primary" /> Browse Folder…
           </Button>
         </div>
       </div>

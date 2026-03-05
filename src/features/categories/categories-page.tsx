@@ -10,7 +10,10 @@ import { cn } from "@/lib/utils";
 
 export function CategoriesPage() {
   const [name, setName] = useState("");
-  const { categories, createCategory, deleteCategory, updateCategory } = useCategoryStore();
+  const categories = useCategoryStore((state) => state.categories);
+  const createCategory = useCategoryStore((state) => state.createCategory);
+  const deleteCategory = useCategoryStore((state) => state.deleteCategory);
+  const updateCategory = useCategoryStore((state) => state.updateCategory);
   const logs = useLogStore((state) => state.logs);
 
   const activeCount = categories.filter(c => c.active).length;
@@ -29,7 +32,7 @@ export function CategoriesPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Management</p>
-          <h2 className="text-2xl font-black text-foreground">Categories</h2>
+          <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Categories</h2>
         </div>
         <div className="flex gap-3">
           <div className="rounded-xl border border-border bg-card px-4 py-2 text-center">

@@ -15,8 +15,11 @@ export function DeveloperPage() {
   const exclusionPatterns = usePrivacyStore((state) => state.exclusionPatterns);
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Developer</h2>
+    <div className="space-y-6 pb-10">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Internal</p>
+        <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Developer</h2>
+      </div>
       <Card>
         <CardHeader><CardTitle>State Snapshot</CardTitle></CardHeader>
         <CardContent>

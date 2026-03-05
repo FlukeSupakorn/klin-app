@@ -30,7 +30,13 @@ export function DashboardPage() {
   };
 
   return (
-    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
+    <div className="space-y-6 pb-10">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Home</p>
+        <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Dashboard</h2>
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
       <section className="space-y-5">
         <OrganizeFilesPanel />
         <RecentMovementsSection
@@ -77,8 +83,7 @@ export function DashboardPage() {
           </div>
         </Link>
       </section>
-
-
+      </div>
     </div>
   );
 }

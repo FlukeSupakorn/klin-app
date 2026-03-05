@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from "uuid";
 import { ScoringStrategyFactory } from "@/lib/ai-scoring-service";
 import { RuleEngine } from "@/services/rule-engine";
 import { tauriClient } from "@/services/tauri-client";
@@ -37,7 +36,7 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
 
   if (!targetFolder) {
     const unmappedLog: AutomationLog = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       itemType: "file",
       fileName: job.fileName,
       originalPath: job.filePath,
@@ -60,7 +59,7 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
   await tauriClient.moveFile({ sourcePath: job.filePath, destinationPath });
 
   const log: AutomationLog = {
-    id: uuidv4(),
+    id: crypto.randomUUID(),
     itemType: "file",
     fileName: job.fileName,
     originalPath: job.filePath,

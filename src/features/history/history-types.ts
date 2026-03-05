@@ -1,3 +1,5 @@
+import type { CategoryScore } from "@/types/domain";
+
 export type HistoryEntryType = "organize" | "summary" | "calendar";
 
 interface HistoryEntryBase {
@@ -8,18 +10,13 @@ interface HistoryEntryBase {
   timestamp: string;
 }
 
-export interface HistoryScore {
-  name: string;
-  score: number;
-}
-
 export interface OrganizeHistoryEntry extends HistoryEntryBase {
   type: "organize";
   fromPath: string;
   toPath: string;
   oldName: string;
   newName: string;
-  scores: HistoryScore[];
+  scores: CategoryScore[];
 }
 
 export interface SummaryHistoryEntry extends HistoryEntryBase {

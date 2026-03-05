@@ -11,7 +11,7 @@ interface CategoryManagementState {
   deleteCategory: (id: string) => void;
 }
 
-const defaultFolder = "/Users/sarun/Pictures";
+const defaultFolder = "";
 
 const initialCategories: ManagedCategory[] = [
   {

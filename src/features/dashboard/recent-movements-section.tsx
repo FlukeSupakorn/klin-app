@@ -39,7 +39,7 @@ export function RecentMovementsSection({ recentEntries, onOpenEntry }: RecentMov
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-semibold">Recent Movements</h3>
+        <h3 className="text-base font-black uppercase tracking-tight">Recent Movements</h3>
         <Link to="/history" className="text-sm font-medium text-primary hover:underline">
           View all history
         </Link>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, CalendarDays, WifiOff, AlertCircle, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -76,16 +77,20 @@ export function CalendarPage() {
   const today = new Date();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-10">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Schedule</p>
+        <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Calendar</h2>
+      </div>
 
       {!isGoogleConnected && (
         <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
           <LogIn className="h-4 w-4 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
             Connect Google Calendar in{" "}
-            <a href="/settings" className="text-primary underline-offset-2 hover:underline">
+            <Link to="/settings" className="text-primary underline-offset-2 hover:underline">
               Settings
-            </a>{" "}
+            </Link>{" "}
             to see your events.
           </p>
         </div>

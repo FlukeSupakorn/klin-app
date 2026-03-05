@@ -6,7 +6,9 @@ import { usePrivacyStore } from "@/stores/use-privacy-store";
 
 export function PrivacyPage() {
   const [pattern, setPattern] = useState("");
-  const { exclusionPatterns, addPattern, removePattern } = usePrivacyStore();
+  const exclusionPatterns = usePrivacyStore((state) => state.exclusionPatterns);
+  const addPattern = usePrivacyStore((state) => state.addPattern);
+  const removePattern = usePrivacyStore((state) => state.removePattern);
 
   return (
     <div className="space-y-6 pb-10">

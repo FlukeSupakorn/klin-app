@@ -8,7 +8,9 @@ import { useRuleStore } from "@/stores/use-rule-store";
 
 export function RulesPage() {
   const categories = useCategoryStore((state) => state.categories);
-  const { categoryToFolderMap, setMapping, removeMapping } = useRuleStore();
+  const categoryToFolderMap = useRuleStore((state) => state.categoryToFolderMap);
+  const setMapping = useRuleStore((state) => state.setMapping);
+  const removeMapping = useRuleStore((state) => state.removeMapping);
   const [categoryName, setCategoryName] = useState("");
   const [folderPath, setFolderPath] = useState("");
 

@@ -9,6 +9,7 @@ import { tauriClient } from "@/services/tauri-client";
 import { historyApiService } from "@/services/history-api-service";
 import { HistoryEntryCard } from "@/features/history/history-entry-card";
 import { getPathTail, joinPath } from "@/features/history/history-utils";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 
 const TYPE_FILTERS: Array<{ label: string; value: "all" | HistoryEntryType }> = [
   { label: "All", value: "all" },
@@ -28,6 +29,7 @@ export function HistoryPage() {
   const [scoreExpandedIds, setScoreExpandedIds] = useState<string[]>([]);
   const [selectedScoreByEntryId, setSelectedScoreByEntryId] = useState<Record<string, string>>({});
   const [openedSummaryPath, setOpenedSummaryPath] = useState<string | null>(null);
+  const categoryDefaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
 
   const expandedEntryIdFromNavState =
     location.state && typeof location.state === "object" && "expandedEntryId" in location.state
@@ -144,7 +146,7 @@ export function HistoryPage() {
 
     setSelectedScoreByEntryId((state) => ({ ...state, [entryId]: categoryName }));
     const fileName = getPathTail(target.toPath);
-    const nextToPath = joinPath(`C:/Users/supak/Documents/KLIN/${categoryName}`, fileName);
+    const nextToPath = joinPath(`${categoryDefaultFolder}/${categoryName}`, fileName);
     applyOrganizeDestinationChange(entryId, nextToPath, `Destination changed via score: ${categoryName}`);
   };
 

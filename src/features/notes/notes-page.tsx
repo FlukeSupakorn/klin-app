@@ -17,7 +17,7 @@ export function NotesPage() {
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
           Documents
         </p>
-        <h2 className="text-2xl font-black uppercase tracking-tight">Notes</h2>
+        <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Notes</h2>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border bg-card">

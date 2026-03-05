@@ -10,6 +10,7 @@ import { NotesPage } from "@/features/notes/notes-page";
 import { FileHealthPage } from "@/features/file-health/file-health-page";
 import { PrivacyPage } from "@/features/privacy/privacy-page";
 import { CalendarPage } from "@/features/calendar/calendar-page";
+import { DeveloperPage } from "@/features/developer/developer-page";
 import { RouteErrorPage } from "@/app/route-error-page";
 
 export const router = createBrowserRouter([
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
       { path: "file-health", element: <FileHealthPage /> },
       { path: "privacy", element: <PrivacyPage /> },
       { path: "settings", element: <SettingsPage /> },
+      { path: "developer", element: <DeveloperPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

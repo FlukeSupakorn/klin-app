@@ -25,7 +25,7 @@ export function FileDropOverlay({ visible }: FileDropOverlayProps) {
         <div className="flex h-20 w-20 items-center justify-center rounded-2xl border-2 border-primary bg-primary/10 shadow-[0_0_24px_hsl(var(--primary)/0.3)]">
           <Upload className="h-9 w-9 text-primary" />
         </div>
-        <p className="text-xl font-semibold text-foreground">Drop to Organize</p>
+        <p className="text-xl font-black text-foreground">Drop to Organize</p>
         <p className="text-sm text-muted-foreground">Release to send files to the organizer</p>
       </div>
     </div>,
