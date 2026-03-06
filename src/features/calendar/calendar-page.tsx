@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, CalendarDays, WifiOff, AlertCircle, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,17 +17,30 @@ export function CalendarPage() {
   const setSelectedDate = useCalendarStore((state) => state.setSelectedDate);
   const openDateModal = useCalendarStore((state) => state.openDateModal);
   const loadVisibleMonth = useCalendarStore((state) => state.loadVisibleMonth);
+  const prefetchMonth = useCalendarStore((state) => state.prefetchMonth);
+  const initializeMonths = useCalendarStore((state) => state.initializeMonths);
   const getEventsForDate = useCalendarStore((state) => state.getEventsForDate);
   const isLoadingMonth = useCalendarStore((state) => state.isLoadingMonth);
   const isCalendarOffline = useCalendarStore((state) => state.isOffline);
   const calendarError = useCalendarStore((state) => state.error);
-  const authToken = useAuthStore((state) => state.accessToken);
-  const isGoogleConnected = Boolean(authToken);
+  const authInitialized = useAuthStore((state) => state.initialized);
+  const authStatus = useAuthStore((state) => state.status);
+  const isGoogleConnected = authInitialized && authStatus === "authenticated";
+
+  const wasConnectedRef = useRef(false);
 
   useEffect(() => {
-    if (!isGoogleConnected) return;
-    void loadVisibleMonth(visibleMonth);
-  }, [isGoogleConnected, loadVisibleMonth, visibleMonth]);
+    if (!isGoogleConnected) {
+      wasConnectedRef.current = false;
+      return;
+    }
+    if (!wasConnectedRef.current) {
+      wasConnectedRef.current = true;
+      void initializeMonths();
+    } else {
+      void loadVisibleMonth(visibleMonth);
+    }
+  }, [isGoogleConnected, visibleMonth, initializeMonths, loadVisibleMonth]);
 
   const calendarDays = useMemo(() => {
     const year = visibleMonth.getFullYear();
@@ -55,23 +68,21 @@ export function CalendarPage() {
 
   const goToPrevMonth = () => {
     const prev = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
+    const prevPrev = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 2, 1);
     setVisibleMonth(prev);
-    if (isGoogleConnected) void loadVisibleMonth(prev);
+    if (isGoogleConnected) void prefetchMonth(prevPrev);
   };
 
   const goToNextMonth = () => {
     const next = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1);
+    const nextNext = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 2, 1);
     setVisibleMonth(next);
-    if (isGoogleConnected) void loadVisibleMonth(next);
+    if (isGoogleConnected) void prefetchMonth(nextNext);
   };
 
-  const handleSelectDate = (date: Date, eventCount: number) => {
+  const handleSelectDate = (date: Date, _eventCount: number) => {
     setSelectedDate(date);
     openDateModal(date);
-    if (isGoogleConnected) {
-      setVisibleMonth(date);
-      void loadVisibleMonth(date);
-    }
   };
 
   const today = new Date();

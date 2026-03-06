@@ -48,6 +48,8 @@ interface CalendarStoreState {
   openDateModal: (date: Date) => void;
   closeDateModal: () => void;
   loadVisibleMonth: (month: Date, force?: boolean) => Promise<void>;
+  prefetchMonth: (month: Date) => Promise<void>;
+  initializeMonths: () => Promise<void>;
   getEventsForDate: (date: Date) => NormalizedCalendarEvent[];
   getEventCountForDate: (date: Date) => number;
 }
@@ -86,15 +88,6 @@ export const useCalendarStore = create<CalendarStoreState>((set, get) => ({
       return;
     }
 
-    if (!navigator.onLine) {
-      set({
-        visibleMonth: month,
-        isOffline: true,
-        error: "You are offline."
-      });
-      return;
-    }
-
     const authState = useAuthStore.getState();
     const token = await authState.ensureValidToken();
 
@@ -122,6 +115,7 @@ export const useCalendarStore = create<CalendarStoreState>((set, get) => ({
           [monthKey]: events,
         },
         isLoadingMonth: false,
+        isOffline: false,
         error: null,
       }));
     } catch (error) {
@@ -150,6 +144,37 @@ export const useCalendarStore = create<CalendarStoreState>((set, get) => ({
         error: offline ? "You are offline." : "Could not load calendar events.",
       });
     }
+  },
+
+  prefetchMonth: async (month) => {
+    const monthKey = getMonthKey(month);
+    if (get().monthCache[monthKey]) return;
+
+    const token = await useAuthStore.getState().ensureValidToken();
+    if (!token) return;
+
+    try {
+      const events = await googleCalendarService.fetchMonthEvents(token, month);
+      set((current) => ({
+        monthCache: {
+          ...current.monthCache,
+          [monthKey]: events,
+        },
+      }));
+    } catch {
+    }
+  },
+
+  initializeMonths: async () => {
+    const { visibleMonth, loadVisibleMonth, prefetchMonth } = get();
+    const prev = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
+    const next = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1);
+
+    await Promise.all([
+      loadVisibleMonth(visibleMonth),
+      prefetchMonth(prev),
+      prefetchMonth(next),
+    ]);
   },
 
   getEventsForDate: (date) => {
