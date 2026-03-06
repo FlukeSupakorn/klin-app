@@ -12,7 +12,7 @@ export function DeveloperPage() {
   const categories = useCategoryStore((state) => state.categories);
   const rules = useRuleStore((state) => state.categoryToFolderMap);
   const logs = useLogStore((state) => state.logs);
-  const exclusionPatterns = usePrivacyStore((state) => state.exclusionPatterns);
+  const lockedPaths = usePrivacyStore((state) => state.lockedPaths);
 
   return (
     <div className="space-y-6 pb-10">
@@ -34,7 +34,7 @@ export function DeveloperPage() {
                 categories,
                 rules,
                 logCount: logs.length,
-                privacy: exclusionPatterns,
+                privacy: lockedPaths,
               },
               null,
               2,

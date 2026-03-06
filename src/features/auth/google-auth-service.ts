@@ -19,9 +19,21 @@ export interface GoogleAccessTokenResult {
   profile: GoogleProfile;
 }
 
+export interface GoogleTokenOnlyResult {
+  accessToken: string;
+  expiresAt: number;
+}
+
 interface GoogleTokenResponse {
   access_token: string;
   expires_in: number;
+  error?: string;
+  error_description?: string;
+}
+
+interface GoogleCodeTokenResponse {
+  access_token?: string;
+  expires_in?: number;
   error?: string;
   error_description?: string;
 }
@@ -182,6 +194,88 @@ class GoogleAuthService {
       accessToken: tokenResponse.access_token,
       expiresAt: Date.now() + tokenResponse.expires_in * 1000,
       profile,
+    };
+  }
+
+  private base64UrlEncode(bytes: Uint8Array): string {
+    const binary = Array.from(bytes, (b) => String.fromCharCode(b)).join("");
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+
+  async createPkcePair(): Promise<{ codeVerifier: string; codeChallenge: string }> {
+    const verifierBytes = crypto.getRandomValues(new Uint8Array(64));
+    const codeVerifier = this.base64UrlEncode(verifierBytes);
+
+    const encoder = new TextEncoder();
+    const digest = await crypto.subtle.digest("SHA-256", encoder.encode(codeVerifier));
+    const codeChallenge = this.base64UrlEncode(new Uint8Array(digest));
+
+    return { codeVerifier, codeChallenge };
+  }
+
+  buildDesktopAuthUrl(input: {
+    clientId: string;
+    redirectUri: string;
+    codeChallenge: string;
+    prompt?: "consent" | "";
+    state?: string;
+  }): string {
+    const params = new URLSearchParams({
+      client_id: input.clientId,
+      redirect_uri: input.redirectUri,
+      response_type: "code",
+      scope: GOOGLE_CALENDAR_SCOPES.join(" "),
+      code_challenge: input.codeChallenge,
+      code_challenge_method: "S256",
+      include_granted_scopes: "true",
+      access_type: "offline",
+      prompt: input.prompt ?? "consent",
+    });
+
+    if (input.state) {
+      params.set("state", input.state);
+    }
+
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  async exchangeCodeForToken(input: {
+    clientId: string;
+    code: string;
+    codeVerifier: string;
+    redirectUri: string;
+    clientSecret?: string;
+  }): Promise<GoogleTokenOnlyResult> {
+    const body = new URLSearchParams({
+      code: input.code,
+      client_id: input.clientId,
+      code_verifier: input.codeVerifier,
+      redirect_uri: input.redirectUri,
+      grant_type: "authorization_code",
+    });
+
+    if (input.clientSecret) {
+      body.set("client_secret", input.clientSecret);
+    }
+
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: body.toString(),
+    });
+
+    const tokenPayload = (await tokenResponse.json()) as GoogleCodeTokenResponse;
+
+    if (!tokenResponse.ok || tokenPayload.error || !tokenPayload.access_token || !tokenPayload.expires_in) {
+      const errorMessage = tokenPayload.error_description ?? tokenPayload.error ?? "Failed to exchange OAuth code";
+      throw new Error(errorMessage);
+    }
+
+    return {
+      accessToken: tokenPayload.access_token,
+      expiresAt: Date.now() + tokenPayload.expires_in * 1000,
     };
   }
 

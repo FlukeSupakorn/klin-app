@@ -35,4 +35,5 @@ export interface TauriClient {
   listLogs(): Promise<AutomationLog[]>;
   getCategories(): Promise<Category[]>;
   saveRuleMapping(input: SaveRuleMappingDto): Promise<void>;
+  startOAuthListener(): Promise<void>;
 }

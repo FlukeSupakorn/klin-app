@@ -1,4 +1,5 @@
-import type { HistoryEntry, HistoryScore } from "@/features/history/history-types";
+import type { HistoryEntry } from "@/features/history/history-types";
+import type { CategoryScore } from "@/types/domain";
 
 const HISTORY_API_URL_CANDIDATES = [
   "http://localhost:3000/history",
@@ -17,7 +18,7 @@ function normalizeScore(value: number): number {
   return Number(value.toFixed(4));
 }
 
-function normalizeScores(input: unknown): HistoryScore[] {
+function normalizeScores(input: unknown): CategoryScore[] {
   if (!Array.isArray(input)) {
     return [];
   }
@@ -36,7 +37,7 @@ function normalizeScores(input: unknown): HistoryScore[] {
 
       return { name, score: normalizeScore(score) };
     })
-    .filter((item): item is HistoryScore => item !== null)
+    .filter((item): item is CategoryScore => item !== null)
     .sort((a, b) => b.score - a.score);
 }
 
@@ -63,7 +64,7 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
   })();
 
   return rawEntries
-    .map((entry, index) => {
+    .map((entry, index): HistoryEntry | null => {
       if (!entry || typeof entry !== "object") {
         return null;
       }
@@ -165,7 +166,7 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
 
       return null;
     })
-    .filter((entry): entry is HistoryEntry => entry !== null);
+    .filter((entry): entry is HistoryEntry => entry !== null) as HistoryEntry[];
 }
 
 async function fetchHistoryFrom(url: string): Promise<HistoryEntry[]> {

@@ -61,6 +61,10 @@ class TauriCommandClient implements TauriClient {
   saveRuleMapping(input: SaveRuleMappingDto): Promise<void> {
     return invoke("save_rule_mapping", { input });
   }
+
+  startOAuthListener(): Promise<void> {
+    return invoke("start_oauth_listener");
+  }
 }
 
 export const tauriClient: TauriClient = new TauriCommandClient();

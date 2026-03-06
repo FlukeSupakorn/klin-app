@@ -22,6 +22,7 @@ interface AuthState {
 }
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const googleClientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET as string | undefined;
 
 export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   initialized: false,
@@ -113,7 +114,9 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
     }
 
     try {
-      await googleAuthService.initialize(googleClientId);
+      if (!("__TAURI_INTERNALS__" in window)) {
+        await googleAuthService.initialize(googleClientId);
+      }
       set({ initialized: true, error: null });
     } catch (error) {
       set({
@@ -132,9 +135,67 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
 
     set({ status: "loading", error: null });
 
+    const isDesktop = "__TAURI_INTERNALS__" in window;
+
+    if (isDesktop) {
+      try {
+        const { codeVerifier, codeChallenge } = await googleAuthService.createPkcePair();
+        const redirectUri = "http://127.0.0.1:17920/callback";
+
+        await tauriClient.startOAuthListener();
+
+        const unlisten = await listen<string>("oauth-callback-code", async (event) => {
+          unlisten();
+          const code = event.payload;
+
+          if (!code) {
+            set({ status: "error", error: "Google sign-in cancelled or failed" });
+            return;
+          }
+
+          try {
+            const tokenResult = await googleAuthService.exchangeCodeForToken({
+              clientId: googleClientId!,
+              code,
+              codeVerifier,
+              redirectUri,
+              clientSecret: googleClientSecret,
+            });
+            const profile = await googleAuthService.fetchProfile(tokenResult.accessToken);
+            set({
+              status: "authenticated",
+              accessToken: tokenResult.accessToken,
+              expiresAt: tokenResult.expiresAt,
+              profile,
+              error: null,
+            });
+          } catch (err) {
+            set({
+              status: "error",
+              error: err instanceof Error ? err.message : "Failed to complete Google sign-in",
+            });
+          }
+        });
+
+        const authUrl = googleAuthService.buildDesktopAuthUrl({
+          clientId: googleClientId,
+          redirectUri,
+          codeChallenge,
+          prompt: "consent",
+        });
+
+        await tauriClient.openExternalUrl(authUrl);
+      } catch (error) {
+        set({
+          status: "error",
+          error: error instanceof Error ? error.message : "Google sign-in failed",
+        });
+      }
+      return;
+    }
+
     try {
       const token = await googleAuthService.requestAccessToken(googleClientId, "consent");
-
       set({
         status: "authenticated",
         accessToken: token.accessToken,
@@ -145,14 +206,10 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Google sign-in failed";
-
       const authUrl = googleAuthService.getManualAuthUrl(googleClientId);
       try {
         await tauriClient.openExternalUrl(authUrl);
-        set({
-          status: "loading",
-          error: null,
-        });
+        set({ status: "loading", error: null });
         return;
       } catch {
         window.location.href = authUrl;
@@ -199,7 +256,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
 
   handleDeepLinkCallback: async (url: string) => {
     console.log("Processing deep link callback...", url);
-    
+
     const callbackData = googleAuthService.parseTokenFromUrl(url);
     if (!callbackData) {
       set({

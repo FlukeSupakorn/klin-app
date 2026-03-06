@@ -456,8 +456,6 @@ export function OrganizeFilesPanel() {
       <SettingsManagementDialogs
         open={openSettingsWindow}
         sections={["default-folder", "categories"]}
-        title="Manage Categories"
-        description="Update default folder and categories."
         onClose={() => setOpenSettingsWindow(false)}
       />
     </>

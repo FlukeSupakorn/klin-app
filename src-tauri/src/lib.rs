@@ -105,6 +105,7 @@ pub fn run() {
             commands::list_logs,
             commands::get_categories,
             commands::save_rule_mapping,
+            commands::start_oauth_listener,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
