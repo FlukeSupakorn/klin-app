@@ -6,9 +6,15 @@ import { SettingsPage } from "@/features/settings/settings-page";
 import { NotesPage } from "@/features/notes/notes-page";
 import { CalendarPage } from "@/features/calendar/calendar-page";
 import { DeveloperPage } from "@/features/developer/developer-page";
+import { OAuthCallbackPage } from "@/features/auth/oauth-callback-page";
 import { RouteErrorPage } from "@/app/route-error-page";
 
 export const router = createBrowserRouter([
+  {
+    path: "/oauth-callback",
+    element: <OAuthCallbackPage />,
+    errorElement: <RouteErrorPage />,
+  },
   {
     path: "/",
     element: <AppShell />,

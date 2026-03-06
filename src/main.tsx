@@ -7,9 +7,10 @@ import "@/styles/globals.css";
 
 const isTauri = "__TAURI__" in window;
 const hash = window.location.hash;
+const pathname = window.location.pathname;
 
-if (!isTauri && hash.includes("access_token=")) {
-  window.location.replace(`klin://auth${hash}`);
+if (!isTauri && pathname !== "/oauth-callback" && hash.includes("access_token=")) {
+  window.location.replace(`/oauth-callback${hash}`);
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
