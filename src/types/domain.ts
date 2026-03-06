@@ -82,20 +82,36 @@ export interface OrganizePreviewItem {
 }
 
 export interface OrganizeAnalyzeRequest {
-  filePaths: string[];
-  categories: Array<{
-    name: string;
-    description: string;
-  }>;
+  filepaths: string[];
+}
+
+export interface OrganizeAnalyzeCategoryScore {
+  category_id: string;
+  name: string;
+  score: number;
+}
+
+export interface OrganizeAnalyzeAnalysis {
+  summary: string | null;
+  suggested_name: string | null;
+}
+
+export interface OrganizeAnalyzeTopCategory {
+  category_id: string;
+  name: string;
+  score: number;
+  destination_path: string | null;
 }
 
 export interface OrganizeAnalyzeFileResult {
-  score: Record<string, number>;
-  new_name: string[];
-  summary: string | null;
-  calendar: string | null;
+  filepath: string;
+  file_id: string;
+  analysis: OrganizeAnalyzeAnalysis;
+  categories: OrganizeAnalyzeCategoryScore[];
+  top_category: OrganizeAnalyzeTopCategory | null;
+  error: string | null;
 }
 
 export interface OrganizeAnalyzeResponse {
-  result: Record<string, OrganizeAnalyzeFileResult>;
+  results: OrganizeAnalyzeFileResult[];
 }

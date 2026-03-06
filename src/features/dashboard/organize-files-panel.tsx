@@ -39,7 +39,7 @@ export function OrganizeFilesPanel() {
       setItems(analyzedItems);
       setMovedItemIds([]);
     } catch {
-      setErrorMessage("Could not load suggestions. Check your API server at localhost:3000.");
+      setErrorMessage("Could not load suggestions. Check your worker sidecar at 127.0.0.1:8000.");
       setItems([]);
       setMovedItemIds([]);
     } finally {

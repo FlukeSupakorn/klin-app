@@ -10,6 +10,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use tauri::{Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_shell::{process::CommandEvent, ShellExt};
 use repositories::{json_category_repository::JsonCategoryRepository, json_log_repository::JsonLogRepository, json_rule_repository::JsonRuleRepository};
 use services::{category_service::CategoryService, log_service::LogService, rule_service::RuleService};
 
@@ -32,9 +33,39 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let app_data_dir = infrastructure::app_paths::resolve_app_data_dir(app.handle())?;
+            let app_data_dir_arg = app_data_dir.to_string_lossy().to_string();
             std::fs::create_dir_all(&app_data_dir)?;
+
+            let sidecar_cmd = app
+                .shell()
+                .sidecar("klin-worker")?
+                .env("KLIN_APP_DATA_DIR", app_data_dir_arg.clone())
+                .args([
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    "8000",
+                    "--data-dir",
+                    app_data_dir_arg.as_str(),
+                ]);
+
+            let (mut rx, _worker_child) = sidecar_cmd.spawn()?;
+            tauri::async_runtime::spawn(async move {
+                while let Some(event) = rx.recv().await {
+                    match event {
+                        CommandEvent::Stdout(line) => {
+                            eprintln!("[klin-worker] {}", String::from_utf8_lossy(&line));
+                        }
+                        CommandEvent::Stderr(line) => {
+                            eprintln!("[klin-worker][stderr] {}", String::from_utf8_lossy(&line));
+                        }
+                        _ => {}
+                    }
+                }
+            });
 
             let log_repo = JsonLogRepository::new(app_data_dir.join("logs.json"));
             let rule_repo = JsonRuleRepository::new(app_data_dir.join("rules.json"));

@@ -5,6 +5,26 @@
   "windows": ["*"],
   "permissions": [
     "core:default",
-    "core:event:allow-listen"
+    "core:event:allow-listen",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/klin-worker",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/klin-worker",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    }
   ]
 }
