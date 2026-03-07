@@ -28,6 +28,12 @@ export interface NoteFileEntryDto {
   last_modified_ms: number;
 }
 
+export interface AutomationConfigDto {
+  auto_organize_enabled: boolean;
+  watched_folders: string[];
+  scan_interval_seconds: number;
+}
+
 export interface TauriClient {
   moveFile(input: MoveFileDto): Promise<void>;
   readFolder(input: ReadFolderDto): Promise<string[]>;
@@ -46,4 +52,6 @@ export interface TauriClient {
   getCategories(): Promise<Category[]>;
   saveRuleMapping(input: SaveRuleMappingDto): Promise<void>;
   startOAuthListener(): Promise<void>;
+  saveAutomationConfig(config: AutomationConfigDto): Promise<void>;
+  loadAutomationConfig(): Promise<AutomationConfigDto>;
 }

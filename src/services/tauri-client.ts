@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  AutomationConfigDto,
   MoveFileDto,
   NoteFileEntryDto,
   ReadFolderDto,
@@ -77,6 +78,14 @@ class TauriCommandClient implements TauriClient {
 
   startOAuthListener(): Promise<void> {
     return invoke("start_oauth_listener");
+  }
+
+  saveAutomationConfig(config: AutomationConfigDto): Promise<void> {
+    return invoke("save_automation_config", { config });
+  }
+
+  loadAutomationConfig(): Promise<AutomationConfigDto> {
+    return invoke("load_automation_config");
   }
 }
 

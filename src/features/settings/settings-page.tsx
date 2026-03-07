@@ -13,11 +13,14 @@ import { usePrivacyStore } from "@/stores/use-privacy-store";
 
 export function SettingsPage() {
   const [open, setOpen] = useState(false);
-  const [autoOrganizeEnabled, setAutoOrganizeEnabled] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isCountingWatcherFiles, setIsCountingWatcherFiles] = useState(false);
+  const [watcherFolderStats, setWatcherFolderStats] = useState<Array<{ folderPath: string; fileCount: number }>>([]);
 
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
+  const isRunning = useAutomationStore((state) => state.isRunning);
   const concurrencyLimit = useAutomationStore((state) => state.concurrencyLimit);
+  const setRunning = useAutomationStore((state) => state.setRunning);
   const setLastScanTime = useAutomationStore((state) => state.setLastScanTime);
   const queueRef = useRef(new AsyncProcessingQueue(concurrencyLimit));
 
@@ -53,6 +56,48 @@ export function SettingsPage() {
       setIsScanning(false);
     }
   };
+
+  const refreshWatcherFileCounts = async () => {
+    if (!isRunning || watchedFolders.length === 0) {
+      setWatcherFolderStats([]);
+      return;
+    }
+
+    setIsCountingWatcherFiles(true);
+    try {
+      const counts = await Promise.all(
+        watchedFolders.map(async (folderPath) => {
+          const files = await tauriClient.readFolder({ folderPath }).catch(() => []);
+          return {
+            folderPath,
+            fileCount: files.length,
+          };
+        }),
+      );
+      setWatcherFolderStats(counts);
+    } finally {
+      setIsCountingWatcherFiles(false);
+    }
+  };
+
+  useEffect(() => {
+    void refreshWatcherFileCounts();
+  }, [isRunning, watchedFolders]);
+
+  useEffect(() => {
+    void tauriClient
+      .saveAutomationConfig({
+        auto_organize_enabled: isRunning,
+        watched_folders: watchedFolders,
+        scan_interval_seconds: 60,
+      })
+      .catch(() => undefined);
+  }, [isRunning, watchedFolders]);
+
+  const totalWatchedFiles = useMemo(
+    () => watcherFolderStats.reduce((sum, item) => sum + item.fileCount, 0),
+    [watcherFolderStats],
+  );
 
   const authStatus = useAuthStore((state) => state.status);
   const authError = useAuthStore((state) => state.error);
@@ -156,13 +201,13 @@ export function SettingsPage() {
           </div>
           <button
             type="button"
-            onClick={() => setAutoOrganizeEnabled((state) => !state)}
+            onClick={() => setRunning(!isRunning)}
             role="switch"
-            aria-pressed={autoOrganizeEnabled}
-            aria-checked={autoOrganizeEnabled}
+            aria-pressed={isRunning}
+            aria-checked={isRunning}
             className={cn(
               "inline-flex items-center gap-2 rounded-full px-2 py-1 transition-colors",
-              autoOrganizeEnabled
+              isRunning
                 ? "bg-primary/15 text-primary"
                 : "bg-muted text-muted-foreground",
             )}
@@ -170,17 +215,17 @@ export function SettingsPage() {
             <span
               className={cn(
                 "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
-                autoOrganizeEnabled ? "bg-primary" : "bg-muted-foreground/30",
+                isRunning ? "bg-primary" : "bg-muted-foreground/30",
               )}
             >
               <span
                 className={cn(
                   "h-4 w-4 rounded-full bg-background shadow transition-transform",
-                  autoOrganizeEnabled ? "translate-x-4" : "translate-x-0.5",
+                  isRunning ? "translate-x-4" : "translate-x-0.5",
                 )}
               />
             </span>
-            <span className="w-8 text-left text-xs font-black uppercase tracking-widest">{autoOrganizeEnabled ? "On" : "Off"}</span>
+            <span className="w-8 text-left text-xs font-black uppercase tracking-widest">{isRunning ? "On" : "Off"}</span>
           </button>
         </div>
 
@@ -203,6 +248,50 @@ export function SettingsPage() {
             {isScanning ? "Scanning..." : "Scan Now"}
           </Button>
         </div>
+
+        {isRunning && (
+          <div className="space-y-3 rounded-lg border border-dashed border-border bg-muted/20 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mock</p>
+                <h4 className="text-sm font-semibold">Watcher File Count</h4>
+              </div>
+              <Button
+                variant="ghost"
+                className="h-8 px-3 text-xs"
+                onClick={() => void refreshWatcherFileCounts()}
+                disabled={isCountingWatcherFiles}
+              >
+                {isCountingWatcherFiles ? "Refreshing..." : "Refresh"}
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+              Watching {watchedFolders.length} folder{watchedFolders.length !== 1 ? "s" : ""} with {totalWatchedFiles} file
+              {totalWatchedFiles !== 1 ? "s" : ""} total.
+            </div>
+
+            {watchedFolders.length === 0 ? (
+              <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+                No watched folders configured.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {watcherFolderStats.map((item) => (
+                  <div
+                    key={item.folderPath}
+                    className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-xs"
+                  >
+                    <span className="min-w-0 truncate font-mono text-muted-foreground" title={item.folderPath}>
+                      {item.folderPath}
+                    </span>
+                    <span className="ml-3 flex-shrink-0 font-black text-foreground">{item.fileCount} file{item.fileCount !== 1 ? "s" : ""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="space-y-5 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">

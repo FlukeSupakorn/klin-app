@@ -6,6 +6,7 @@ mod repositories;
 mod services;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use tauri::{Emitter, Manager};
@@ -89,6 +90,53 @@ pub fn run() {
                 }
             });
 
+            if let Some(main_window) = app.get_webview_window("main") {
+                let close_window = main_window.clone();
+                main_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = close_window.hide();
+                    }
+                });
+            }
+
+            let scanner_app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let mut previous_has_files = false;
+
+                loop {
+                    std::thread::sleep(Duration::from_secs(60));
+
+                    let config = match commands::load_automation_config(scanner_app_handle.clone()) {
+                        Ok(config) => config,
+                        Err(_) => continue,
+                    };
+
+                    if !config.auto_organize_enabled || config.watched_folders.is_empty() {
+                        previous_has_files = false;
+                        continue;
+                    }
+
+                    let has_files = config
+                        .watched_folders
+                        .iter()
+                        .any(|folder| {
+                            services::file_service::FileService::read_folder(folder.clone())
+                                .map(|files| !files.is_empty())
+                                .unwrap_or(false)
+                        });
+
+                    if has_files && !previous_has_files {
+                        if let Some(main_window) = scanner_app_handle.get_webview_window("main") {
+                            let _ = main_window.show();
+                            let _ = main_window.set_focus();
+                        }
+                    }
+
+                    previous_has_files = has_files;
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -109,6 +157,8 @@ pub fn run() {
             commands::get_categories,
             commands::save_rule_mapping,
             commands::start_oauth_listener,
+            commands::save_automation_config,
+            commands::load_automation_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

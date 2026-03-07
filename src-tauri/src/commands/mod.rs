@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State};
 
 use crate::{
@@ -150,6 +150,50 @@ pub fn read_note_file(file_path: String) -> Result<String, String> {
     }
 
     std::fs::read_to_string(file_path).map_err(|err| err.to_string())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutomationConfigDto {
+    pub auto_organize_enabled: bool,
+    pub watched_folders: Vec<String>,
+    pub scan_interval_seconds: u64,
+}
+
+impl Default for AutomationConfigDto {
+    fn default() -> Self {
+        Self {
+            auto_organize_enabled: false,
+            watched_folders: Vec::new(),
+            scan_interval_seconds: 60,
+        }
+    }
+}
+
+#[tauri::command]
+pub fn save_automation_config<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    config: AutomationConfigDto,
+) -> Result<(), String> {
+    let app_data_dir = app_paths::resolve_app_data_dir(&app)?;
+    std::fs::create_dir_all(&app_data_dir).map_err(|err| err.to_string())?;
+
+    let config_path = app_data_dir.join("automation-config.json");
+    let json = serde_json::to_string_pretty(&config).map_err(|err| err.to_string())?;
+
+    std::fs::write(config_path, json).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn load_automation_config<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<AutomationConfigDto, String> {
+    let app_data_dir = app_paths::resolve_app_data_dir(&app)?;
+    let config_path = app_data_dir.join("automation-config.json");
+
+    if !config_path.exists() {
+        return Ok(AutomationConfigDto::default());
+    }
+
+    let json = std::fs::read_to_string(config_path).map_err(|err| err.to_string())?;
+    serde_json::from_str::<AutomationConfigDto>(&json).map_err(|err| err.to_string())
 }
 
 #[tauri::command]
