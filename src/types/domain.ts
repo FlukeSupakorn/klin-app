@@ -19,6 +19,7 @@ export interface ManagedCategory {
 }
 
 export interface CategoryScore {
+  categoryId?: string;
   name: string;
   score: number;
 }
@@ -71,6 +72,7 @@ export interface PaginationState {
 
 export interface OrganizePreviewItem {
   id: string;
+  workerFileId: string | null;
   fileName: string;
   currentPath: string;
   suggestedNames: string[];

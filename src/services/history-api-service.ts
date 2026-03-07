@@ -160,7 +160,9 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
 
       const id = "id" in entry ? String(entry.id ?? "") : `history-${index + 1}`;
       const action = "action" in entry ? String(entry.action ?? "") : "";
-      const inferredType = action.startsWith("organized") ? "organize" : "";
+      const inferredType = ["organized", "organized_cached", "organized_reclassified", "moved", "renamed", "renamed_moved"].includes(action)
+        ? "organize"
+        : "";
       const type = "type" in entry ? String(entry.type ?? inferredType) : inferredType;
       const timestamp =
         "timestamp" in entry
@@ -170,15 +172,28 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
             : new Date().toISOString();
 
       const backendCategory = "current_category" in entry ? String(entry.current_category ?? "") : "";
+      const backendSelectedCategory = "category" in entry && entry.category && typeof entry.category === "object"
+        ? String((entry.category as { name?: unknown }).name ?? "")
+        : "";
       const title =
         "title" in entry
           ? String(entry.title ?? "")
+          : "file_name" in entry
+            ? String(entry.file_name ?? "")
           : "original_path" in entry
             ? getPathTail(String(entry.original_path ?? ""))
             : "Organized file";
       const subtitle =
         "subtitle" in entry
           ? String(entry.subtitle ?? "")
+          : action === "renamed_moved"
+            ? "Renamed and moved"
+          : action === "renamed"
+            ? "Renamed"
+          : action === "moved"
+            ? "Moved"
+          : backendSelectedCategory
+            ? `Organized to ${backendSelectedCategory}`
           : backendCategory
             ? `Organized to ${backendCategory}`
             : "Organized";
@@ -189,7 +204,11 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
 
       if (type === "organize") {
         const backendOriginalPath = "original_path" in entry ? String(entry.original_path ?? "") : "";
-        const backendMovedPath = "moved_path" in entry ? String(entry.moved_path ?? "") : "";
+        const backendMovedPath = "moved_path" in entry
+          ? String(entry.moved_path ?? "")
+          : "new_path" in entry
+            ? String(entry.new_path ?? "")
+            : "";
         const defaultToPath = backendMovedPath || backendOriginalPath;
         const fromPath = "fromPath" in entry ? String(entry.fromPath ?? backendOriginalPath) : backendOriginalPath;
         const toPath = "toPath" in entry
@@ -197,7 +216,20 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
           : defaultToPath;
         const oldName = "oldName" in entry ? String(entry.oldName ?? getPathTail(fromPath)) : getPathTail(fromPath);
         const newName = "newName" in entry ? String(entry.newName ?? getPathTail(toPath)) : getPathTail(toPath);
-        const scores = normalizeScores("scores" in entry ? entry.scores : "categories" in entry ? entry.categories : []);
+        let scores = normalizeScores("scores" in entry ? entry.scores : "categories" in entry ? entry.categories : []);
+        if (scores.length === 0 && "category" in entry && entry.category && typeof entry.category === "object") {
+          const rawCategory = entry.category as { id?: unknown; name?: unknown; score?: unknown };
+          const name = typeof rawCategory.name === "string" ? rawCategory.name : "";
+          if (name) {
+            const rawScore = typeof rawCategory.score === "number"
+              ? rawCategory.score
+              : typeof rawCategory.score === "string"
+                ? Number(rawCategory.score)
+                : 0;
+            const normalized = normalizeScore(rawScore);
+            scores = [{ categoryId: typeof rawCategory.id === "string" ? rawCategory.id : undefined, name, score: normalized }];
+          }
+        }
 
         return {
           id,

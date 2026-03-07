@@ -27,6 +27,7 @@ export function buildQueuedItem(path: string, categories: ManagedCategory[], def
 
   return {
     id: crypto.randomUUID(),
+    workerFileId: null,
     fileName,
     currentPath: path,
     suggestedNames: [],

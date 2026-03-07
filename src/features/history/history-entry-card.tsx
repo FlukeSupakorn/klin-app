@@ -43,24 +43,16 @@ function hexToRgba(hex: string, alpha: number): string | null {
 interface HistoryEntryCardProps {
   entry: HistoryEntry;
   isExpanded: boolean;
-  isScoreExpanded: boolean;
-  selectedScoreCategory?: string;
   onToggleExpand: () => void;
-  onToggleScores: () => void;
   onRequestEditMovedTo: (entryId: string) => void;
-  onUseScoreFolder: (entryId: string, categoryName: string) => void;
   onOpenSummary: (path: string) => void;
 }
 
 export function HistoryEntryCard({
   entry,
   isExpanded,
-  isScoreExpanded,
-  selectedScoreCategory,
   onToggleExpand,
-  onToggleScores,
   onRequestEditMovedTo,
-  onUseScoreFolder,
   onOpenSummary,
 }: HistoryEntryCardProps) {
   const categories = useCategoryManagementStore((state) => state.categories);
@@ -173,11 +165,7 @@ export function HistoryEntryCard({
           {entry.type === "organize" && (
             <HistoryOrganizeDetails
               entry={entry}
-              isShowAllScores={isScoreExpanded}
-              selectedScoreCategory={selectedScoreCategory}
-              onToggleScores={onToggleScores}
               onRequestEditMovedTo={onRequestEditMovedTo}
-              onUseScoreFolder={onUseScoreFolder}
             />
           )}
 

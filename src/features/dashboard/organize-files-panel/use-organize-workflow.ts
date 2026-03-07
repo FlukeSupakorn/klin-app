@@ -389,6 +389,31 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
     setErrorMessage(null);
 
     try {
+      const selectedScore = item.topScores.find((score) => score.name === item.selectedCategory) ?? item.topScores[0];
+      const categoryByName = categories.find((category) => category.name === item.selectedCategory);
+      const selectedCategoryPayload = item.selectedCategory === "No category"
+        ? null
+        : {
+          id: selectedScore?.categoryId ?? categoryByName?.id ?? "",
+          name: item.selectedCategory,
+          score: Number(((selectedScore?.score ?? 0) <= 1 ? (selectedScore?.score ?? 0) * 100 : (selectedScore?.score ?? 0)).toFixed(2)),
+        };
+
+      if (!item.workerFileId) {
+        throw new Error("Missing worker file id. Please re-analyze this file before moving.");
+      }
+
+      if (selectedCategoryPayload && !selectedCategoryPayload.id) {
+        throw new Error(`Missing category id for '${item.selectedCategory}'. Please re-analyze or reselect category.`);
+      }
+
+      // Persist the user decision in worker first, then perform local file move.
+      await organizeApiService.applyDecision({
+        fileId: item.workerFileId,
+        selectedName: item.suggestedName,
+        selectedCategory: selectedCategoryPayload,
+      });
+
       await tauriClient.moveFile({ sourcePath: item.currentPath, destinationPath: item.destinationPath });
 
       setItems((state) => state.map((entry) => (
@@ -405,7 +430,7 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
       const chosenCategory = item.selectedCategory === "No category"
         ? "No category"
         : item.selectedCategory;
-      const selectedScore = item.topScores.find((score) => score.name === chosenCategory) ?? item.topScores[0];
+      const selectedScoreForLog = item.topScores.find((score) => score.name === chosenCategory) ?? item.topScores[0];
       const moveLog: AutomationLog = {
         id: crypto.randomUUID(),
         itemType: "file",
@@ -413,7 +438,7 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
         originalPath: item.currentPath,
         movedTo: item.destinationPath,
         chosenCategory,
-        score: selectedScore?.score ?? 0,
+        score: selectedScoreForLog?.score ?? 0,
         allScores: item.topScores,
         timestamp: new Date().toISOString(),
         processingTimeMs: 0,

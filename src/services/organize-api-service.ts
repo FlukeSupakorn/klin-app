@@ -93,6 +93,7 @@ function parseScoreEntries(fileResult: OrganizeAnalyzeFileResult | undefined): C
 
   return fileResult.categories
     .map((entry) => ({
+      categoryId: entry.category_id,
       name: entry.name,
       score: normalizeScore(entry.score),
     }))
@@ -238,6 +239,7 @@ export const organizeApiService = {
 
       return {
         id: crypto.randomUUID(),
+        workerFileId: fileResult?.file_id ?? null,
         fileName,
         currentPath: path,
         suggestedNames,
@@ -267,6 +269,7 @@ export const organizeApiService = {
     const fileName = path.split(/[\\/]/).pop() ?? "unknown-file";
     return {
       id: crypto.randomUUID(),
+      workerFileId: null,
       fileName,
       currentPath: path,
       suggestedNames: [],
@@ -283,5 +286,53 @@ export const organizeApiService = {
       lastMovedFromPath: null,
       lastMovedToPath: null,
     };
+  },
+
+  async applyDecision(input: {
+    fileId: string;
+    selectedName: string | null;
+    selectedCategory: { id: string; name: string; score: number } | null;
+  }): Promise<void> {
+    const urlCandidates = [
+      "http://127.0.0.1:8000/api/organize/apply",
+      "http://localhost:8000/api/organize/apply",
+    ];
+
+    const payload = {
+      file_id: input.fileId,
+      selected_name: input.selectedName,
+      selected_category: input.selectedCategory
+        ? {
+          id: input.selectedCategory.id,
+          name: input.selectedCategory.name,
+          score: input.selectedCategory.score,
+        }
+        : null,
+    };
+
+    let lastError: unknown = null;
+
+    for (const url of urlCandidates) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          lastError = new Error(`Organize apply API error: ${response.status} at ${url}`);
+          continue;
+        }
+
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError ?? new Error("Organize apply API unavailable");
   },
 };

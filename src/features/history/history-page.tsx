@@ -32,8 +32,6 @@ export function HistoryPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | HistoryEntryType>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [scoreExpandedIds, setScoreExpandedIds] = useState<string[]>([]);
-  const [selectedScoreByEntryId, setSelectedScoreByEntryId] = useState<Record<string, string>>({});
   const [openedSummaryPath, setOpenedSummaryPath] = useState<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const categoryDefaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
@@ -190,18 +188,6 @@ export function HistoryPage() {
     applyOrganizeDestinationChange(entryId, joinPath(pickedFolder, fileName), "Destination updated manually");
   };
 
-  const handleUseScoreFolder = (entryId: string, categoryName: string) => {
-    const target = historyEntries.find((entry) => entry.id === entryId && entry.type === "organize");
-    if (!target || target.type !== "organize") {
-      return;
-    }
-
-    setSelectedScoreByEntryId((state) => ({ ...state, [entryId]: categoryName }));
-    const fileName = getPathTail(target.toPath);
-    const nextToPath = joinPath(`${categoryDefaultFolder}/${categoryName}`, fileName);
-    applyOrganizeDestinationChange(entryId, nextToPath, `Destination changed via score: ${categoryName}`);
-  };
-
   const filteredRows = useMemo(() => {
     return historyEntries.filter((entry) => {
       const byType = typeFilter === "all" || entry.type === typeFilter;
@@ -212,12 +198,6 @@ export function HistoryPage() {
       return byType && bySearch;
     });
   }, [historyEntries, search, typeFilter]);
-
-  const toggleScoreExpansion = (id: string) => {
-    setScoreExpandedIds((state) =>
-      state.includes(id) ? state.filter((itemId) => itemId !== id) : [...state, id],
-    );
-  };
 
   return (
     <div className="space-y-6 pb-10">
@@ -292,12 +272,8 @@ export function HistoryPage() {
                   key={entry.id}
                   entry={entry}
                   isExpanded={isExpanded}
-                  isScoreExpanded={scoreExpandedIds.includes(entry.id)}
-                  selectedScoreCategory={selectedScoreByEntryId[entry.id]}
                   onToggleExpand={() => setExpandedId(isExpanded ? null : entry.id)}
-                  onToggleScores={() => toggleScoreExpansion(entry.id)}
                   onRequestEditMovedTo={handleRequestEditMovedTo}
-                  onUseScoreFolder={handleUseScoreFolder}
                   onOpenSummary={setOpenedSummaryPath}
                 />
               );
