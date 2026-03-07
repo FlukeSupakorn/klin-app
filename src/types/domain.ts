@@ -115,3 +115,21 @@ export interface OrganizeAnalyzeFileResult {
 export interface OrganizeAnalyzeResponse {
   results: OrganizeAnalyzeFileResult[];
 }
+
+export interface FileSearchRequest {
+  query: string;
+}
+
+export interface FileSearchResultItem {
+  id: string;
+  fileName: string;
+  fileType: string;
+  sizeBytes: number;
+  folder: string;
+  lastEdited: string;
+  path: string;
+}
+
+export interface FileSearchResponse {
+  results: FileSearchResultItem[];
+}

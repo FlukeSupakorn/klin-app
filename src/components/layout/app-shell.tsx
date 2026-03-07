@@ -10,8 +10,11 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { bootstrapAppData } from "@/services/bootstrap-service";
+import { fileSearchApiService } from "@/services/file-search-api-service";
 import { useAuthStore } from "@/features/auth/use-auth-store";
+import type { FileSearchResultItem } from "@/types/domain";
 import klinLogo from "@/assets/klin-logo.svg";
 
 const navItems = [
@@ -27,7 +30,13 @@ export function AppShell() {
   const profile = useAuthStore((state) => state.profile);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<FileSearchResultItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [activeResultIndex, setActiveResultIndex] = useState(-1);
+  const [searchSubmitted, setSearchSubmitted] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void initializeAuth();
@@ -37,6 +46,96 @@ export function AppShell() {
   useEffect(() => {
     if (searchOpen) searchRef.current?.focus();
   }, [searchOpen]);
+
+  useEffect(() => {
+    const onClickAway = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (searchPanelRef.current && !searchPanelRef.current.contains(target)) {
+        setActiveResultIndex(-1);
+      }
+    };
+
+    document.addEventListener("mousedown", onClickAway);
+    return () => {
+      document.removeEventListener("mousedown", onClickAway);
+    };
+  }, []);
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+
+    const kb = bytes / 1024;
+    if (kb < 1024) {
+      return `${kb.toFixed(1)} KB`;
+    }
+
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
+  };
+
+  const formatLastEdited = (value: string) => {
+    const time = Date.parse(value);
+    if (Number.isNaN(time)) {
+      return "Unknown";
+    }
+
+    return new Date(time).toLocaleString();
+  };
+
+  const submitSearch = async () => {
+    const query = searchQuery.trim();
+    setSearchSubmitted(true);
+    setActiveResultIndex(-1);
+
+    if (!query) {
+      setSearchResults([]);
+      setSearchError(null);
+      return;
+    }
+
+    setSearchLoading(true);
+    setSearchError(null);
+
+    try {
+      const results = await fileSearchApiService.search(query);
+      setSearchResults(results);
+    } catch (error) {
+      setSearchResults([]);
+      setSearchError(error instanceof Error ? error.message : "Search failed");
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const onSearchKeyDown = async (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      await submitSearch();
+      return;
+    }
+
+    if (!searchResults.length) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveResultIndex((prev) => (prev + 1) % searchResults.length);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveResultIndex((prev) => (prev <= 0 ? searchResults.length - 1 : prev - 1));
+      return;
+    }
+
+    if (event.key === "Escape") {
+      setActiveResultIndex(-1);
+    }
+  };
 
   const profileInitial = (profile?.name?.trim()?.charAt(0) || "K").toUpperCase();
 
@@ -78,7 +177,7 @@ export function AppShell() {
           ))}
         </nav>
 
-        <div className="ml-2 flex items-center">
+        <div className="relative ml-2 flex items-center" ref={searchPanelRef}>
           <div
             className={cn(
               "flex items-center gap-2 rounded-full bg-muted transition-all duration-200",
@@ -91,6 +190,10 @@ export function AppShell() {
                 if (searchOpen) {
                   setSearchOpen(false);
                   setSearchQuery("");
+                  setSearchSubmitted(false);
+                  setSearchResults([]);
+                  setSearchError(null);
+                  setActiveResultIndex(-1);
                 } else {
                   setSearchOpen(true);
                 }
@@ -105,11 +208,58 @@ export function AppShell() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={onSearchKeyDown}
                 placeholder="Search…"
                 className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
             )}
           </div>
+
+          {searchOpen && (searchSubmitted || searchLoading || searchError) && (
+            <div className="absolute left-0 top-14 z-50 w-[30rem] max-w-[80vw] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+              <div className="border-b border-border bg-muted/50 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                Search Results
+              </div>
+
+              <div className="max-h-80 overflow-y-auto p-2">
+                {searchLoading ? (
+                  <div className="rounded-lg px-3 py-6 text-center text-sm text-muted-foreground">Searching...</div>
+                ) : searchError ? (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-4 text-sm text-destructive">
+                    {searchError}
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="rounded-lg px-3 py-6 text-center text-sm text-muted-foreground">
+                    No files found for "{searchQuery.trim()}".
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {searchResults.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className={cn(
+                          "rounded-lg border border-border bg-card px-3 py-2 transition-colors",
+                          activeResultIndex === index ? "bg-accent" : "hover:bg-muted/40",
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-foreground">{item.fileName}</p>
+                          <Badge variant="secondary" className="uppercase">
+                            {item.fileType || "file"}
+                          </Badge>
+                        </div>
+                        <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                          <p className="truncate">Size: {formatSize(item.sizeBytes)}</p>
+                          <p className="truncate">Last edit: {formatLastEdited(item.lastEdited)}</p>
+                          <p className="col-span-2 truncate">Folder: {item.folder}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex-1" />
