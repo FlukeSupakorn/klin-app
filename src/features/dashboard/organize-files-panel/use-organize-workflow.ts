@@ -56,8 +56,6 @@ export interface OrganizeWorkflow {
   setOpenSettingsWindow: (open: boolean) => void;
   toggleSuggestionFor: (itemId: string) => void;
   updateFileName: (itemId: string, fileName: string) => void;
-  updateFolderPath: (itemId: string, folderPath: string) => void;
-  pickFolderForItem: (itemId: string) => Promise<void>;
   setNoMoveCategory: (itemId: string) => void;
   applyCategory: (itemId: string, categoryName: string) => void;
   applySuggestedName: (itemId: string, selectedName: string | null) => void;
@@ -121,17 +119,6 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
   };
 
   const normalizePathForCompare = (value: string) => value.replace(/\\/g, "/").replace(/\/+$/g, "").toLowerCase();
-
-  const resolveCategoryByDestinationPath = (destinationPath: string): string => {
-    const { folderPath } = splitDestinationPath(destinationPath);
-    if (!folderPath) {
-      return "No category";
-    }
-
-    const normalizedFolder = normalizePathForCompare(folderPath);
-    const matched = categories.find((category) => normalizePathForCompare(category.folderPath) === normalizedFolder);
-    return matched?.name ?? "No category";
-  };
 
   const buildDestinationPath = (folderPath: string, fileName: string) => {
     const trimmedFolder = folderPath.trim();
@@ -335,36 +322,6 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
     }));
   };
 
-  const updateFolderPath = (itemId: string, folderPath: string) => {
-    const nextFolderPath = folderPath.trim();
-    if (!nextFolderPath) {
-      return;
-    }
-
-    setItems((state) => state.map((item) => {
-      if (item.id !== itemId) {
-        return item;
-      }
-
-      const { fileName } = splitDestinationPath(item.destinationPath);
-      const nextDestinationPath = buildDestinationPath(nextFolderPath, fileName);
-      return {
-        ...item,
-        destinationPath: nextDestinationPath,
-        selectedCategory: resolveCategoryByDestinationPath(nextDestinationPath),
-      };
-    }));
-  };
-
-  const pickFolderForItem = async (itemId: string) => {
-    const pickedFolder = await tauriClient.pickFolderForOrganize();
-    if (!pickedFolder) {
-      return;
-    }
-
-    updateFolderPath(itemId, pickedFolder);
-  };
-
   const applySuggestedName = (itemId: string, selectedName: string | null) => {
     setItems((state) => state.map((item) => (
       item.id === itemId ? applySuggestedNameToItem(item, selectedName) : item
@@ -447,7 +404,7 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
 
       const chosenCategory = item.selectedCategory === "No category"
         ? "No category"
-        : resolveCategoryByDestinationPath(item.destinationPath);
+        : item.selectedCategory;
       const selectedScore = item.topScores.find((score) => score.name === chosenCategory) ?? item.topScores[0];
       const moveLog: AutomationLog = {
         id: crypto.randomUUID(),
@@ -551,8 +508,6 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
       setOpenSuggestionFor((state) => (state === itemId ? null : itemId));
     },
     updateFileName,
-    updateFolderPath,
-    pickFolderForItem,
     setNoMoveCategory,
     applyCategory,
     applySuggestedName,

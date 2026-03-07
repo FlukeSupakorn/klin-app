@@ -119,16 +119,6 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground">Folder:</span>
             <p className="truncate text-xs text-muted-foreground">{folderPath || "(same folder)"}</p>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-              onClick={() => void workflow.pickFolderForItem(item.id)}
-              aria-label="Edit folder"
-              title="Edit folder"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
           </div>
           <p className="text-[11px] text-muted-foreground">Original: {item.currentPath}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
