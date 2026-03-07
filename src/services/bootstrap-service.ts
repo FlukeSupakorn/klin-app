@@ -23,6 +23,7 @@ export async function bootstrapAppData() {
     logState.setLogs(logs);
   }
 
+  await categoryManagementService.initializeFromWorker().catch(() => undefined);
   categoryManagementService.syncToAutomationStores();
 
   didBootstrap = true;

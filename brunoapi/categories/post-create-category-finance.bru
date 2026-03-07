@@ -1,0 +1,25 @@
+meta {
+  name: Create Category Finance Records
+  type: http
+  seq: 3
+}
+
+post {
+  url: http://127.0.0.1:8000/api/categories
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Finance Records",
+    "description": "Invoices, receipts, purchase orders, subscription bills, bank statements, tax preparation files, and payment confirmations.",
+    "enabled": true,
+    "folder_path": "",
+    "color": "#059669"
+  }
+}

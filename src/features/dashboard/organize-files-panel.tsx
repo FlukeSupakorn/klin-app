@@ -10,8 +10,9 @@ import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
+import { useLogStore } from "@/stores/use-log-store";
 import { cn } from "@/lib/utils";
-import type { OrganizePreviewItem } from "@/types/domain";
+import type { AutomationLog, OrganizePreviewItem } from "@/types/domain";
 
 export function OrganizeFilesPanel() {
   const categories = useCategoryManagementStore((state) => state.categories);
@@ -22,12 +23,18 @@ export function OrganizeFilesPanel() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [openSuggestionFor, setOpenSuggestionFor] = useState<string | null>(null);
   const [movedItemIds, setMovedItemIds] = useState<string[]>([]);
+  const [movingItemIds, setMovingItemIds] = useState<string[]>([]);
   const [openSettingsWindow, setOpenSettingsWindow] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const lastNativeDropAtRef = useRef(0);
 
+  const normalizeSelectedPaths = (paths: string[]): string[] => {
+    return [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
+  };
+
   const openWithPaths = async (paths: string[]) => {
-    if (paths.length === 0) {
+    const selectedPaths = normalizeSelectedPaths(paths);
+    if (selectedPaths.length === 0) {
       return;
     }
 
@@ -35,7 +42,7 @@ export function OrganizeFilesPanel() {
     setErrorMessage(null);
 
     try {
-      const analyzedItems = await organizeApiService.analyze(paths, categories);
+      const analyzedItems = await organizeApiService.analyze(selectedPaths, categories);
       setItems(analyzedItems);
       setMovedItemIds([]);
     } catch {
@@ -236,11 +243,12 @@ export function OrganizeFilesPanel() {
 
         const activeName = item.suggestedName ?? item.fileName;
         const folderPath = category ? category.folderPath : `${defaultFolder}/${categoryName}`;
+        const separator = folderPath.includes("\\") ? "\\" : "/";
 
         return {
           ...item,
           selectedCategory: category?.name ?? categoryName,
-          destinationPath: `${folderPath}/${activeName}`,
+          destinationPath: `${folderPath}${separator}${activeName}`,
         };
       });
     });
@@ -258,10 +266,12 @@ export function OrganizeFilesPanel() {
 
         const finalName = selectedName ?? item.fileName;
 
+        const separator = folderPath.includes("\\") ? "\\" : "/";
+
         return {
           ...item,
           suggestedName: selectedName,
-          destinationPath: `${folderPath}/${finalName}`,
+          destinationPath: `${folderPath}${separator}${finalName}`,
         };
       });
     });
@@ -269,20 +279,67 @@ export function OrganizeFilesPanel() {
     setOpenSuggestionFor(null);
   };
 
-  const toggleMoved = (itemId: string) => {
-    setMovedItemIds((state) =>
-      state.includes(itemId) ? state.filter((id) => id !== itemId) : [...state, itemId],
-    );
+  const markMoving = (itemId: string, isMoving: boolean) => {
+    setMovingItemIds((state) => {
+      if (isMoving) {
+        return state.includes(itemId) ? state : [...state, itemId];
+      }
+      return state.filter((id) => id !== itemId);
+    });
   };
 
-  const toggleMoveAll = () => {
-    if (items.length === 0) {
+  const moveSingleItem = async (item: OrganizePreviewItem) => {
+    if (movedItemIds.includes(item.id)) {
       return;
     }
 
-    setMovedItemIds((state) =>
-      state.length === items.length ? [] : items.map((item) => item.id),
-    );
+    markMoving(item.id, true);
+    setErrorMessage(null);
+
+    try {
+      await tauriClient.moveFile({
+        sourcePath: item.currentPath,
+        destinationPath: item.destinationPath,
+      });
+
+      setMovedItemIds((state) => (state.includes(item.id) ? state : [...state, item.id]));
+
+      const selectedScore = item.topScores.find((score) => score.name === item.selectedCategory) ?? item.topScores[0];
+      const moveLog: AutomationLog = {
+        id: crypto.randomUUID(),
+        itemType: "file",
+        fileName: item.fileName,
+        originalPath: item.currentPath,
+        movedTo: item.destinationPath,
+        chosenCategory: item.selectedCategory,
+        score: selectedScore?.score ?? 0,
+        allScores: item.topScores,
+        timestamp: new Date().toISOString(),
+        processingTimeMs: 0,
+        status: "completed",
+      };
+
+      useLogStore.getState().appendLog(moveLog);
+      await tauriClient.writeLog({ log: moveLog });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Move failed";
+      setErrorMessage(`Failed to move ${item.fileName}: ${reason}`);
+    } finally {
+      markMoving(item.id, false);
+    }
+  };
+
+  const moveAllPending = async () => {
+    const pendingItems = items.filter((item) => !movedItemIds.includes(item.id));
+    if (pendingItems.length === 0) {
+      return;
+    }
+
+    for (const item of pendingItems) {
+      // Keep sequential execution so errors are easier to trace for a specific file.
+      // eslint-disable-next-line no-await-in-loop
+      await moveSingleItem(item);
+    }
   };
 
   const allMoved = items.length > 0 && movedItemIds.length === items.length;
@@ -355,9 +412,10 @@ export function OrganizeFilesPanel() {
                       <Button
                         size="sm"
                         variant={movedItemIds.includes(item.id) ? "outline" : "default"}
-                        onClick={() => toggleMoved(item.id)}
+                        onClick={() => void moveSingleItem(item)}
+                        disabled={movingItemIds.includes(item.id) || movedItemIds.includes(item.id)}
                       >
-                        {movedItemIds.includes(item.id) ? "Undo" : "Move"}
+                        {movingItemIds.includes(item.id) ? "Moving..." : movedItemIds.includes(item.id) ? "Moved" : "Move"}
                       </Button>
                     </div>
 
@@ -437,8 +495,8 @@ export function OrganizeFilesPanel() {
 
               <div className="flex items-center justify-between border-t border-border pt-3">
                 <div className="flex gap-2">
-                  <Button className="gap-2" onClick={toggleMoveAll}>
-                    <Sparkles className="h-4 w-4" /> {allMoved ? "Undo All" : "Move All Files"}
+                  <Button className="gap-2" onClick={() => void moveAllPending()} disabled={allMoved}>
+                    <Sparkles className="h-4 w-4" /> {allMoved ? "All Files Moved" : "Move All Files"}
                   </Button>
                   <Button variant="outline" onClick={() => void handleAddFiles()}>Add More Files</Button>
                   <Button variant="outline" onClick={() => setOpenSettingsWindow(true)}>Manage Categories</Button>

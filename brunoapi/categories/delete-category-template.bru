@@ -1,0 +1,11 @@
+meta {
+  name: Delete Category Template
+  type: http
+  seq: 7
+}
+
+delete {
+  url: http://127.0.0.1:8000/api/categories/{{categoryId}}
+  body: none
+  auth: none
+}

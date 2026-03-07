@@ -16,6 +16,8 @@ export function SettingsPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [isCountingWatcherFiles, setIsCountingWatcherFiles] = useState(false);
   const [watcherFolderStats, setWatcherFolderStats] = useState<Array<{ folderPath: string; fileCount: number }>>([]);
+  const [isCheckingApi, setIsCheckingApi] = useState(false);
+  const [apiHealthSummary, setApiHealthSummary] = useState<string | null>(null);
 
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
   const isRunning = useAutomationStore((state) => state.isRunning);
@@ -36,6 +38,41 @@ export function SettingsPage() {
   const handleLockFolder = async () => {
     const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
     if (folder) lockPath(folder);
+  };
+
+  const checkWorkerApiHealth = async () => {
+    setIsCheckingApi(true);
+    setApiHealthSummary(null);
+
+    const candidates = [
+      "http://127.0.0.1:8000/health",
+      "http://localhost:8000/health",
+    ];
+
+    let lastError: unknown = null;
+    for (const url of candidates) {
+      try {
+        const response = await fetch(url, { method: "GET" });
+        if (!response.ok) {
+          lastError = new Error(`HTTP ${response.status}`);
+          continue;
+        }
+
+        const payload = (await response.json()) as { status?: string; version?: string; rag_ready?: boolean };
+        const status = payload.status ?? "unknown";
+        const version = payload.version ?? "n/a";
+        const rag = payload.rag_ready ? "ready" : "not ready";
+        setApiHealthSummary(`Connected: ${url} | status=${status} | version=${version} | rag=${rag}`);
+        setIsCheckingApi(false);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    const message = lastError instanceof Error ? lastError.message : "Worker API unavailable";
+    setApiHealthSummary(`Check failed: ${message}`);
+    setIsCheckingApi(false);
   };
 
   const runScanCycle = async () => {
@@ -194,6 +231,23 @@ export function SettingsPage() {
       </section>
 
       <section className="space-y-5 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Backend</p>
+            <h3 className="font-semibold">Worker API Health</h3>
+          </div>
+          <Button variant="outline" className="h-9 gap-2" onClick={() => void checkWorkerApiHealth()} disabled={isCheckingApi}>
+            <RefreshCw className={cn("h-3.5 w-3.5", isCheckingApi && "animate-spin")} />
+            {isCheckingApi ? "Checking..." : "Check API"}
+          </Button>
+        </div>
+
+        {apiHealthSummary && (
+          <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            {apiHealthSummary}
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Automation</p>

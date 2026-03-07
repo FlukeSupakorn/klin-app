@@ -3,7 +3,6 @@ import type {
   ManagedCategory,
   OrganizeAnalyzeFileResult,
   OrganizeAnalyzeRequest,
-  OrganizeAnalyzeResponse,
   OrganizePreviewItem,
 } from "@/types/domain";
 
@@ -110,19 +109,48 @@ function parseSuggestedNames(rawName: unknown): string[] {
   return [];
 }
 
-function buildRequest(paths: string[]): OrganizeAnalyzeRequest {
-  return {
-    filepaths: paths,
-  };
-}
-
-function normalizeResults(payload: unknown): OrganizeAnalyzeFileResult[] {
-  if (!payload || typeof payload !== "object") {
+function parseWorkerSuggestedNames(fileResult: OrganizeAnalyzeFileResult | undefined): string[] {
+  if (!fileResult) {
     return [];
   }
 
-  const root = payload as OrganizeAnalyzeResponse;
-  return Array.isArray(root.results) ? root.results : [];
+  // Keep compatibility with older payloads while preferring v3 `suggested_names`.
+  const analysis = fileResult.analysis as {
+    suggested_names?: unknown;
+    suggested_name?: unknown;
+  };
+
+  if (Array.isArray(analysis.suggested_names)) {
+    return analysis.suggested_names.map((entry) => String(entry).trim()).filter(Boolean);
+  }
+
+  return parseSuggestedNames(analysis.suggested_name);
+}
+
+function buildRequest(paths: string[]): OrganizeAnalyzeRequest {
+  return {
+    file_paths: paths,
+  };
+}
+
+function normalizeResults(payload: unknown): Map<string, OrganizeAnalyzeFileResult> {
+  if (!payload || typeof payload !== "object") {
+    return new Map();
+  }
+
+  const root = payload as { results?: unknown };
+  if (!root.results || typeof root.results !== "object" || Array.isArray(root.results)) {
+    return new Map();
+  }
+
+  const resultMap = new Map<string, OrganizeAnalyzeFileResult>();
+  Object.entries(root.results as Record<string, unknown>).forEach(([filePath, value]) => {
+    if (value && typeof value === "object") {
+      resultMap.set(filePath, value as OrganizeAnalyzeFileResult);
+    }
+  });
+
+  return resultMap;
 }
 
 async function postAnalyze(requestPayload: OrganizeAnalyzeRequest): Promise<unknown> {
@@ -164,9 +192,8 @@ export const organizeApiService = {
     }
 
     const requestPayload = buildRequest(paths);
-    const payload = (await postAnalyze(requestPayload)) as OrganizeAnalyzeResponse;
-    const results = normalizeResults(payload);
-    const resultMap = new Map(results.map((result) => [result.filepath, result]));
+    const payload = await postAnalyze(requestPayload);
+    const resultMap = normalizeResults(payload);
 
     const categoryPathMap = new Map(categoryCatalog.map((category) => [category.name, category.folderPath]));
 
@@ -176,10 +203,10 @@ export const organizeApiService = {
       const topScores = parseScoreEntries(fileResult);
       const alignedScores = alignScoresToManagedCategories(topScores, categoryCatalog);
       const fallbackScores = alignedScores.length > 0 ? alignedScores : buildFallbackScores(categoryCatalog);
-      const selectedCategory = fileResult?.top_category?.name ?? fallbackScores[0]?.name ?? "Uncategorized";
+      const selectedCategory = fallbackScores[0]?.name ?? "Uncategorized";
       const destinationFolder =
-        fileResult?.top_category?.destination_path ?? categoryPathMap.get(selectedCategory) ?? categoryCatalog[0]?.folderPath ?? "";
-      const suggestedNames = parseSuggestedNames(fileResult?.analysis?.suggested_name);
+        categoryPathMap.get(selectedCategory) ?? categoryCatalog[0]?.folderPath ?? "";
+      const suggestedNames = parseWorkerSuggestedNames(fileResult);
       const effectiveName = suggestedNames[0] ?? fileName;
 
       return {

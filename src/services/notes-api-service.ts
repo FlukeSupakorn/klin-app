@@ -1,14 +1,22 @@
 const NOTES_API_URL_CANDIDATES = [
-  "http://127.0.0.1:8000/api/notes/summarize",
-  "http://localhost:8000/api/notes/summarize",
-  "http://localhost:3000/notes/summarize",
-  "http://localhost:3000/note/summarize",
+  "http://127.0.0.1:8000/api/summary",
+  "http://localhost:8000/api/summary",
 ];
 
 export interface NotesSummarizeResult {
   summary: string;
   suggestedTitle: string;
   processingTimeMs?: number;
+}
+
+function buildSuggestedTitleFromPaths(filePaths: string[]): string {
+  const first = filePaths[0];
+  if (!first) {
+    return "Quick-Note";
+  }
+
+  const base = first.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "")?.trim();
+  return base && base.length > 0 ? base : "Quick-Note";
 }
 
 function normalizeResponse(payload: unknown): NotesSummarizeResult {
@@ -47,6 +55,7 @@ function normalizeResponse(payload: unknown): NotesSummarizeResult {
 export const notesApiService = {
   async summarizeFromFiles(filePaths: string[]): Promise<NotesSummarizeResult> {
     let lastError: unknown = null;
+    const fallbackTitle = buildSuggestedTitleFromPaths(filePaths);
 
     for (const url of NOTES_API_URL_CANDIDATES) {
       try {
@@ -55,7 +64,7 @@ export const notesApiService = {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ filePaths }),
+          body: JSON.stringify({ file_paths: filePaths }),
         });
 
         if (!response.ok) {
@@ -64,7 +73,12 @@ export const notesApiService = {
         }
 
         const payload = await response.json();
-        return normalizeResponse(payload);
+        const normalized = normalizeResponse(payload);
+
+        return {
+          ...normalized,
+          suggestedTitle: normalized.suggestedTitle === "Quick-Note" ? fallbackTitle : normalized.suggestedTitle,
+        };
       } catch (error) {
         lastError = error;
       }

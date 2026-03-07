@@ -2,11 +2,14 @@ import type { HistoryEntry } from "@/features/history/history-types";
 import type { CategoryScore } from "@/types/domain";
 
 const HISTORY_API_URL_CANDIDATES = [
-  "http://127.0.0.1:8000/api/history/list",
-  "http://localhost:8000/api/history/list",
-  "http://localhost:3000/history",
-  "http://localhost:3000/history/list",
+  "http://127.0.0.1:8000/api/history",
+  "http://localhost:8000/api/history",
 ];
+
+function getPathTail(path: string): string {
+  const value = path.split(/[\\/]/).pop();
+  return value && value.trim().length > 0 ? value : "Unknown";
+}
 
 function normalizeScore(value: number): number {
   if (!Number.isFinite(value) || value <= 0) {
@@ -50,7 +53,10 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
     }
 
     if (payload && typeof payload === "object") {
-      const root = payload as { items?: unknown; result?: unknown; history?: unknown };
+      const root = payload as { items?: unknown; result?: unknown; history?: unknown; results?: unknown };
+      if (Array.isArray(root.results)) {
+        return root.results;
+      }
       if (Array.isArray(root.items)) {
         return root.items;
       }
@@ -72,25 +78,45 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
       }
 
       const id = "id" in entry ? String(entry.id ?? "") : `history-${index + 1}`;
-      const type = "type" in entry ? String(entry.type ?? "") : "";
-      const title = "title" in entry ? String(entry.title ?? "") : "";
-      const subtitle = "subtitle" in entry ? String(entry.subtitle ?? "") : "";
-      const timestamp = "timestamp" in entry ? String(entry.timestamp ?? new Date().toISOString()) : new Date().toISOString();
+      const action = "action" in entry ? String(entry.action ?? "") : "";
+      const inferredType = action.startsWith("organized") ? "organize" : "";
+      const type = "type" in entry ? String(entry.type ?? inferredType) : inferredType;
+      const timestamp =
+        "timestamp" in entry
+          ? String(entry.timestamp ?? new Date().toISOString())
+          : "created_at" in entry
+            ? String(entry.created_at ?? new Date().toISOString())
+            : new Date().toISOString();
+
+      const backendCategory = "current_category" in entry ? String(entry.current_category ?? "") : "";
+      const title =
+        "title" in entry
+          ? String(entry.title ?? "")
+          : "original_path" in entry
+            ? getPathTail(String(entry.original_path ?? ""))
+            : "Organized file";
+      const subtitle =
+        "subtitle" in entry
+          ? String(entry.subtitle ?? "")
+          : backendCategory
+            ? `Organized to ${backendCategory}`
+            : "Organized";
 
       if (!title || !subtitle || !timestamp) {
         return null;
       }
 
       if (type === "organize") {
-        const fromPath = "fromPath" in entry ? String(entry.fromPath ?? "") : "";
-        const toPath = "toPath" in entry ? String(entry.toPath ?? "") : "";
-        const oldName = "oldName" in entry ? String(entry.oldName ?? "") : "";
-        const newName = "newName" in entry ? String(entry.newName ?? "") : "";
-        const scores = normalizeScores("scores" in entry ? entry.scores : []);
-
-        if (!fromPath || !toPath || !oldName || !newName) {
-          return null;
-        }
+        const backendOriginalPath = "original_path" in entry ? String(entry.original_path ?? "") : "";
+        const backendMovedPath = "moved_path" in entry ? String(entry.moved_path ?? "") : "";
+        const defaultToPath = backendMovedPath || backendOriginalPath;
+        const fromPath = "fromPath" in entry ? String(entry.fromPath ?? backendOriginalPath) : backendOriginalPath;
+        const toPath = "toPath" in entry
+          ? String((entry.toPath ?? backendMovedPath) || backendOriginalPath)
+          : defaultToPath;
+        const oldName = "oldName" in entry ? String(entry.oldName ?? getPathTail(fromPath)) : getPathTail(fromPath);
+        const newName = "newName" in entry ? String(entry.newName ?? getPathTail(toPath)) : getPathTail(toPath);
+        const scores = normalizeScores("scores" in entry ? entry.scores : "categories" in entry ? entry.categories : []);
 
         return {
           id,

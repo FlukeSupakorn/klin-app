@@ -10,6 +10,7 @@ import { historyApiService } from "@/services/history-api-service";
 import { HistoryEntryCard } from "@/features/history/history-entry-card";
 import { getPathTail, joinPath } from "@/features/history/history-utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
+import type { AutomationLog } from "@/types/domain";
 
 const TYPE_FILTERS: Array<{ label: string; value: "all" | HistoryEntryType }> = [
   { label: "All", value: "all" },
@@ -39,17 +40,46 @@ export function HistoryPage() {
   useEffect(() => {
     let isMounted = true;
 
+    const mapLocalLogToHistoryEntry = (log: AutomationLog): Extract<HistoryEntry, { type: "organize" }> => ({
+      id: log.id,
+      type: "organize",
+      title: log.fileName || getPathTail(log.originalPath),
+      subtitle: `Organized to ${log.chosenCategory || "Unknown"}`,
+      timestamp: log.timestamp,
+      fromPath: log.originalPath,
+      toPath: log.movedTo || log.originalPath,
+      oldName: getPathTail(log.originalPath),
+      newName: getPathTail(log.movedTo || log.originalPath),
+      scores: log.allScores || [],
+    });
+
     const loadHistory = async () => {
       setIsLoading(true);
       setLoadError(null);
 
       try {
-        const entries = await historyApiService.list();
+        const [apiEntries, localLogs] = await Promise.all([
+          historyApiService.list(),
+          tauriClient.listLogs().catch(() => []),
+        ]);
         if (!isMounted) {
           return;
         }
 
-        setHistoryEntries(entries);
+        const localOrganizeEntries = localLogs
+          .filter((log) => log.status === "completed" && log.originalPath && log.movedTo)
+          .map(mapLocalLogToHistoryEntry);
+
+        const mergedMap = new Map<string, HistoryEntry>();
+        [...apiEntries, ...localOrganizeEntries].forEach((entry) => {
+          mergedMap.set(entry.id, entry);
+        });
+
+        const merged = [...mergedMap.values()].sort(
+          (left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime(),
+        );
+
+        setHistoryEntries(merged);
       } catch (error) {
         if (!isMounted) {
           return;

@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { bootstrapAppData } from "@/services/bootstrap-service";
+import { categoryManagementService } from "@/services/category-management-service";
 import { fileSearchApiService } from "@/services/file-search-api-service";
 import { useAuthStore } from "@/features/auth/use-auth-store";
 import type { FileSearchResultItem } from "@/types/domain";
@@ -42,6 +43,32 @@ export function AppShell() {
     void initializeAuth();
     void bootstrapAppData().catch(() => undefined);
   }, [initializeAuth]);
+
+  useEffect(() => {
+    const syncCategoriesFromWorker = () => {
+      void categoryManagementService.refreshCategoriesFromWorker().then(() => {
+        categoryManagementService.syncToAutomationStores();
+      });
+    };
+
+    const onFocus = () => {
+      syncCategoriesFromWorker();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncCategoriesFromWorker();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (searchOpen) searchRef.current?.focus();

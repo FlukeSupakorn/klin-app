@@ -82,7 +82,7 @@ export interface OrganizePreviewItem {
 }
 
 export interface OrganizeAnalyzeRequest {
-  filepaths: string[];
+  file_paths: string[];
 }
 
 export interface OrganizeAnalyzeCategoryScore {
@@ -92,28 +92,19 @@ export interface OrganizeAnalyzeCategoryScore {
 }
 
 export interface OrganizeAnalyzeAnalysis {
-  summary: string | null;
-  suggested_name: string | null;
-}
-
-export interface OrganizeAnalyzeTopCategory {
-  category_id: string;
-  name: string;
-  score: number;
-  destination_path: string | null;
+  summary?: string | null;
+  suggested_names: string[];
 }
 
 export interface OrganizeAnalyzeFileResult {
-  filepath: string;
   file_id: string;
   analysis: OrganizeAnalyzeAnalysis;
   categories: OrganizeAnalyzeCategoryScore[];
-  top_category: OrganizeAnalyzeTopCategory | null;
   error: string | null;
 }
 
 export interface OrganizeAnalyzeResponse {
-  results: OrganizeAnalyzeFileResult[];
+  results: Record<string, OrganizeAnalyzeFileResult>;
 }
 
 export interface FileSearchRequest {
