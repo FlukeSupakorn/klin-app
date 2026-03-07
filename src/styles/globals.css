@@ -10,6 +10,53 @@ body {
   @apply bg-background text-foreground font-sans text-base antialiased;
 }
 
+.wmde-markdown,
+.wmde-markdown-var {
+  font-family: "Noto Sans", "Noto Sans Thai", "Segoe UI", "Inter", sans-serif;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+}
+
+.wmde-markdown h1,
+.wmde-markdown h2,
+.wmde-markdown h3,
+.wmde-markdown h4,
+.wmde-markdown h5,
+.wmde-markdown h6 {
+  color: hsl(var(--foreground));
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  margin-top: 1.1em;
+  margin-bottom: 0.45em;
+}
+
+.wmde-markdown h1 {
+  font-size: 1.85rem;
+}
+
+.wmde-markdown h2 {
+  font-size: 1.5rem;
+}
+
+.wmde-markdown h3 {
+  font-size: 1.25rem;
+}
+
+.wmde-markdown p,
+.wmde-markdown li {
+  color: hsl(var(--foreground));
+}
+
+.wmde-markdown strong {
+  font-weight: 800;
+}
+
+.wmde-markdown code,
+.wmde-markdown pre code {
+  font-family: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+}
+
 #root {
   @apply min-h-screen;
 }

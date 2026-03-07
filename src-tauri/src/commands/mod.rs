@@ -2,6 +2,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
 
+use serde::Serialize;
 use tauri::{Emitter, State};
 
 use crate::{
@@ -86,6 +87,69 @@ pub fn delete_file(file_path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn get_downloads_folder<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<String, String> {
     app_paths::resolve_downloads_dir(&app).map(|path| path.to_string_lossy().to_string())
+}
+
+#[derive(Serialize)]
+pub struct NoteFileEntryDto {
+    path: String,
+    file_name: String,
+    size_bytes: u64,
+    last_modified_ms: u64,
+}
+
+#[tauri::command]
+pub fn get_app_data_dir<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<String, String> {
+    app_paths::resolve_app_data_dir(&app).map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn list_note_files(folder_path: String) -> Result<Vec<NoteFileEntryDto>, String> {
+    if folder_path.trim().is_empty() {
+        return Err("Folder path is required".to_string());
+    }
+
+    let folder = PathBuf::from(folder_path);
+    if !folder.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut entries: Vec<NoteFileEntryDto> = std::fs::read_dir(folder)
+        .map_err(|err| err.to_string())?
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let path = entry.path();
+            let extension = path.extension()?.to_string_lossy().to_ascii_lowercase();
+            if extension != "md" {
+                return None;
+            }
+
+            let metadata = entry.metadata().ok()?;
+            let modified = metadata.modified().ok()?;
+            let duration = modified.duration_since(std::time::UNIX_EPOCH).ok()?;
+
+            Some(NoteFileEntryDto {
+                path: path.to_string_lossy().to_string(),
+                file_name: path
+                    .file_name()
+                    .map(|value| value.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "Untitled.md".to_string()),
+                size_bytes: metadata.len(),
+                last_modified_ms: duration.as_millis() as u64,
+            })
+        })
+        .collect();
+
+    entries.sort_by(|a, b| b.last_modified_ms.cmp(&a.last_modified_ms));
+    Ok(entries)
+}
+
+#[tauri::command]
+pub fn read_note_file(file_path: String) -> Result<String, String> {
+    if file_path.trim().is_empty() {
+        return Err("File path is required".to_string());
+    }
+
+    std::fs::read_to_string(file_path).map_err(|err| err.to_string())
 }
 
 #[tauri::command]

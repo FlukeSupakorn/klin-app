@@ -1,0 +1,24 @@
+meta {
+  name: Summarize Notes From Files
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://127.0.0.1:8000/api/notes/summarize
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "filePaths": [
+      "C:/Users/supak/Downloads/meeting-notes.txt",
+      "C:/Users/supak/Downloads/project-plan.docx"
+    ]
+  }
+}

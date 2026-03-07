@@ -1,41 +1,46 @@
 const NOTES_API_URL_CANDIDATES = [
+  "http://127.0.0.1:8000/api/notes/summarize",
+  "http://localhost:8000/api/notes/summarize",
   "http://localhost:3000/notes/summarize",
   "http://localhost:3000/note/summarize",
 ];
 
 export interface NotesSummarizeResult {
   summary: string;
-  suggestedFolders: string[];
-  titleSuggestion: string;
+  suggestedTitle: string;
+  processingTimeMs?: number;
 }
 
 function normalizeResponse(payload: unknown): NotesSummarizeResult {
   if (!payload || typeof payload !== "object") {
     return {
       summary: "",
-      suggestedFolders: [],
-      titleSuggestion: "Quick-Note",
+      suggestedTitle: "Quick-Note",
     };
   }
 
   const data = payload as {
     summary?: unknown;
-    suggestedFolders?: unknown;
+    suggested_title?: unknown;
+    suggestedTitle?: unknown;
     titleSuggestion?: unknown;
+    processing_time_ms?: unknown;
+    processingTimeMs?: unknown;
   };
 
   const summary = typeof data.summary === "string" ? data.summary : "";
-  const suggestedFolders = Array.isArray(data.suggestedFolders)
-    ? data.suggestedFolders.map((item) => String(item)).filter(Boolean)
-    : [];
-  const titleSuggestion = typeof data.titleSuggestion === "string" && data.titleSuggestion.trim().length > 0
-    ? data.titleSuggestion.trim()
+  const suggestedTitleRaw =
+    data.suggestedTitle ?? data.suggested_title ?? data.titleSuggestion;
+  const suggestedTitle = typeof suggestedTitleRaw === "string" && suggestedTitleRaw.trim().length > 0
+    ? suggestedTitleRaw.trim()
     : "Quick-Note";
+  const processingRaw = data.processingTimeMs ?? data.processing_time_ms;
+  const processingTimeMs = Number.isFinite(Number(processingRaw)) ? Number(processingRaw) : undefined;
 
   return {
     summary,
-    suggestedFolders,
-    titleSuggestion,
+    suggestedTitle,
+    processingTimeMs,
   };
 }
 

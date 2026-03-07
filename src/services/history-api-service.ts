@@ -2,6 +2,8 @@ import type { HistoryEntry } from "@/features/history/history-types";
 import type { CategoryScore } from "@/types/domain";
 
 const HISTORY_API_URL_CANDIDATES = [
+  "http://127.0.0.1:8000/api/history/list",
+  "http://localhost:8000/api/history/list",
   "http://localhost:3000/history",
   "http://localhost:3000/history/list",
 ];

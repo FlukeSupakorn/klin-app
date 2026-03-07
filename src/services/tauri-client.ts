@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   MoveFileDto,
+  NoteFileEntryDto,
   ReadFolderDto,
   SaveRuleMappingDto,
   TauriClient,
@@ -30,6 +31,14 @@ class TauriCommandClient implements TauriClient {
     return invoke("save_note_file", input);
   }
 
+  listNoteFiles(folderPath: string): Promise<NoteFileEntryDto[]> {
+    return invoke("list_note_files", { folderPath });
+  }
+
+  readNoteFile(filePath: string): Promise<string> {
+    return invoke("read_note_file", { filePath });
+  }
+
   openExternalUrl(url: string): Promise<void> {
     return invoke("open_external_url", { url });
   }
@@ -44,6 +53,10 @@ class TauriCommandClient implements TauriClient {
 
   getDownloadsFolder(): Promise<string> {
     return invoke("get_downloads_folder");
+  }
+
+  getAppDataDir(): Promise<string> {
+    return invoke("get_app_data_dir");
   }
 
   writeLog(input: WriteLogDto): Promise<void> {
