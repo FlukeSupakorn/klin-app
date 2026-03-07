@@ -22,6 +22,7 @@ type ModalMode = "edit" | "add";
 interface CategoryFormState {
   name: string;
   description: string;
+  color: string;
   folderPath: string;
   enabled: boolean;
   aiLearned: boolean;
@@ -30,6 +31,7 @@ interface CategoryFormState {
 const emptyForm: CategoryFormState = {
   name: "",
   description: "",
+  color: "#6366f1",
   folderPath: "",
   enabled: true,
   aiLearned: true,
@@ -57,6 +59,15 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
   const [formState, setFormState] = useState<CategoryFormState>(emptyForm);
 
   const enabledCount = useMemo(() => categories.filter((category) => category.enabled).length, [categories]);
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((left, right) => {
+      if (left.enabled !== right.enabled) {
+        return left.enabled ? -1 : 1;
+      }
+
+      return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
+    });
+  }, [categories]);
   const showDefaultFolder = sections.includes("default-folder");
   const showWatchedFolders = sections.includes("watched-folders");
   const showCategories = sections.includes("categories");
@@ -110,6 +121,7 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
     setFormState({
       name: category.name,
       description: category.description,
+      color: category.color,
       folderPath: category.folderPath,
       enabled: category.enabled,
       aiLearned: category.aiLearned,
@@ -160,6 +172,7 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
       await categoryManagementService.updateCategoryInWorker(editingCategoryId, {
         name: normalizedName,
         description: normalizedDescription,
+        color: formState.color,
         folderPath: normalizedFolderPath,
         enabled: formState.enabled,
         aiLearned: formState.aiLearned,
@@ -170,6 +183,7 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
       await categoryManagementService.addCategoryToWorker({
         name: normalizedName,
         description: normalizedDescription,
+        color: formState.color,
         folderPath: normalizedFolderPath,
         enabled: formState.enabled,
         aiLearned: formState.aiLearned,
@@ -318,7 +332,7 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  {categories.map((category) => (
+                  {sortedCategories.map((category) => (
                     <div
                       key={category.id}
                       className={cn(
@@ -329,6 +343,11 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
+                            <span
+                              className="inline-block h-3 w-3 rounded-full border border-border"
+                              style={{ backgroundColor: category.color }}
+                              title={category.color}
+                            />
                             <span className="text-sm font-black">{category.name}</span>
                             <button
                               type="button"
@@ -414,6 +433,23 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
                   onChange={(event) => setFormState((state) => ({ ...state, description: event.target.value }))}
                   className="min-h-[100px] w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none"
                 />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={formState.color}
+                    onChange={(event) => setFormState((state) => ({ ...state, color: event.target.value }))}
+                    className="h-9 w-12 cursor-pointer rounded border border-border bg-muted p-1"
+                  />
+                  <Input
+                    value={formState.color}
+                    onChange={(event) => setFormState((state) => ({ ...state, color: event.target.value }))}
+                    className="border-border bg-muted font-mono"
+                    placeholder="#6366f1"
+                  />
+                </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Folder Path</label>

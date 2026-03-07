@@ -4,11 +4,51 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import type { OrganizePreviewItem } from "@/types/domain";
 import type { OrganizeWorkflow } from "./use-organize-workflow";
 
 interface OrganizeFilesModalProps {
   workflow: OrganizeWorkflow;
+}
+
+function normalizeCategoryName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function findCategoryColor(name: string, palette: Array<{ name: string; color: string }>): string | null {
+  const normalized = normalizeCategoryName(name);
+  if (!normalized) {
+    return null;
+  }
+
+  const matched = palette.find((item) => normalizeCategoryName(item.name) === normalized);
+  return matched?.color ?? null;
+}
+
+function hexToRgba(hex: string, alpha: number): string | null {
+  const normalized = hex.trim().replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return null;
+  }
+
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function getContrastTextColor(hex: string): string {
+  const normalized = hex.trim().replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return "#111827";
+  }
+
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.62 ? "#111827" : "#f8fafc";
 }
 
 function splitDestinationPath(destinationPath: string): { folderPath: string; fileName: string } {
@@ -24,6 +64,7 @@ function splitDestinationPath(destinationPath: string): { folderPath: string; fi
 }
 
 function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: OrganizeWorkflow }) {
+  const categories = useCategoryManagementStore((state) => state.categories);
   const { folderPath, fileName } = splitDestinationPath(item.destinationPath);
   const currentSplit = splitDestinationPath(item.currentPath);
   const normalizePath = (value: string) => value.replace(/\\/g, "/").replace(/\/+$/g, "").toLowerCase();
@@ -213,19 +254,30 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
               None
             </button>
             {item.topScores.map((score) => (
-              <button
-                type="button"
-                key={score.name}
-                onClick={() => workflow.applyCategory(item.id, score.name)}
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs transition-colors",
-                  item.selectedCategory === score.name
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground",
-                )}
-              >
-                {score.name} · {Math.round(score.score * 100)}%
-              </button>
+              (() => {
+                const isSelected = item.selectedCategory === score.name;
+                const categoryColor = findCategoryColor(score.name, categories);
+                const tintedBackground = categoryColor ? hexToRgba(categoryColor, isSelected ? 0.98 : 0.18) : null;
+                const tintedBorder = categoryColor ? hexToRgba(categoryColor, 0.45) : null;
+                return (
+                  <button
+                    type="button"
+                    key={score.name}
+                    onClick={() => workflow.applyCategory(item.id, score.name)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs transition-colors",
+                      !categoryColor && (isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"),
+                    )}
+                    style={categoryColor ? {
+                      backgroundColor: tintedBackground ?? undefined,
+                      borderColor: tintedBorder ?? undefined,
+                      color: isSelected ? getContrastTextColor(categoryColor) : categoryColor,
+                    } : undefined}
+                  >
+                    {score.name} · {Math.round(score.score * 100)}%
+                  </button>
+                );
+              })()
             ))}
           </div>
 

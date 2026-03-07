@@ -46,6 +46,8 @@ export function AppShell() {
   }, [initializeAuth]);
 
   useEffect(() => {
+    let disposed = false;
+
     const syncCategoriesFromWorker = () => {
       void categoryManagementService
         .refreshCategoriesFromWorker()
@@ -54,6 +56,16 @@ export function AppShell() {
         })
         .catch(() => undefined);
     };
+
+    // Hydrate category metadata (including color) immediately on app load.
+    syncCategoriesFromWorker();
+
+    // Retry a few times because worker API can come up slightly after UI mounts.
+    const retryTimers = [1000, 3000, 7000].map((delay) => window.setTimeout(() => {
+      if (!disposed) {
+        syncCategoriesFromWorker();
+      }
+    }, delay));
 
     const onFocus = () => {
       syncCategoriesFromWorker();
@@ -69,6 +81,8 @@ export function AppShell() {
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
+      disposed = true;
+      retryTimers.forEach((id) => window.clearTimeout(id));
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };

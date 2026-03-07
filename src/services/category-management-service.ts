@@ -21,6 +21,7 @@ interface WorkerCategory {
   id: string;
   name: string;
   description: string;
+  color?: string | null;
   folder_path?: string | null;
   destination_path?: string | null;
   enabled?: boolean;
@@ -72,6 +73,7 @@ function joinFolderPath(basePath: string, categoryName: string): string {
 
 function toManagedCategory(category: WorkerCategory, defaultFolder: string): ManagedCategory {
   const folderPath = category.folder_path?.trim() || category.destination_path?.trim() || joinFolderPath(defaultFolder, category.name);
+  const color = (category.color?.trim() || "#6366f1").toLowerCase();
   const enabled = typeof category.enabled === "boolean"
     ? category.enabled
     : typeof category.is_active === "boolean"
@@ -87,6 +89,7 @@ function toManagedCategory(category: WorkerCategory, defaultFolder: string): Man
     id: category.id,
     name: category.name,
     description: category.description,
+    color,
     folderPath,
     enabled,
     aiLearned,
@@ -202,6 +205,7 @@ export class CategoryManagementService {
           description: normalizedDescription,
           enabled: category.enabled,
           folder_path: inferredFolderPath,
+          color: category.color,
         }),
       });
 
@@ -226,6 +230,9 @@ export class CategoryManagementService {
     }
     if (typeof updates.enabled === "boolean") {
       payload.enabled = updates.enabled;
+    }
+    if (typeof updates.color === "string") {
+      payload.color = updates.color.trim();
     }
 
     if (Object.keys(payload).length === 0) {

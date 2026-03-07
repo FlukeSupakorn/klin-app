@@ -1,7 +1,34 @@
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import type { HistoryEntry } from "@/features/history/history-types";
+
+function normalizeCategoryName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function findCategoryColor(name: string, palette: Array<{ name: string; color: string }>): string | null {
+  const normalized = normalizeCategoryName(name);
+  if (!normalized) {
+    return null;
+  }
+
+  const matched = palette.find((item) => normalizeCategoryName(item.name) === normalized);
+  return matched?.color ?? null;
+}
+
+function hexToRgba(hex: string, alpha: number): string | null {
+  const normalized = hex.trim().replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return null;
+  }
+
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 interface HistoryOrganizeDetailsProps {
   entry: Extract<HistoryEntry, { type: "organize" }>;
@@ -20,6 +47,7 @@ export function HistoryOrganizeDetails({
   onRequestEditMovedTo,
   onUseScoreFolder,
 }: HistoryOrganizeDetailsProps) {
+  const categories = useCategoryManagementStore((state) => state.categories);
   const visibleScores = isShowAllScores ? entry.scores : entry.scores.slice(0, 3);
   const isRenamed = entry.oldName !== entry.newName;
 
@@ -76,28 +104,44 @@ export function HistoryOrganizeDetails({
 
         <div className="space-y-3">
           {visibleScores.map((score) => (
-            <button
-              key={score.name}
-              type="button"
-              onClick={() => onUseScoreFolder(entry.id, score.name)}
-              className={cn(
-                "w-full space-y-1 rounded-lg border border-transparent p-2 text-left transition-colors hover:border-border hover:bg-muted/30",
-                selectedScoreCategory === score.name && "border-primary/40 bg-primary/5",
-              )}
-            >
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium">{score.name}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">{Math.round(score.score * 100)}%</span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {selectedScoreCategory === score.name ? "Selected" : "Use folder"}
-                  </span>
-                </div>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-primary" style={{ width: `${score.score * 100}%` }} />
-              </div>
-            </button>
+            (() => {
+              const isSelected = selectedScoreCategory === score.name;
+              const categoryColor = findCategoryColor(score.name, categories);
+              const borderColor = categoryColor ? hexToRgba(categoryColor, isSelected ? 0.65 : 0.35) : null;
+              const backgroundColor = categoryColor ? hexToRgba(categoryColor, isSelected ? 0.14 : 0.07) : null;
+              return (
+                <button
+                  key={score.name}
+                  type="button"
+                  onClick={() => onUseScoreFolder(entry.id, score.name)}
+                  className={cn(
+                    "w-full space-y-1 rounded-lg border p-2 text-left transition-colors hover:border-border hover:bg-muted/30",
+                    !categoryColor && "border-transparent",
+                    !categoryColor && isSelected && "border-primary/40 bg-primary/5",
+                  )}
+                  style={categoryColor ? {
+                    borderColor: borderColor ?? undefined,
+                    backgroundColor: backgroundColor ?? undefined,
+                  } : undefined}
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium" style={categoryColor ? { color: categoryColor } : undefined}>{score.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{Math.round(score.score * 100)}%</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {isSelected ? "Selected" : "Use folder"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${score.score * 100}%`, backgroundColor: categoryColor ?? undefined }}
+                    />
+                  </div>
+                </button>
+              );
+            })()
           ))}
         </div>
       </div>
