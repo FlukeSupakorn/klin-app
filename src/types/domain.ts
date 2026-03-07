@@ -1,4 +1,5 @@
 export type AutomationStatus = "queued" | "processing" | "completed" | "failed";
+export type OrganizeMoveStatus = "idle" | "processing" | "completed" | "failed";
 
 export interface Category {
   id: string;
@@ -79,6 +80,9 @@ export interface OrganizePreviewItem {
   topScores: CategoryScore[];
   summary: string | null;
   calendar: string | null;
+  analysisStatus: AutomationStatus;
+  analysisError: string | null;
+  moveStatus: OrganizeMoveStatus;
 }
 
 export interface OrganizeAnalyzeRequest {

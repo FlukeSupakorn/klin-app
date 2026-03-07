@@ -15,6 +15,7 @@ import { bootstrapAppData } from "@/services/bootstrap-service";
 import { categoryManagementService } from "@/services/category-management-service";
 import { fileSearchApiService } from "@/services/file-search-api-service";
 import { useAuthStore } from "@/features/auth/use-auth-store";
+import { GlobalOrganizeResumeBubble } from "@/features/dashboard/organize-files-panel/global-organize-resume-bubble";
 import type { FileSearchResultItem } from "@/types/domain";
 import klinLogo from "@/assets/klin-logo.svg";
 
@@ -311,6 +312,8 @@ export function AppShell() {
       <main className="flex-1 overflow-y-auto px-8 py-6 lg:px-10">
         <Outlet />
       </main>
+
+      <GlobalOrganizeResumeBubble />
     </div>
   );
 }

@@ -207,7 +207,6 @@ export const organizeApiService = {
       const destinationFolder =
         categoryPathMap.get(selectedCategory) ?? categoryCatalog[0]?.folderPath ?? "";
       const suggestedNames = parseWorkerSuggestedNames(fileResult);
-      const effectiveName = suggestedNames[0] ?? fileName;
 
       return {
         id: crypto.randomUUID(),
@@ -216,12 +215,41 @@ export const organizeApiService = {
         suggestedNames,
         suggestedName: null,
         selectedCategory,
-        destinationPath: destinationFolder ? `${destinationFolder}/${effectiveName}` : effectiveName,
+        // Keep original filename unless user explicitly applies a suggested name in the UI.
+        destinationPath: destinationFolder ? `${destinationFolder}/${fileName}` : fileName,
         confidence: fallbackScores[0]?.score ?? 0,
         topScores: fallbackScores,
         summary: fileResult?.analysis?.summary ?? fileResult?.error ?? null,
         calendar: null,
+        analysisStatus: fileResult?.error ? "failed" : "completed",
+        analysisError: fileResult?.error ?? null,
+        moveStatus: "idle",
       };
     });
+  },
+
+  async analyzeOne(path: string, categoryCatalog: ManagedCategory[]): Promise<OrganizePreviewItem> {
+    const [item] = await this.analyze([path], categoryCatalog);
+    if (item) {
+      return item;
+    }
+
+    const fileName = path.split(/[\\/]/).pop() ?? "unknown-file";
+    return {
+      id: crypto.randomUUID(),
+      fileName,
+      currentPath: path,
+      suggestedNames: [],
+      suggestedName: null,
+      selectedCategory: "Uncategorized",
+      destinationPath: fileName,
+      confidence: 0,
+      topScores: [{ name: "Uncategorized", score: 0 }],
+      summary: null,
+      calendar: null,
+      analysisStatus: "failed",
+      analysisError: "No analysis result returned by worker.",
+      moveStatus: "idle",
+    };
   },
 };
