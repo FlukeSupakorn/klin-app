@@ -137,11 +137,33 @@ export const useCalendarStore = create<CalendarStoreState>((set, get) => ({
         return;
       }
 
-      const offline = error instanceof TypeError;
+      if (error instanceof TypeError) {
+        setTimeout(() => {
+          const retryToken = useAuthStore.getState().accessToken;
+          if (!retryToken) {
+            set({ isLoadingMonth: false, isOffline: true, error: "You are offline." });
+            return;
+          }
+          googleCalendarService
+            .fetchMonthEvents(retryToken, month)
+            .then((events) => {
+              set((current) => ({
+                monthCache: { ...current.monthCache, [getMonthKey(month)]: events },
+                isLoadingMonth: false,
+                isOffline: false,
+                error: null,
+              }));
+            })
+            .catch(() => {
+              set({ isLoadingMonth: false, isOffline: true, error: "You are offline." });
+            });
+        }, 2000);
+        return;
+      }
       set({
         isLoadingMonth: false,
-        isOffline: offline,
-        error: offline ? "You are offline." : "Could not load calendar events.",
+        isOffline: false,
+        error: "Could not load calendar events.",
       });
     }
   },
