@@ -47,9 +47,12 @@ export function AppShell() {
 
   useEffect(() => {
     const syncCategoriesFromWorker = () => {
-      void categoryManagementService.refreshCategoriesFromWorker().then(() => {
-        categoryManagementService.syncToAutomationStores();
-      });
+      void categoryManagementService
+        .refreshCategoriesFromWorker()
+        .then(() => {
+          categoryManagementService.syncToAutomationStores();
+        })
+        .catch(() => undefined);
     };
 
     const onFocus = () => {

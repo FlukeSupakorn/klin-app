@@ -40,6 +40,8 @@ export function buildQueuedItem(path: string, categories: ManagedCategory[], def
     analysisStatus: "queued",
     analysisError: null,
     moveStatus: "idle",
+    lastMovedFromPath: null,
+    lastMovedToPath: null,
   };
 }
 

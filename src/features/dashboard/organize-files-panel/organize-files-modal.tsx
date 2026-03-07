@@ -25,8 +25,12 @@ function splitDestinationPath(destinationPath: string): { folderPath: string; fi
 
 function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: OrganizeWorkflow }) {
   const { folderPath, fileName } = splitDestinationPath(item.destinationPath);
+  const currentSplit = splitDestinationPath(item.currentPath);
   const normalizePath = (value: string) => value.replace(/\\/g, "/").replace(/\/+$/g, "").toLowerCase();
   const isNoChange = normalizePath(item.currentPath) === normalizePath(item.destinationPath);
+  const isFolderChanged = normalizePath(currentSplit.folderPath) !== normalizePath(folderPath);
+  const isNameChanged = currentSplit.fileName.trim().toLowerCase() !== fileName.trim().toLowerCase();
+  const isRenameOnly = isNameChanged && !isFolderChanged;
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(fileName);
 
@@ -45,6 +49,21 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
     setIsEditingName(false);
   };
 
+  const itemWithDraftName = (): OrganizePreviewItem => {
+    const trimmed = nameDraft.trim();
+    if (!isEditingName || !trimmed || trimmed === fileName) {
+      return item;
+    }
+
+    const separator = folderPath.includes("\\") ? "\\" : "/";
+    const nextDestinationPath = folderPath ? `${folderPath}${separator}${trimmed}` : trimmed;
+
+    return {
+      ...item,
+      destinationPath: nextDestinationPath,
+    };
+  };
+
   return (
     <div className="rounded-xl border border-border p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -56,6 +75,7 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
                 <Input
                   value={nameDraft}
                   onChange={(event) => setNameDraft(event.target.value)}
+                  onBlur={saveFileName}
                   className="h-8 max-w-md text-sm"
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
@@ -162,7 +182,13 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
                 return;
               }
 
-              void workflow.moveSingleItem(item);
+              const itemForMove = itemWithDraftName();
+              if (itemForMove.destinationPath !== item.destinationPath) {
+                workflow.updateFileName(item.id, nameDraft.trim());
+                setIsEditingName(false);
+              }
+
+              void workflow.moveSingleItem(itemForMove);
             }}
             disabled={item.analysisStatus !== "completed" || item.moveStatus === "processing" || (item.moveStatus !== "completed" && isNoChange)}
           >
@@ -175,8 +201,8 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
                   : isNoChange
                     ? "No Change"
                   : item.moveStatus === "failed"
-                    ? "Retry Move"
-                    : "Move"}
+                    ? (isRenameOnly ? "Retry Rename" : "Retry Move")
+                    : (isRenameOnly ? "Rename" : "Move")}
           </Button>
         </div>
       </div>

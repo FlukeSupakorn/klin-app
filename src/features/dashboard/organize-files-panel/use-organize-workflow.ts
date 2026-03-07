@@ -194,6 +194,8 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
                 analysisStatus: analyzedItem.analysisStatus === "failed" ? "failed" : "completed",
                 analysisError: analyzedItem.analysisError,
                 moveStatus: item.moveStatus === "completed" ? "completed" : "idle",
+                lastMovedFromPath: item.moveStatus === "completed" ? item.lastMovedFromPath ?? item.currentPath : null,
+                lastMovedToPath: item.moveStatus === "completed" ? item.lastMovedToPath ?? item.destinationPath : null,
               }
               : item
           )));
@@ -433,7 +435,14 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
       await tauriClient.moveFile({ sourcePath: item.currentPath, destinationPath: item.destinationPath });
 
       setItems((state) => state.map((entry) => (
-        entry.id === item.id ? { ...entry, moveStatus: "completed" } : entry
+        entry.id === item.id
+          ? {
+            ...entry,
+            moveStatus: "completed",
+            lastMovedFromPath: item.currentPath,
+            lastMovedToPath: item.destinationPath,
+          }
+          : entry
       )));
 
       const chosenCategory = item.selectedCategory === "No category"
@@ -470,6 +479,9 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
       return;
     }
 
+    const sourcePath = item.lastMovedToPath ?? item.destinationPath;
+    const destinationPath = item.lastMovedFromPath ?? item.currentPath;
+
     setItems((state) => state.map((entry) => (
       entry.id === item.id ? { ...entry, moveStatus: "processing" } : entry
     )));
@@ -477,10 +489,17 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
     setErrorMessage(null);
 
     try {
-      await tauriClient.moveFile({ sourcePath: item.destinationPath, destinationPath: item.currentPath });
+      await tauriClient.moveFile({ sourcePath, destinationPath });
 
       setItems((state) => state.map((entry) => (
-        entry.id === item.id ? { ...entry, moveStatus: "idle" } : entry
+        entry.id === item.id
+          ? {
+            ...entry,
+            moveStatus: "idle",
+            lastMovedFromPath: null,
+            lastMovedToPath: null,
+          }
+          : entry
       )));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Undo failed";

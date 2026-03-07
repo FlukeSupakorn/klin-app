@@ -252,6 +252,8 @@ export const organizeApiService = {
         analysisStatus: fileResult?.error ? "failed" : "completed",
         analysisError: fileResult?.error ?? null,
         moveStatus: "idle",
+        lastMovedFromPath: null,
+        lastMovedToPath: null,
       };
     });
   },
@@ -278,6 +280,8 @@ export const organizeApiService = {
       analysisStatus: "failed",
       analysisError: "No analysis result returned by worker.",
       moveStatus: "idle",
+      lastMovedFromPath: null,
+      lastMovedToPath: null,
     };
   },
 };

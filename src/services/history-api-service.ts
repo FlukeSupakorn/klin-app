@@ -1,5 +1,7 @@
 import type { HistoryEntry } from "@/features/history/history-types";
 import type { CategoryScore } from "@/types/domain";
+import { tauriClient } from "@/services/tauri-client";
+import { useLogStore } from "@/stores/use-log-store";
 
 const HISTORY_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/history",
@@ -17,6 +19,72 @@ export interface HistoryListPage {
   limit: number;
   offset: number;
   hasMore: boolean;
+}
+
+function toIso(value: unknown): string {
+  const raw = typeof value === "string" ? value : "";
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString();
+}
+
+function normalizeLogScores(input: unknown): CategoryScore[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return input
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const name = "name" in item ? String(item.name ?? "") : "";
+      const score = "score" in item ? Number(item.score) : Number.NaN;
+      if (!name) {
+        return null;
+      }
+
+      return { name, score: normalizeScore(score) };
+    })
+    .filter((item): item is CategoryScore => item !== null)
+    .sort((a, b) => b.score - a.score);
+}
+
+async function getLocalOrganizeHistoryEntries(): Promise<HistoryEntry[]> {
+  const tauriLogs = await tauriClient.listLogs().catch(() => []);
+  const storeLogs = useLogStore.getState().logs;
+  const mergedLogs = [...storeLogs, ...tauriLogs];
+  const dedupedById = new Map<string, (typeof mergedLogs)[number]>();
+  mergedLogs.forEach((log) => {
+    if (!dedupedById.has(log.id)) {
+      dedupedById.set(log.id, log);
+    }
+  });
+  const logs = [...dedupedById.values()];
+
+  return logs
+    .filter((log) => log.itemType === "file" && typeof log.originalPath === "string" && typeof log.movedTo === "string")
+    .map((log) => {
+      const fromPath = log.originalPath;
+      const toPath = log.movedTo;
+      const oldName = getPathTail(fromPath);
+      const newName = getPathTail(toPath);
+      const fileName = newName || oldName;
+
+      return {
+        id: `local-${log.id}`,
+        type: "organize",
+        title: fileName,
+        subtitle: log.chosenCategory ? `Organized to ${log.chosenCategory}` : "Organized",
+        timestamp: toIso(log.timestamp),
+        fromPath,
+        toPath,
+        oldName,
+        newName,
+        scores: normalizeLogScores(log.allScores),
+      } satisfies HistoryEntry;
+    })
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
 }
 
 function getPathTail(path: string): string {
@@ -249,14 +317,60 @@ async function fetchHistoryFrom(url: string, params: HistoryListParams): Promise
 
 export const historyApiService = {
   async list(params: HistoryListParams = {}): Promise<HistoryListPage> {
+    const isFirstPage = (params.offset ?? 0) === 0;
+    const localEntries = isFirstPage
+      ? await getLocalOrganizeHistoryEntries().catch(() => [] as HistoryEntry[])
+      : [];
+
     let lastError: unknown = null;
 
     for (const url of HISTORY_API_URL_CANDIDATES) {
       try {
-        return await fetchHistoryFrom(url, params);
+        const remotePage = await fetchHistoryFrom(url, params);
+
+        if (!isFirstPage || localEntries.length === 0) {
+          return remotePage;
+        }
+
+        const filteredRemoteEntries = remotePage.entries.filter((entry) => {
+          if (entry.type !== "organize") {
+            return true;
+          }
+
+          // Worker history currently stores organize-analysis rows without actual move paths.
+          // When local move logs exist, suppress these no-op rows to avoid false "No move" display.
+          const isNoOpOrganize = entry.fromPath === entry.toPath && entry.oldName === entry.newName;
+          return !isNoOpOrganize;
+        });
+
+        const merged = [...localEntries, ...filteredRemoteEntries];
+        const deduped = new Map<string, HistoryEntry>();
+        merged.forEach((entry) => {
+          if (!deduped.has(entry.id)) {
+            deduped.set(entry.id, entry);
+          }
+        });
+
+        const entries = [...deduped.values()].sort(
+          (left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp),
+        );
+
+        return {
+          ...remotePage,
+          entries,
+        };
       } catch (error) {
         lastError = error;
       }
+    }
+
+    if (isFirstPage && localEntries.length > 0) {
+      return {
+        entries: localEntries,
+        limit: params.limit ?? 20,
+        offset: params.offset ?? 0,
+        hasMore: false,
+      };
     }
 
     throw lastError ?? new Error("History API unavailable");

@@ -83,6 +83,9 @@ export interface OrganizePreviewItem {
   analysisStatus: AutomationStatus;
   analysisError: string | null;
   moveStatus: OrganizeMoveStatus;
+  // Tracks the exact file move operation so undo remains correct even if UI destination is edited later.
+  lastMovedFromPath?: string | null;
+  lastMovedToPath?: string | null;
 }
 
 export interface OrganizeAnalyzeRequest {

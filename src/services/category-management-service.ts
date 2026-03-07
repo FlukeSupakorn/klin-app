@@ -10,6 +10,9 @@ const SETTINGS_API_URL_CANDIDATES = [
 ];
 
 const CATEGORIES_API_URL_CANDIDATES = [
+  "http://127.0.0.1:8000/api/settings/categories",
+  "http://localhost:8000/api/settings/categories",
+  // Backward-compatible fallback for older worker builds.
   "http://127.0.0.1:8000/api/categories",
   "http://localhost:8000/api/categories",
 ];
