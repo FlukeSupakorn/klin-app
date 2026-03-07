@@ -15,6 +15,22 @@ import {
 import { useOrganizeDragDrop } from "./use-organize-drag-drop";
 import { useOrganizeWorkflowStore } from "./use-organize-workflow-store";
 
+function isAbortError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return true;
+  }
+
+  if (error && typeof error === "object" && "name" in error) {
+    return (error as { name?: string }).name === "AbortError";
+  }
+
+  if (error instanceof Error) {
+    return /abort/i.test(error.message);
+  }
+
+  return false;
+}
+
 export interface OrganizeWorkflow {
   items: OrganizePreviewItem[];
   modalOpen: boolean;
@@ -39,6 +55,10 @@ export interface OrganizeWorkflow {
   openModal: () => void;
   setOpenSettingsWindow: (open: boolean) => void;
   toggleSuggestionFor: (itemId: string) => void;
+  updateFileName: (itemId: string, fileName: string) => void;
+  updateFolderPath: (itemId: string, folderPath: string) => void;
+  pickFolderForItem: (itemId: string) => Promise<void>;
+  setNoMoveCategory: (itemId: string) => void;
   applyCategory: (itemId: string, categoryName: string) => void;
   applySuggestedName: (itemId: string, selectedName: string | null) => void;
   cancelItem: (itemId: string) => void;
@@ -83,6 +103,48 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
   const itemsRef = useRef<OrganizePreviewItem[]>(items);
   itemsRef.current = items;
   const isQueueRunningRef = useRef(false);
+  const activeAnalyzeRef = useRef<{ itemId: string; controller: AbortController } | null>(null);
+
+  const splitDestinationPath = (destinationPath: string) => {
+    const slashIndex = Math.max(destinationPath.lastIndexOf("/"), destinationPath.lastIndexOf("\\"));
+    if (slashIndex < 0) {
+      return {
+        folderPath: "",
+        fileName: destinationPath,
+      };
+    }
+
+    return {
+      folderPath: destinationPath.slice(0, slashIndex),
+      fileName: destinationPath.slice(slashIndex + 1),
+    };
+  };
+
+  const normalizePathForCompare = (value: string) => value.replace(/\\/g, "/").replace(/\/+$/g, "").toLowerCase();
+
+  const resolveCategoryByDestinationPath = (destinationPath: string): string => {
+    const { folderPath } = splitDestinationPath(destinationPath);
+    if (!folderPath) {
+      return "No category";
+    }
+
+    const normalizedFolder = normalizePathForCompare(folderPath);
+    const matched = categories.find((category) => normalizePathForCompare(category.folderPath) === normalizedFolder);
+    return matched?.name ?? "No category";
+  };
+
+  const buildDestinationPath = (folderPath: string, fileName: string) => {
+    const trimmedFolder = folderPath.trim();
+    const trimmedFileName = fileName.trim();
+    if (!trimmedFolder) {
+      return trimmedFileName;
+    }
+
+    const separator = trimmedFolder.includes("\\") ? "\\" : "/";
+    return `${trimmedFolder}${separator}${trimmedFileName}`;
+  };
+
+  const isSamePath = (left: string, right: string) => normalizePathForCompare(left) === normalizePathForCompare(right);
 
   const runAnalyzeQueue = async () => {
     if (isQueueRunningRef.current) {
@@ -107,9 +169,19 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
         )));
 
         try {
+          const controller = new AbortController();
+          activeAnalyzeRef.current = {
+            itemId: nextQueuedItem.id,
+            controller,
+          };
+
           // Keep sequential analysis so queue progress is deterministic in the modal.
           // eslint-disable-next-line no-await-in-loop
-          const analyzedItem = await organizeApiService.analyzeOne(nextQueuedItem.currentPath, categories);
+          const analyzedItem = await organizeApiService.analyzeOne(
+            nextQueuedItem.currentPath,
+            categories,
+            controller.signal,
+          );
 
           setItems((state) => state.map((item) => (
             item.id === nextQueuedItem.id
@@ -130,6 +202,12 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
             hasFailures = true;
           }
         } catch (error) {
+          const aborted = isAbortError(error);
+          if (aborted) {
+            activeAnalyzeRef.current = null;
+            continue;
+          }
+
           hasFailures = true;
           const reason = error instanceof Error ? error.message : "Unknown analysis error";
 
@@ -138,6 +216,10 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
               ? { ...item, analysisStatus: "failed", analysisError: reason }
               : item
           )));
+        } finally {
+          if (activeAnalyzeRef.current?.itemId === nextQueuedItem.id) {
+            activeAnalyzeRef.current = null;
+          }
         }
       }
     } finally {
@@ -212,6 +294,75 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
     )));
   };
 
+  const setNoMoveCategory = (itemId: string) => {
+    setItems((state) => state.map((item) => {
+      if (item.id !== itemId) {
+        return item;
+      }
+
+      const { fileName } = splitDestinationPath(item.destinationPath);
+      const { folderPath } = splitDestinationPath(item.currentPath);
+      const nextDestinationPath = buildDestinationPath(folderPath, fileName);
+
+      return {
+        ...item,
+        selectedCategory: "No category",
+        destinationPath: nextDestinationPath,
+      };
+    }));
+  };
+
+  const updateFileName = (itemId: string, fileName: string) => {
+    const nextFileName = fileName.trim();
+    if (!nextFileName) {
+      return;
+    }
+
+    setItems((state) => state.map((item) => {
+      if (item.id !== itemId) {
+        return item;
+      }
+
+      const { folderPath } = splitDestinationPath(item.destinationPath);
+      const nextDestinationPath = buildDestinationPath(folderPath, nextFileName);
+      return {
+        ...item,
+        destinationPath: nextDestinationPath,
+        selectedCategory: item.selectedCategory,
+      };
+    }));
+  };
+
+  const updateFolderPath = (itemId: string, folderPath: string) => {
+    const nextFolderPath = folderPath.trim();
+    if (!nextFolderPath) {
+      return;
+    }
+
+    setItems((state) => state.map((item) => {
+      if (item.id !== itemId) {
+        return item;
+      }
+
+      const { fileName } = splitDestinationPath(item.destinationPath);
+      const nextDestinationPath = buildDestinationPath(nextFolderPath, fileName);
+      return {
+        ...item,
+        destinationPath: nextDestinationPath,
+        selectedCategory: resolveCategoryByDestinationPath(nextDestinationPath),
+      };
+    }));
+  };
+
+  const pickFolderForItem = async (itemId: string) => {
+    const pickedFolder = await tauriClient.pickFolderForOrganize();
+    if (!pickedFolder) {
+      return;
+    }
+
+    updateFolderPath(itemId, pickedFolder);
+  };
+
   const applySuggestedName = (itemId: string, selectedName: string | null) => {
     setItems((state) => state.map((item) => (
       item.id === itemId ? applySuggestedNameToItem(item, selectedName) : item
@@ -228,10 +379,20 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
   };
 
   const cancelItem = (itemId: string) => {
+    if (activeAnalyzeRef.current?.itemId === itemId) {
+      activeAnalyzeRef.current.controller.abort();
+      activeAnalyzeRef.current = null;
+    }
+
     cancelItemById(itemId);
   };
 
   const cancelOrganize = () => {
+    if (activeAnalyzeRef.current) {
+      activeAnalyzeRef.current.controller.abort();
+      activeAnalyzeRef.current = null;
+    }
+
     cancelPendingItems();
   };
 
@@ -257,6 +418,11 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
       return;
     }
 
+    if (isSamePath(item.currentPath, item.destinationPath)) {
+      setErrorMessage(`No changes for ${item.fileName}. Rename or choose a different folder before moving.`);
+      return;
+    }
+
     setItems((state) => state.map((entry) => (
       entry.id === item.id ? { ...entry, moveStatus: "processing" } : entry
     )));
@@ -270,14 +436,17 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
         entry.id === item.id ? { ...entry, moveStatus: "completed" } : entry
       )));
 
-      const selectedScore = item.topScores.find((score) => score.name === item.selectedCategory) ?? item.topScores[0];
+      const chosenCategory = item.selectedCategory === "No category"
+        ? "No category"
+        : resolveCategoryByDestinationPath(item.destinationPath);
+      const selectedScore = item.topScores.find((score) => score.name === chosenCategory) ?? item.topScores[0];
       const moveLog: AutomationLog = {
         id: crypto.randomUUID(),
         itemType: "file",
         fileName: item.fileName,
         originalPath: item.currentPath,
         movedTo: item.destinationPath,
-        chosenCategory: item.selectedCategory,
+        chosenCategory,
         score: selectedScore?.score ?? 0,
         allScores: item.topScores,
         timestamp: new Date().toISOString(),
@@ -362,6 +531,10 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
     toggleSuggestionFor: (itemId: string) => {
       setOpenSuggestionFor((state) => (state === itemId ? null : itemId));
     },
+    updateFileName,
+    updateFolderPath,
+    pickFolderForItem,
+    setNoMoveCategory,
     applyCategory,
     applySuggestedName,
     cancelItem,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { History, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { historyApiService } from "@/services/history-api-service";
 import { HistoryEntryCard } from "@/features/history/history-entry-card";
 import { getPathTail, joinPath } from "@/features/history/history-utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
-import type { AutomationLog } from "@/types/domain";
+
+const HISTORY_PAGE_SIZE = 20;
 
 const TYPE_FILTERS: Array<{ label: string; value: "all" | HistoryEntryType }> = [
   { label: "All", value: "all" },
@@ -23,13 +24,18 @@ export function HistoryPage() {
   const location = useLocation();
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [nextOffset, setNextOffset] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | HistoryEntryType>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [scoreExpandedIds, setScoreExpandedIds] = useState<string[]>([]);
   const [selectedScoreByEntryId, setSelectedScoreByEntryId] = useState<Record<string, string>>({});
   const [openedSummaryPath, setOpenedSummaryPath] = useState<string | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const categoryDefaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
 
   const expandedEntryIdFromNavState =
@@ -38,67 +44,83 @@ export function HistoryPage() {
       : "";
 
   useEffect(() => {
-    let isMounted = true;
-
-    const mapLocalLogToHistoryEntry = (log: AutomationLog): Extract<HistoryEntry, { type: "organize" }> => ({
-      id: log.id,
-      type: "organize",
-      title: log.fileName || getPathTail(log.originalPath),
-      subtitle: `Organized to ${log.chosenCategory || "Unknown"}`,
-      timestamp: log.timestamp,
-      fromPath: log.originalPath,
-      toPath: log.movedTo || log.originalPath,
-      oldName: getPathTail(log.originalPath),
-      newName: getPathTail(log.movedTo || log.originalPath),
-      scores: log.allScores || [],
-    });
-
-    const loadHistory = async () => {
-      setIsLoading(true);
-      setLoadError(null);
-
-      try {
-        const [apiEntries, localLogs] = await Promise.all([
-          historyApiService.list(),
-          tauriClient.listLogs().catch(() => []),
-        ]);
-        if (!isMounted) {
-          return;
-        }
-
-        const localOrganizeEntries = localLogs
-          .filter((log) => log.status === "completed" && log.originalPath && log.movedTo)
-          .map(mapLocalLogToHistoryEntry);
-
-        const mergedMap = new Map<string, HistoryEntry>();
-        [...apiEntries, ...localOrganizeEntries].forEach((entry) => {
-          mergedMap.set(entry.id, entry);
-        });
-
-        const merged = [...mergedMap.values()].sort(
-          (left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime(),
-        );
-
-        setHistoryEntries(merged);
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        setLoadError(error instanceof Error ? error.message : "Failed to load history");
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void loadHistory();
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 250);
 
     return () => {
-      isMounted = false;
+      window.clearTimeout(timer);
     };
-  }, []);
+  }, [search]);
+
+  const loadHistoryPage = useCallback(async (reset: boolean) => {
+    if (reset) {
+      setIsLoading(true);
+      setLoadError(null);
+    } else {
+      setIsLoadingMore(true);
+    }
+
+    const requestOffset = reset ? 0 : nextOffset;
+
+    try {
+      const page = await historyApiService.list({
+        limit: HISTORY_PAGE_SIZE,
+        offset: requestOffset,
+        search: debouncedSearch,
+      });
+
+      setHistoryEntries((state) => {
+        if (reset) {
+          return page.entries;
+        }
+
+        const merged = [...state, ...page.entries];
+        const deduped = new Map<string, HistoryEntry>();
+        merged.forEach((entry) => {
+          deduped.set(entry.id, entry);
+        });
+
+        return [...deduped.values()];
+      });
+
+      setHasMore(page.hasMore);
+      setNextOffset(requestOffset + page.entries.length);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Failed to load history");
+    } finally {
+      if (reset) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
+    }
+  }, [debouncedSearch, nextOffset]);
+
+  useEffect(() => {
+    void loadHistoryPage(true);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasMore || isLoading || isLoadingMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && hasMore && !isLoadingMore && !isLoading) {
+          void loadHistoryPage(false);
+        }
+      },
+      { rootMargin: "160px" },
+    );
+
+    observer.observe(target);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasMore, isLoading, isLoadingMore, loadHistoryPage]);
 
   useEffect(() => {
     if (!expandedEntryIdFromNavState) {
@@ -261,24 +283,40 @@ export function HistoryPage() {
             No history rows found.
           </div>
         ) : (
-          filteredRows.map((entry) => {
-            const isExpanded = expandedId === entry.id;
+          <>
+            {filteredRows.map((entry) => {
+              const isExpanded = expandedId === entry.id;
 
-            return (
-              <HistoryEntryCard
-                key={entry.id}
-                entry={entry}
-                isExpanded={isExpanded}
-                isScoreExpanded={scoreExpandedIds.includes(entry.id)}
-                selectedScoreCategory={selectedScoreByEntryId[entry.id]}
-                onToggleExpand={() => setExpandedId(isExpanded ? null : entry.id)}
-                onToggleScores={() => toggleScoreExpansion(entry.id)}
-                onRequestEditMovedTo={handleRequestEditMovedTo}
-                onUseScoreFolder={handleUseScoreFolder}
-                onOpenSummary={setOpenedSummaryPath}
-              />
-            );
-          })
+              return (
+                <HistoryEntryCard
+                  key={entry.id}
+                  entry={entry}
+                  isExpanded={isExpanded}
+                  isScoreExpanded={scoreExpandedIds.includes(entry.id)}
+                  selectedScoreCategory={selectedScoreByEntryId[entry.id]}
+                  onToggleExpand={() => setExpandedId(isExpanded ? null : entry.id)}
+                  onToggleScores={() => toggleScoreExpansion(entry.id)}
+                  onRequestEditMovedTo={handleRequestEditMovedTo}
+                  onUseScoreFolder={handleUseScoreFolder}
+                  onOpenSummary={setOpenedSummaryPath}
+                />
+              );
+            })}
+
+            {isLoadingMore && (
+              <div className="rounded-lg border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+                Loading more history...
+              </div>
+            )}
+
+            {!hasMore && historyEntries.length > 0 && (
+              <div className="rounded-lg border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+                End of history.
+              </div>
+            )}
+
+            <div ref={loadMoreRef} className="h-2" />
+          </>
         )}
       </div>
     </div>

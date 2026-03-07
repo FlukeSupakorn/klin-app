@@ -11,6 +11,22 @@ const ORGANIZE_API_URL_CANDIDATES = [
   "http://localhost:8000/api/organize",
 ];
 
+function isAbortError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return true;
+  }
+
+  if (error && typeof error === "object" && "name" in error) {
+    return (error as { name?: string }).name === "AbortError";
+  }
+
+  if (error instanceof Error) {
+    return /abort/i.test(error.message);
+  }
+
+  return false;
+}
+
 function normalizeCategoryLabel(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -153,7 +169,11 @@ function normalizeResults(payload: unknown): Map<string, OrganizeAnalyzeFileResu
   return resultMap;
 }
 
-async function postAnalyze(requestPayload: OrganizeAnalyzeRequest): Promise<unknown> {
+async function postAnalyze(requestPayload: OrganizeAnalyzeRequest, signal?: AbortSignal): Promise<unknown> {
+  if (signal?.aborted) {
+    throw new DOMException("Request aborted", "AbortError");
+  }
+
   let lastError: unknown = null;
 
   for (const url of ORGANIZE_API_URL_CANDIDATES) {
@@ -164,15 +184,23 @@ async function postAnalyze(requestPayload: OrganizeAnalyzeRequest): Promise<unkn
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestPayload),
+        signal,
       });
 
       if (!response.ok) {
+        if (signal?.aborted) {
+          throw new DOMException("Request aborted", "AbortError");
+        }
         lastError = new Error(`Organize API error: ${response.status} at ${url}`);
         continue;
       }
 
       return await response.json();
     } catch (error) {
+      if (signal?.aborted || isAbortError(error)) {
+        throw error;
+      }
+
       lastError = error;
     }
   }
@@ -186,13 +214,13 @@ function buildFallbackScores(categoryCatalog: ManagedCategory[]): CategoryScore[
 }
 
 export const organizeApiService = {
-  async analyze(paths: string[], categoryCatalog: ManagedCategory[]): Promise<OrganizePreviewItem[]> {
+  async analyze(paths: string[], categoryCatalog: ManagedCategory[], signal?: AbortSignal): Promise<OrganizePreviewItem[]> {
     if (paths.length === 0) {
       return [];
     }
 
     const requestPayload = buildRequest(paths);
-    const payload = await postAnalyze(requestPayload);
+    const payload = await postAnalyze(requestPayload, signal);
     const resultMap = normalizeResults(payload);
 
     const categoryPathMap = new Map(categoryCatalog.map((category) => [category.name, category.folderPath]));
@@ -228,8 +256,8 @@ export const organizeApiService = {
     });
   },
 
-  async analyzeOne(path: string, categoryCatalog: ManagedCategory[]): Promise<OrganizePreviewItem> {
-    const [item] = await this.analyze([path], categoryCatalog);
+  async analyzeOne(path: string, categoryCatalog: ManagedCategory[], signal?: AbortSignal): Promise<OrganizePreviewItem> {
+    const [item] = await this.analyze([path], categoryCatalog, signal);
     if (item) {
       return item;
     }

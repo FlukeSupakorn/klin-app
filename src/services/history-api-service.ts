@@ -6,6 +6,19 @@ const HISTORY_API_URL_CANDIDATES = [
   "http://localhost:8000/api/history",
 ];
 
+export interface HistoryListParams {
+  limit?: number;
+  offset?: number;
+  search?: string;
+}
+
+export interface HistoryListPage {
+  entries: HistoryEntry[];
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
 function getPathTail(path: string): string {
   const value = path.split(/[\\/]/).pop();
   return value && value.trim().length > 0 ? value : "Unknown";
@@ -197,8 +210,22 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
     .filter((entry): entry is HistoryEntry => entry !== null) as HistoryEntry[];
 }
 
-async function fetchHistoryFrom(url: string): Promise<HistoryEntry[]> {
-  const response = await fetch(url, {
+async function fetchHistoryFrom(url: string, params: HistoryListParams): Promise<HistoryListPage> {
+  const query = new URLSearchParams();
+  if (typeof params.limit === "number") {
+    query.set("limit", String(params.limit));
+  }
+  if (typeof params.offset === "number") {
+    query.set("offset", String(params.offset));
+  }
+  if (params.search && params.search.trim().length > 0) {
+    query.set("search", params.search.trim());
+  }
+
+  const queryString = query.toString();
+  const requestUrl = queryString ? `${url}?${queryString}` : url;
+
+  const response = await fetch(requestUrl, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -210,16 +237,23 @@ async function fetchHistoryFrom(url: string): Promise<HistoryEntry[]> {
   }
 
   const payload = await response.json();
-  return normalizeEntries(payload);
+  const root = payload && typeof payload === "object" ? payload as { limit?: unknown; offset?: unknown; has_more?: unknown } : {};
+
+  return {
+    entries: normalizeEntries(payload),
+    limit: typeof root.limit === "number" ? root.limit : params.limit ?? 20,
+    offset: typeof root.offset === "number" ? root.offset : params.offset ?? 0,
+    hasMore: Boolean(root.has_more),
+  };
 }
 
 export const historyApiService = {
-  async list(): Promise<HistoryEntry[]> {
+  async list(params: HistoryListParams = {}): Promise<HistoryListPage> {
     let lastError: unknown = null;
 
     for (const url of HISTORY_API_URL_CANDIDATES) {
       try {
-        return await fetchHistoryFrom(url);
+        return await fetchHistoryFrom(url, params);
       } catch (error) {
         lastError = error;
       }

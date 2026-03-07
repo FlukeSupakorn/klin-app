@@ -1,4 +1,5 @@
-import { Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Pencil, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,13 +11,106 @@ interface OrganizeFilesModalProps {
   workflow: OrganizeWorkflow;
 }
 
+function splitDestinationPath(destinationPath: string): { folderPath: string; fileName: string } {
+  const slashIndex = Math.max(destinationPath.lastIndexOf("/"), destinationPath.lastIndexOf("\\"));
+  if (slashIndex < 0) {
+    return { folderPath: "", fileName: destinationPath };
+  }
+
+  return {
+    folderPath: destinationPath.slice(0, slashIndex),
+    fileName: destinationPath.slice(slashIndex + 1),
+  };
+}
+
 function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: OrganizeWorkflow }) {
+  const { folderPath, fileName } = splitDestinationPath(item.destinationPath);
+  const normalizePath = (value: string) => value.replace(/\\/g, "/").replace(/\/+$/g, "").toLowerCase();
+  const isNoChange = normalizePath(item.currentPath) === normalizePath(item.destinationPath);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(fileName);
+
+  useEffect(() => {
+    setNameDraft(fileName);
+  }, [fileName, item.id]);
+
+  const saveFileName = () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) {
+      setNameDraft(fileName);
+      setIsEditingName(false);
+      return;
+    }
+    workflow.updateFileName(item.id, trimmed);
+    setIsEditingName(false);
+  };
+
   return (
     <div className="rounded-xl border border-border p-4">
       <div className="mb-2 flex items-center justify-between">
-        <div>
-          <p className="font-semibold">{item.fileName}</p>
-          <p className="text-xs text-muted-foreground">{item.currentPath}</p>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Name:</span>
+            {isEditingName ? (
+              <>
+                <Input
+                  value={nameDraft}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  className="h-8 max-w-md text-sm"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      saveFileName();
+                    }
+
+                    if (event.key === "Escape") {
+                      setNameDraft(fileName);
+                      setIsEditingName(false);
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 w-6 p-0"
+                  onClick={saveFileName}
+                  aria-label="Save name"
+                  title="Save name"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="truncate text-sm font-semibold">{fileName}</p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => setIsEditingName(true)}
+                  aria-label="Edit name"
+                  title="Edit name"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Folder:</span>
+            <p className="truncate text-xs text-muted-foreground">{folderPath || "(same folder)"}</p>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => void workflow.pickFolderForItem(item.id)}
+              aria-label="Edit folder"
+              title="Edit folder"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">Original: {item.currentPath}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
             <span
               className={cn(
@@ -70,7 +164,7 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
 
               void workflow.moveSingleItem(item);
             }}
-            disabled={item.analysisStatus !== "completed" || item.moveStatus === "processing"}
+            disabled={item.analysisStatus !== "completed" || item.moveStatus === "processing" || (item.moveStatus !== "completed" && isNoChange)}
           >
             {item.analysisStatus !== "completed"
               ? "Waiting..."
@@ -78,6 +172,8 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
                 ? "Moving..."
                 : item.moveStatus === "completed"
                   ? "Undo"
+                  : isNoChange
+                    ? "No Change"
                   : item.moveStatus === "failed"
                     ? "Retry Move"
                     : "Move"}
@@ -88,6 +184,18 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
       {item.analysisStatus === "completed" ? (
         <>
           <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => workflow.setNoMoveCategory(item.id)}
+              className={cn(
+                "rounded-full px-3 py-1 text-xs transition-colors",
+                item.selectedCategory === "No category"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-foreground",
+              )}
+            >
+              None
+            </button>
             {item.topScores.map((score) => (
               <button
                 type="button"
@@ -108,54 +216,75 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
           <div className="space-y-2 rounded-lg bg-muted/40 p-3 text-xs">
             <p><strong>Move to:</strong> {item.destinationPath}</p>
             <p><strong>Confidence:</strong> {Math.round(item.confidence * 100)}%</p>
-            <p><strong>Summary:</strong> {item.summary ?? "No summary"}</p>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1"
-                onClick={() => workflow.toggleSuggestionFor(item.id)}
-              >
-                Suggest Name
-              </Button>
-              <span>
-                {item.suggestedName ? (
-                  <>Suggested name: <strong>{item.suggestedName}</strong></>
-                ) : (
-                  <>No recommendation</>
-                )}
-              </span>
-            </div>
-
-            {workflow.openSuggestionFor === item.id && (
-              <div className="flex flex-wrap gap-2">
-                {item.suggestedNames.length > 0 ? (
-                  <>
-                    {item.suggestedNames.map((name) => (
-                      <Button
-                        key={name}
-                        size="sm"
-                        variant={item.suggestedName === name ? "default" : "outline"}
-                        className="h-7"
-                        onClick={() => workflow.applySuggestedName(item.id, name)}
-                      >
-                        {name}
-                      </Button>
-                    ))}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7"
-                      onClick={() => workflow.applySuggestedName(item.id, null)}
-                    >
-                      Use Original
-                    </Button>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">No recommendation</span>
-                )}
-              </div>
+            <p><strong>Category:</strong> {item.selectedCategory}</p>
+            {isNoChange && (
+              <p className="font-semibold text-amber-700">Can't move yet: no change detected.</p>
             )}
+            <p><strong>Summary:</strong> {item.summary ?? "No summary"}</p>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => workflow.toggleSuggestionFor(item.id)}
+                  className={cn(
+                    "h-6 w-6 p-0 text-muted-foreground hover:text-foreground",
+                    workflow.openSuggestionFor === item.id && "text-primary",
+                  )}
+                  aria-label="Edit suggested name"
+                  title="Edit suggested name"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {item.suggestedName ? (
+                    <>Selected: <strong className="text-foreground">{item.suggestedName}</strong></>
+                  ) : (
+                    <>No recommendation</>
+                  )}
+                </span>
+              </div>
+
+              {workflow.openSuggestionFor === item.id && (
+                <div className="flex flex-wrap gap-2">
+                  {item.suggestedNames.length > 0 ? (
+                    <>
+                      {item.suggestedNames.map((name) => (
+                        <button
+                          type="button"
+                          key={name}
+                          onClick={() => workflow.applySuggestedName(item.id, name)}
+                          className={cn(
+                            "rounded-full px-3 py-1 text-xs transition-colors",
+                            item.suggestedName === name
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-foreground",
+                          )}
+                        >
+                          {name}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => workflow.applySuggestedName(item.id, null)}
+                        className={cn(
+                          "rounded-full px-3 py-1 text-xs transition-colors",
+                          item.suggestedName === null
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-foreground",
+                        )}
+                      >
+                        Use Original
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No recommendation</span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </>
       ) : (
