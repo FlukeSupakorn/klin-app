@@ -45,6 +45,11 @@ function createDefaultTitle(prefix = "Quick-Note"): string {
   return `${prefix}-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-")}`;
 }
 
+function getPathTail(path: string): string {
+  const value = path.split(/[\\/]/).pop();
+  return value && value.trim().length > 0 ? value : "Quick-Note.md";
+}
+
 export function NotesPage() {
   const categories = useCategoryManagementStore((state) => state.categories);
 
@@ -238,7 +243,7 @@ export function NotesPage() {
     }
   };
 
-  const saveToFolder = async (targetFolder: string) => {
+  const saveToFolder = async (targetFolder: string, options?: { categoryName?: string }) => {
     if (!targetFolder.trim()) {
       setEditorError("Target folder is required.");
       return;
@@ -250,6 +255,18 @@ export function NotesPage() {
     try {
       const savedPath = await notesFileService.saveToFolder(targetFolder, title, content);
       setActivePath(savedPath);
+
+      try {
+        await notesApiService.logNoteHistory({
+          fileName: getPathTail(savedPath),
+          destinationPath: savedPath,
+          sourceFiles: summarySourceFiles,
+          categoryName: options?.categoryName,
+        });
+      } catch {
+        // Keep note save successful even if history logging fails.
+      }
+
       setEditorNotice(`Saved note to ${savedPath}`);
       await refreshNotes();
     } catch (error) {
@@ -281,7 +298,7 @@ export function NotesPage() {
       return;
     }
 
-    await saveToFolder(category.folderPath);
+    await saveToFolder(category.folderPath, { categoryName: category.name });
   };
 
   return (

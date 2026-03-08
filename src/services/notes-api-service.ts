@@ -3,6 +3,11 @@ const NOTES_API_URL_CANDIDATES = [
   "http://localhost:8000/api/summary",
 ];
 
+const NOTE_HISTORY_API_URL_CANDIDATES = [
+  "http://127.0.0.1:8000/api/history/note",
+  "http://localhost:8000/api/history/note",
+];
+
 export interface NotesSummarizeResult {
   summary: string;
   suggestedTitle: string;
@@ -13,6 +18,13 @@ interface NotesStreamCallbacks {
   onChunk?: (delta: string) => void;
   onMeta?: (meta: { suggestedTitle?: string }) => void;
   signal?: AbortSignal;
+}
+
+export interface NoteHistoryPayload {
+  fileName: string;
+  destinationPath: string;
+  sourceFiles?: string[];
+  categoryName?: string;
 }
 
 function buildSuggestedTitleFromPaths(filePaths: string[]): string {
@@ -220,5 +232,37 @@ export const notesApiService = {
     } catch {
       throw lastError ?? new Error("Notes API stream unavailable");
     }
+  },
+
+  async logNoteHistory(payload: NoteHistoryPayload): Promise<void> {
+    let lastError: unknown = null;
+
+    for (const url of NOTE_HISTORY_API_URL_CANDIDATES) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            file_name: payload.fileName,
+            destination_path: payload.destinationPath,
+            source_files: payload.sourceFiles ?? [],
+            category_name: payload.categoryName ?? null,
+          }),
+        });
+
+        if (!response.ok) {
+          lastError = new Error(`Note history API error: ${response.status} at ${url}`);
+          continue;
+        }
+
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError ?? new Error("Note history API unavailable");
   },
 };

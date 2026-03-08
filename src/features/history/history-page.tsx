@@ -16,7 +16,7 @@ const HISTORY_PAGE_SIZE = 20;
 const TYPE_FILTERS: Array<{ label: string; value: "all" | HistoryEntryType }> = [
   { label: "All", value: "all" },
   { label: "Organize", value: "organize" },
-  { label: "Summary", value: "summary" },
+  { label: "Note", value: "summary" },
   { label: "Calendar", value: "calendar" },
 ];
 
@@ -32,7 +32,6 @@ export function HistoryPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | HistoryEntryType>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [openedSummaryPath, setOpenedSummaryPath] = useState<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const categoryDefaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
 
@@ -199,6 +198,10 @@ export function HistoryPage() {
     });
   }, [historyEntries, search, typeFilter]);
 
+  const handleOpenSummary = useCallback((path: string) => {
+    void tauriClient.openExternalUrl(path);
+  }, []);
+
   return (
     <div className="space-y-6 pb-10">
       <div>
@@ -240,15 +243,6 @@ export function HistoryPage() {
         </div>
       </div>
 
-      {openedSummaryPath && (
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-primary/20 bg-primary/10 p-3 text-sm">
-          <p className="truncate text-primary">Mock open summary file: {openedSummaryPath}</p>
-          <Button variant="ghost" size="sm" onClick={() => setOpenedSummaryPath(null)}>
-            Dismiss
-          </Button>
-        </div>
-      )}
-
       <div className="space-y-3">
         {isLoading ? (
           <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
@@ -274,7 +268,7 @@ export function HistoryPage() {
                   isExpanded={isExpanded}
                   onToggleExpand={() => setExpandedId(isExpanded ? null : entry.id)}
                   onRequestEditMovedTo={handleRequestEditMovedTo}
-                  onOpenSummary={setOpenedSummaryPath}
+                  onOpenSummary={handleOpenSummary}
                 />
               );
             })}

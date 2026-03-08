@@ -162,6 +162,8 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
       const action = "action" in entry ? String(entry.action ?? "") : "";
       const inferredType = ["organized", "organized_cached", "organized_reclassified", "moved", "renamed", "renamed_moved"].includes(action)
         ? "organize"
+        : action === "note"
+          ? "summary"
         : "";
       const type = "type" in entry ? String(entry.type ?? inferredType) : inferredType;
       const timestamp =
@@ -186,6 +188,8 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
       const subtitle =
         "subtitle" in entry
           ? String(entry.subtitle ?? "")
+          : action === "note"
+            ? "Note saved"
           : action === "renamed_moved"
             ? "Renamed and moved"
           : action === "renamed"
@@ -246,10 +250,21 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
       }
 
       if (type === "summary") {
-        const summaryPath = "summaryPath" in entry ? String(entry.summaryPath ?? "") : "";
+        const summaryPath = "summaryPath" in entry
+          ? String(entry.summaryPath ?? "")
+          : "new_path" in entry
+            ? String(entry.new_path ?? "")
+            : "destination_path" in entry
+              ? String(entry.destination_path ?? "")
+              : "";
         const fileNames = "fileNames" in entry && Array.isArray(entry.fileNames)
           ? entry.fileNames.map((item: unknown) => String(item)).filter(Boolean)
+          : "source_files" in entry && Array.isArray(entry.source_files)
+            ? entry.source_files.map((item: unknown) => String(item)).filter(Boolean)
+            : "file_name" in entry && String(entry.file_name ?? "").trim().length > 0
+              ? [String(entry.file_name)]
           : [];
+        const categoryName = "category_name" in entry ? String(entry.category_name ?? "") : "";
 
         if (!summaryPath) {
           return null;
@@ -259,10 +274,13 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
           id,
           type: "summary",
           title,
-          subtitle,
+          subtitle: action === "note"
+            ? (categoryName ? `Saved to ${categoryName}` : "Note saved")
+            : subtitle,
           timestamp,
           summaryPath,
           fileNames,
+          categoryName: categoryName || undefined,
         } satisfies HistoryEntry;
       }
 
