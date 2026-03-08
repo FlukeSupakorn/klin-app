@@ -41,6 +41,13 @@ VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
 
 Without this value, Google connect/auth features will stay in an error state.
 
+For the AI runtime, you can choose between:
+
+- bundled sidecar binaries for the normal packaged workflow
+- locally run `llama-server` plus a source-run `klin-worker` in development
+
+Start from [.env.example](.env.example) and enable the external-service flags only for the dev workflow.
+
 ## Getting Started
 
 ```bash
@@ -59,6 +66,24 @@ bun run dev:vite
 bun tauri dev
 ```
 
+### Run desktop app with source worker
+
+1. Copy `.env.example` to `.env`.
+2. In `.env`, enable:
+	- `KLIN_WORKER_EXTERNAL=true`
+3. Ensure `KLIN_MODEL_PATH` is set in `.env` so Tauri launches the `llama-server` sidecar.
+4. Start `klin-worker` from source in the worker repo:
+
+```bash
+uv run fastapi dev app/main.py
+```
+
+5. Start the desktop app:
+
+```bash
+bun tauri dev
+```
+
 ### Build frontend bundle
 
 ```bash
@@ -70,6 +95,8 @@ bun run build
 ```bash
 bun tauri build
 ```
+
+For the packaged workflow, keep `KLIN_WORKER_EXTERNAL` unset or false so Tauri uses the bundled sidecar binaries from [src-tauri/binaries](src-tauri/binaries).
 
 ## Available Scripts
 
