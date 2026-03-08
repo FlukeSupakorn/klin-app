@@ -187,8 +187,8 @@ export function AppShell() {
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
       <header className="flex h-20 flex-shrink-0 items-center gap-4 px-8 lg:px-10">
-        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center">
-          <img src={klinLogo} alt="KLIN" className="h-10 w-10 object-contain" />
+        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center">
+          <img src={klinLogo} alt="KLIN" className="h-13 w-13 object-contain" />
         </div>
 
         <nav className="flex items-center gap-2">
