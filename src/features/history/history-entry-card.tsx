@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { theme } from "@/theme/theme";
 import type { HistoryEntry } from "@/features/history/history-types";
 import { HistoryCalendarDetails } from "@/features/history/history-calendar-details";
@@ -13,29 +14,48 @@ import { HistoryOrganizeDetails } from "@/features/history/history-organize-deta
 import { HistorySummaryDetails } from "@/features/history/history-summary-details";
 import { formatTime, getFolderTail } from "@/features/history/history-utils";
 
+function normalizeCategoryName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function findCategoryColor(name: string, palette: Array<{ name: string; color: string }>): string | null {
+  const normalized = normalizeCategoryName(name);
+  if (!normalized) {
+    return null;
+  }
+
+  const matched = palette.find((item) => normalizeCategoryName(item.name) === normalized);
+  return matched?.color ?? null;
+}
+
+function hexToRgba(hex: string, alpha: number): string | null {
+  const normalized = hex.trim().replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return null;
+  }
+
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 interface HistoryEntryCardProps {
   entry: HistoryEntry;
   isExpanded: boolean;
-  isScoreExpanded: boolean;
-  selectedScoreCategory?: string;
   onToggleExpand: () => void;
-  onToggleScores: () => void;
   onRequestEditMovedTo: (entryId: string) => void;
-  onUseScoreFolder: (entryId: string, categoryName: string) => void;
   onOpenSummary: (path: string) => void;
 }
 
 export function HistoryEntryCard({
   entry,
   isExpanded,
-  isScoreExpanded,
-  selectedScoreCategory,
   onToggleExpand,
-  onToggleScores,
   onRequestEditMovedTo,
-  onUseScoreFolder,
   onOpenSummary,
 }: HistoryEntryCardProps) {
+  const categories = useCategoryManagementStore((state) => state.categories);
   const actionTheme = theme.actions[entry.type];
   const Icon = actionTheme.icon;
   const organizeEntry = entry.type === "organize" ? entry : null;
@@ -55,6 +75,10 @@ export function HistoryEntryCard({
       ? `From: ${calendarEntry.sourceFileName} · Meet: ${calendarEntry.meetingTime}`
       : entry.subtitle);
 
+  const topCategoryName = organizeEntry?.scores[0]?.name ?? "";
+  const topCategoryScore = Math.round((organizeEntry?.scores[0]?.score ?? 0) * 100);
+  const topCategoryColor = findCategoryColor(topCategoryName, categories);
+
   return (
     <div className={cn("relative overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-border/80", isExpanded && "border-primary/20 bg-card")}>
       <span className={cn("pointer-events-none absolute bottom-0 left-0 top-0 w-1", actionTheme.accent)} />
@@ -67,11 +91,21 @@ export function HistoryEntryCard({
               </div>
               <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className={cn("uppercase", actionTheme.badge)}>{entry.type}</Badge>
                   {entry.type === "organize" && (
-                    <Badge variant="secondary" className="gap-1">
+                    <Badge
+                      variant="secondary"
+                      className="gap-1"
+                      style={topCategoryColor ? {
+                        backgroundColor: hexToRgba(topCategoryColor, 0.12) ?? undefined,
+                        borderColor: hexToRgba(topCategoryColor, 0.4) ?? undefined,
+                        color: topCategoryColor,
+                      } : undefined}
+                    >
+                      {topCategoryColor && (
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: topCategoryColor }} />
+                      )}
                       <Sparkles className="h-3 w-3" />
-                      Top: {entry.scores[0]?.name ?? "-"} {Math.round((entry.scores[0]?.score ?? 0) * 100)}%
+                      {topCategoryName || "-"} {topCategoryScore}%
                     </Badge>
                   )}
                 </div>
@@ -131,11 +165,7 @@ export function HistoryEntryCard({
           {entry.type === "organize" && (
             <HistoryOrganizeDetails
               entry={entry}
-              isShowAllScores={isScoreExpanded}
-              selectedScoreCategory={selectedScoreCategory}
-              onToggleScores={onToggleScores}
               onRequestEditMovedTo={onRequestEditMovedTo}
-              onUseScoreFolder={onUseScoreFolder}
             />
           )}
 

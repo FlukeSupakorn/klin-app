@@ -14,8 +14,8 @@ export function DashboardPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const historyRows = await historyApiService.list();
-        const rows = historyRows
+        const firstPage = await historyApiService.list({ limit: 20, offset: 0 });
+        const rows = firstPage.entries
           .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
           .slice(0, 5);
         setRecentHistoryEntries(rows);

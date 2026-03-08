@@ -23,6 +23,7 @@ export interface SummaryHistoryEntry extends HistoryEntryBase {
   type: "summary";
   fileNames: string[];
   summaryPath: string;
+  categoryName?: string;
 }
 
 export interface CalendarHistoryEntry extends HistoryEntryBase {

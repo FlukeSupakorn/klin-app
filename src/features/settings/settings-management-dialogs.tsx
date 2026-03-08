@@ -9,6 +9,12 @@ import { useAutomationStore } from "@/stores/use-automation-store";
 import { cn } from "@/lib/utils";
 import type { ManagedCategory } from "@/types/domain";
 
+function joinDefaultFolderPath(basePath: string, categoryName: string): string {
+  const normalizedBase = basePath.trim().replace(/[\\/]+$/, "");
+  const normalizedName = categoryName.trim();
+  return normalizedBase ? `${normalizedBase}/${normalizedName}` : normalizedName;
+}
+
 export type SettingsDialogSection = "default-folder" | "watched-folders" | "categories";
 
 type ModalMode = "edit" | "add";
@@ -16,6 +22,7 @@ type ModalMode = "edit" | "add";
 interface CategoryFormState {
   name: string;
   description: string;
+  color: string;
   folderPath: string;
   enabled: boolean;
   aiLearned: boolean;
@@ -24,6 +31,7 @@ interface CategoryFormState {
 const emptyForm: CategoryFormState = {
   name: "",
   description: "",
+  color: "#6366f1",
   folderPath: "",
   enabled: true,
   aiLearned: true,
@@ -38,20 +46,28 @@ interface SettingsManagementDialogsProps {
 export function SettingsManagementDialogs({ open, sections, onClose }: SettingsManagementDialogsProps) {
   const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
   const categories = useCategoryManagementStore((state) => state.categories);
-  const setDefaultFolder = useCategoryManagementStore((state) => state.setDefaultFolder);
-  const addCategory = useCategoryManagementStore((state) => state.addCategory);
-  const updateCategory = useCategoryManagementStore((state) => state.updateCategory);
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
   const addWatchedFolder = useAutomationStore((state) => state.addWatchedFolder);
   const removeWatchedFolder = useAutomationStore((state) => state.removeWatchedFolder);
 
   const [draftDefaultFolder, setDraftDefaultFolder] = useState(defaultFolder);
+  const [isSavingDefaultFolder, setIsSavingDefaultFolder] = useState(false);
+  const [defaultFolderError, setDefaultFolderError] = useState<string | null>(null);
   const [newWatchedFolderPath, setNewWatchedFolderPath] = useState("");
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [formState, setFormState] = useState<CategoryFormState>(emptyForm);
 
   const enabledCount = useMemo(() => categories.filter((category) => category.enabled).length, [categories]);
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((left, right) => {
+      if (left.enabled !== right.enabled) {
+        return left.enabled ? -1 : 1;
+      }
+
+      return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
+    });
+  }, [categories]);
   const showDefaultFolder = sections.includes("default-folder");
   const showWatchedFolders = sections.includes("watched-folders");
   const showCategories = sections.includes("categories");
@@ -60,12 +76,52 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
     setDraftDefaultFolder(defaultFolder);
   }, [defaultFolder]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    void categoryManagementService.refreshCategoriesFromWorker().then(() => {
+      categoryManagementService.syncToAutomationStores();
+    });
+  }, [open]);
+
+  const persistDefaultFolder = async (path: string) => {
+    const normalized = path.trim();
+    if (!normalized) {
+      return;
+    }
+
+    setIsSavingDefaultFolder(true);
+    setDefaultFolderError(null);
+
+    try {
+      await categoryManagementService.saveDefaultFolder(normalized);
+      categoryManagementService.syncToAutomationStores();
+      setDraftDefaultFolder(normalized);
+    } catch (error) {
+      setDefaultFolderError(error instanceof Error ? error.message : "Failed to save default folder");
+    } finally {
+      setIsSavingDefaultFolder(false);
+    }
+  };
+
+  const browseAndSaveDefaultFolder = async () => {
+    const selectedFolder = await tauriClient.pickFolderForOrganize().catch(() => null);
+    if (!selectedFolder) {
+      return;
+    }
+
+    await persistDefaultFolder(selectedFolder);
+  };
+
   const openEditModal = (category: ManagedCategory) => {
     setModalMode("edit");
     setEditingCategoryId(category.id);
     setFormState({
       name: category.name,
       description: category.description,
+      color: category.color,
       folderPath: category.folderPath,
       enabled: category.enabled,
       aiLearned: category.aiLearned,
@@ -77,7 +133,7 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
     setEditingCategoryId(null);
     setFormState({
       ...emptyForm,
-      folderPath: `${defaultFolder}/New Category`,
+      folderPath: joinDefaultFolderPath(defaultFolder, "New Category"),
     });
   };
 
@@ -88,30 +144,47 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
   };
 
   const toggleCategoryEnabled = (category: ManagedCategory) => {
-    updateCategory(category.id, { enabled: !category.enabled });
-    categoryManagementService.syncToAutomationStores();
+    void categoryManagementService
+      .updateCategoryInWorker(category.id, { enabled: !category.enabled })
+      .then(() => {
+        categoryManagementService.syncToAutomationStores();
+      });
   };
 
-  const handleSaveCategory = () => {
-    if (!formState.name.trim() || !formState.description.trim() || !formState.folderPath.trim()) {
+  const handleDeleteCategory = (category: ManagedCategory) => {
+    void categoryManagementService
+      .deleteCategoryInWorker(category.id)
+      .then(() => {
+        categoryManagementService.syncToAutomationStores();
+      });
+  };
+
+  const handleSaveCategory = async () => {
+    if (!formState.name.trim() || !formState.description.trim()) {
       return;
     }
 
+    const normalizedName = formState.name.trim();
+    const normalizedDescription = formState.description.trim();
+    const normalizedFolderPath = formState.folderPath.trim() || joinDefaultFolderPath(defaultFolder, normalizedName);
+
     if (modalMode === "edit" && editingCategoryId) {
-      updateCategory(editingCategoryId, {
-        name: formState.name.trim(),
-        description: formState.description.trim(),
-        folderPath: formState.folderPath.trim(),
+      await categoryManagementService.updateCategoryInWorker(editingCategoryId, {
+        name: normalizedName,
+        description: normalizedDescription,
+        color: formState.color,
+        folderPath: normalizedFolderPath,
         enabled: formState.enabled,
         aiLearned: formState.aiLearned,
       });
     }
 
     if (modalMode === "add") {
-      addCategory({
-        name: formState.name.trim(),
-        description: formState.description.trim(),
-        folderPath: formState.folderPath.trim(),
+      await categoryManagementService.addCategoryToWorker({
+        name: normalizedName,
+        description: normalizedDescription,
+        color: formState.color,
+        folderPath: normalizedFolderPath,
         enabled: formState.enabled,
         aiLearned: formState.aiLearned,
       });
@@ -156,15 +229,25 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
                     className="border-border bg-muted"
                   />
                   <Button
+                    variant="outline"
+                    onClick={() => void browseAndSaveDefaultFolder()}
+                    disabled={isSavingDefaultFolder}
+                  >
+                    Browse Folder
+                  </Button>
+                  <Button
                     onClick={() => {
                       if (!draftDefaultFolder.trim()) return;
-                      setDefaultFolder(draftDefaultFolder.trim());
-                      categoryManagementService.syncToAutomationStores();
+                      void persistDefaultFolder(draftDefaultFolder.trim());
                     }}
+                    disabled={isSavingDefaultFolder}
                   >
-                    Save
+                    {isSavingDefaultFolder ? "Saving..." : "Save"}
                   </Button>
                 </div>
+                {defaultFolderError && (
+                  <p className="text-xs text-destructive">{defaultFolderError}</p>
+                )}
                 <p className="text-xs text-muted-foreground">{enabledCount} categor{enabledCount !== 1 ? "ies" : "y"} enabled</p>
               </div>
             )}
@@ -249,7 +332,7 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
                   </Button>
                 </div>
                 <div className="space-y-2">
-                  {categories.map((category) => (
+                  {sortedCategories.map((category) => (
                     <div
                       key={category.id}
                       className={cn(
@@ -260,6 +343,11 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
+                            <span
+                              className="inline-block h-3 w-3 rounded-full border border-border"
+                              style={{ backgroundColor: category.color }}
+                              title={category.color}
+                            />
                             <span className="text-sm font-black">{category.name}</span>
                             <button
                               type="button"
@@ -292,6 +380,13 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
                             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                           >
                             <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCategory(category)}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
@@ -340,6 +435,23 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
                 />
               </div>
               <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={formState.color}
+                    onChange={(event) => setFormState((state) => ({ ...state, color: event.target.value }))}
+                    className="h-9 w-12 cursor-pointer rounded border border-border bg-muted p-1"
+                  />
+                  <Input
+                    value={formState.color}
+                    onChange={(event) => setFormState((state) => ({ ...state, color: event.target.value }))}
+                    className="border-border bg-muted font-mono"
+                    placeholder="#6366f1"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Folder Path</label>
                 <Input
                   value={formState.folderPath}
@@ -351,12 +463,12 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
               <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs">
                 <CheckCircle2 className={cn("h-3.5 w-3.5", formState.aiLearned ? "text-primary" : "text-muted-foreground")} />
                 <span className={formState.aiLearned ? "text-foreground" : "text-muted-foreground"}>
-                  {formState.aiLearned ? "AI already understands this category." : "AI learning this category • 72%"}
+                  {formState.aiLearned ? "AI learned" : "AI learning"}
                 </span>
               </div>
               <div className="flex justify-between pt-1">
                 <Button variant="outline" onClick={closeCategoryEditor}>Cancel</Button>
-                <Button onClick={handleSaveCategory}>
+                <Button onClick={() => void handleSaveCategory()}>
                   {modalMode === "edit" ? "Save Changes" : "Add Category"}
                 </Button>
               </div>

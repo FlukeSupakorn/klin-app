@@ -12,8 +12,10 @@ import {
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { bootstrapAppData } from "@/services/bootstrap-service";
+import { categoryManagementService } from "@/services/category-management-service";
 import { fileSearchApiService } from "@/services/file-search-api-service";
 import { useAuthStore } from "@/features/auth/use-auth-store";
+import { GlobalOrganizeResumeBubble } from "@/features/dashboard/organize-files-panel/global-organize-resume-bubble";
 import type { FileSearchResultItem } from "@/types/domain";
 import klinLogo from "@/assets/klin-logo.svg";
 
@@ -42,6 +44,49 @@ export function AppShell() {
     void initializeAuth();
     void bootstrapAppData().catch(() => undefined);
   }, [initializeAuth]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    const syncCategoriesFromWorker = () => {
+      void categoryManagementService
+        .refreshCategoriesFromWorker()
+        .then(() => {
+          categoryManagementService.syncToAutomationStores();
+        })
+        .catch(() => undefined);
+    };
+
+    // Hydrate category metadata (including color) immediately on app load.
+    syncCategoriesFromWorker();
+
+    // Retry a few times because worker API can come up slightly after UI mounts.
+    const retryTimers = [1000, 3000, 7000].map((delay) => window.setTimeout(() => {
+      if (!disposed) {
+        syncCategoriesFromWorker();
+      }
+    }, delay));
+
+    const onFocus = () => {
+      syncCategoriesFromWorker();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncCategoriesFromWorker();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      disposed = true;
+      retryTimers.forEach((id) => window.clearTimeout(id));
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (searchOpen) searchRef.current?.focus();
@@ -142,8 +187,8 @@ export function AppShell() {
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
       <header className="flex h-20 flex-shrink-0 items-center gap-4 px-8 lg:px-10">
-        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center">
-          <img src={klinLogo} alt="KLIN" className="h-10 w-10 object-contain" />
+        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center">
+          <img src={klinLogo} alt="KLIN" className="h-13 w-13 object-contain" />
         </div>
 
         <nav className="flex items-center gap-2">
@@ -284,6 +329,8 @@ export function AppShell() {
       <main className="flex-1 overflow-y-auto px-8 py-6 lg:px-10">
         <Outlet />
       </main>
+
+      <GlobalOrganizeResumeBubble />
     </div>
   );
 }

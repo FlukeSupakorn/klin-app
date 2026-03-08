@@ -45,6 +45,11 @@ function createDefaultTitle(prefix = "Quick-Note"): string {
   return `${prefix}-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-")}`;
 }
 
+function getPathTail(path: string): string {
+  const value = path.split(/[\\/]/).pop();
+  return value && value.trim().length > 0 ? value : "Quick-Note.md";
+}
+
 export function NotesPage() {
   const categories = useCategoryManagementStore((state) => state.categories);
 
@@ -62,6 +67,10 @@ export function NotesPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isStreamingContent, setIsStreamingContent] = useState(false);
+  const [summarizeElapsedSec, setSummarizeElapsedSec] = useState(0);
+  const [summarizeStartedAt, setSummarizeStartedAt] = useState<number | null>(null);
+  const [activeStreamController, setActiveStreamController] = useState<AbortController | null>(null);
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
 
@@ -93,6 +102,19 @@ export function NotesPage() {
     void refreshNotes();
   }, []);
 
+  useEffect(() => {
+    if (!isSummarizing || !summarizeStartedAt) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const seconds = Math.max(0, Math.floor((Date.now() - summarizeStartedAt) / 1000));
+      setSummarizeElapsedSec(seconds);
+    }, 500);
+
+    return () => clearInterval(timer);
+  }, [isSummarizing, summarizeStartedAt]);
+
   const openEditorForDraft = (draftTitle: string, draftContent: string, sourceFiles: string[] = []) => {
     setTitle(draftTitle);
     setContent(draftContent);
@@ -110,8 +132,14 @@ export function NotesPage() {
 
   const handleSummarizeFromFiles = async () => {
     setIsSummarizing(true);
+    setIsStreamingContent(false);
+    setSummarizeStartedAt(Date.now());
+    setSummarizeElapsedSec(0);
     setEditorError(null);
     setEditorNotice(null);
+    let waitingTimer: ReturnType<typeof setInterval> | null = null;
+    const streamController = new AbortController();
+    setActiveStreamController(streamController);
 
     try {
       const filePaths = await tauriClient.pickFilesForOrganize();
@@ -120,15 +148,83 @@ export function NotesPage() {
         return;
       }
 
-      const summarizeResult = await notesApiService.summarizeFromFiles(filePaths);
-      const nextTitle = summarizeResult.suggestedTitle || createDefaultTitle("Summary");
+      const loadingTitle = filePaths.length > 1
+        ? `Summary - ${filePaths.length} files`
+        : createDefaultTitle("Summary");
+      const loadingContent = `# ${loadingTitle}\n\n_Summarizing selected files._`;
+      openEditorForDraft(loadingTitle, loadingContent, filePaths);
+      setEditorNotice("Summarizing files. Please wait...");
+
+      let liveTitle = loadingTitle;
+      let streamed = "";
+      let hasFirstChunk = false;
+      const dotPhases = [".", "..", "..."];
+      let dotIndex = 0;
+      const renderWaiting = () => {
+        if (hasFirstChunk) {
+          return;
+        }
+
+        const dots = dotPhases[dotIndex % dotPhases.length];
+        dotIndex += 1;
+        setContent(`# ${liveTitle}\n\n_Summarizing selected files${dots}_`);
+      };
+
+      renderWaiting();
+      waitingTimer = setInterval(renderWaiting, 350);
+
+      const summarizeResult = await notesApiService.summarizeFromFilesStream(filePaths, {
+        signal: streamController.signal,
+        onMeta: (meta) => {
+          if (meta.suggestedTitle?.trim()) {
+            liveTitle = meta.suggestedTitle.trim();
+            setTitle(liveTitle);
+            renderWaiting();
+          }
+        },
+        onChunk: (delta) => {
+          if (!hasFirstChunk) {
+            hasFirstChunk = true;
+            setIsStreamingContent(true);
+            if (waitingTimer) {
+              clearInterval(waitingTimer);
+              waitingTimer = null;
+            }
+            streamed = "";
+          }
+          streamed += delta;
+          setContent(`# ${liveTitle}\n\n${streamed}`);
+        },
+      });
+
+      const nextTitle = summarizeResult.suggestedTitle || liveTitle || createDefaultTitle("Summary");
       const nextContent = `# ${nextTitle}\n\n${summarizeResult.summary}\n`;
-      openEditorForDraft(nextTitle, nextContent, filePaths);
+      setTitle(nextTitle);
+      setContent(nextContent);
+      setEditorNotice("Summary generated.");
     } catch (error) {
-      setEditorError(error instanceof Error ? error.message : "Failed to summarize selected files");
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setEditorNotice("Summary canceled.");
+      } else {
+        setEditorError(error instanceof Error ? error.message : "Failed to summarize selected files");
+      }
     } finally {
+      if (waitingTimer) {
+        clearInterval(waitingTimer);
+      }
       setIsSummarizing(false);
+      setIsStreamingContent(false);
+      setSummarizeStartedAt(null);
+      setActiveStreamController(null);
     }
+  };
+
+  const handleStopSummarize = () => {
+    if (!activeStreamController) {
+      return;
+    }
+
+    activeStreamController.abort();
   };
 
   const handleOpenNote = async (note: NoteFileItem) => {
@@ -147,7 +243,7 @@ export function NotesPage() {
     }
   };
 
-  const saveToFolder = async (targetFolder: string) => {
+  const saveToFolder = async (targetFolder: string, options?: { categoryName?: string }) => {
     if (!targetFolder.trim()) {
       setEditorError("Target folder is required.");
       return;
@@ -159,6 +255,18 @@ export function NotesPage() {
     try {
       const savedPath = await notesFileService.saveToFolder(targetFolder, title, content);
       setActivePath(savedPath);
+
+      try {
+        await notesApiService.logNoteHistory({
+          fileName: getPathTail(savedPath),
+          destinationPath: savedPath,
+          sourceFiles: summarySourceFiles,
+          categoryName: options?.categoryName,
+        });
+      } catch {
+        // Keep note save successful even if history logging fails.
+      }
+
       setEditorNotice(`Saved note to ${savedPath}`);
       await refreshNotes();
     } catch (error) {
@@ -190,7 +298,7 @@ export function NotesPage() {
       return;
     }
 
-    await saveToFolder(category.folderPath);
+    await saveToFolder(category.folderPath, { categoryName: category.name });
   };
 
   return (
@@ -280,11 +388,16 @@ export function NotesPage() {
               />
             </div>
 
-            <Button size="sm" onClick={() => void handleSaveToAppFolder()} disabled={isSaving}>
+            <Button size="sm" onClick={() => void handleSaveToAppFolder()} disabled={isSaving || isSummarizing}>
               {isSaving ? "Saving..." : "Save"}
             </Button>
 
-            <Button size="sm" variant="outline" onClick={() => void handleSaveToPickedFolder()} disabled={isSaving}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void handleSaveToPickedFolder()}
+              disabled={isSaving || isSummarizing}
+            >
               Save to Folder
             </Button>
 
@@ -308,7 +421,7 @@ export function NotesPage() {
               size="sm"
               variant="secondary"
               onClick={() => void handleSaveToCategory()}
-              disabled={isSaving || !selectedCategoryId}
+              disabled={isSaving || isSummarizing || !selectedCategoryId}
             >
               Save to Category
             </Button>
@@ -325,6 +438,24 @@ export function NotesPage() {
                 Summary source files
               </div>
               <p className="truncate">{summarySourceFiles.join(" | ")}</p>
+            </div>
+          )}
+
+          {isSummarizing && (
+            <div className="border-b border-border bg-primary/5 px-4 py-2 text-xs text-primary">
+              <div className="flex flex-wrap items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>
+                  {isStreamingContent ? "Writing summary" : "Preparing summary"}
+                  <span className="ml-1 animate-pulse">|</span>
+                </span>
+                <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                  {summarizeElapsedSec}s
+                </span>
+                <Button size="sm" variant="ghost" onClick={handleStopSummarize} className="h-7 px-2 text-xs">
+                  Stop
+                </Button>
+              </div>
             </div>
           )}
 

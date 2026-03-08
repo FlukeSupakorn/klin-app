@@ -48,6 +48,20 @@ body {
   color: hsl(var(--foreground));
 }
 
+.wmde-markdown ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
+.wmde-markdown ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+
+.wmde-markdown li {
+  margin: 0.25rem 0;
+}
+
 .wmde-markdown strong {
   font-weight: 800;
 }

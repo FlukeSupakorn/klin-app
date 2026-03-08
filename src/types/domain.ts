@@ -1,4 +1,5 @@
 export type AutomationStatus = "queued" | "processing" | "completed" | "failed";
+export type OrganizeMoveStatus = "idle" | "processing" | "completed" | "failed";
 
 export interface Category {
   id: string;
@@ -11,12 +12,14 @@ export interface ManagedCategory {
   id: string;
   name: string;
   description: string;
+  color: string;
   folderPath: string;
   enabled: boolean;
   aiLearned: boolean;
 }
 
 export interface CategoryScore {
+  categoryId?: string;
   name: string;
   score: number;
 }
@@ -69,6 +72,7 @@ export interface PaginationState {
 
 export interface OrganizePreviewItem {
   id: string;
+  workerFileId: string | null;
   fileName: string;
   currentPath: string;
   suggestedNames: string[];
@@ -79,10 +83,16 @@ export interface OrganizePreviewItem {
   topScores: CategoryScore[];
   summary: string | null;
   calendar: string | null;
+  analysisStatus: AutomationStatus;
+  analysisError: string | null;
+  moveStatus: OrganizeMoveStatus;
+  // Tracks the exact file move operation so undo remains correct even if UI destination is edited later.
+  lastMovedFromPath?: string | null;
+  lastMovedToPath?: string | null;
 }
 
 export interface OrganizeAnalyzeRequest {
-  filepaths: string[];
+  file_paths: string[];
 }
 
 export interface OrganizeAnalyzeCategoryScore {
@@ -92,28 +102,19 @@ export interface OrganizeAnalyzeCategoryScore {
 }
 
 export interface OrganizeAnalyzeAnalysis {
-  summary: string | null;
-  suggested_name: string | null;
-}
-
-export interface OrganizeAnalyzeTopCategory {
-  category_id: string;
-  name: string;
-  score: number;
-  destination_path: string | null;
+  summary?: string | null;
+  suggested_names: string[];
 }
 
 export interface OrganizeAnalyzeFileResult {
-  filepath: string;
   file_id: string;
   analysis: OrganizeAnalyzeAnalysis;
   categories: OrganizeAnalyzeCategoryScore[];
-  top_category: OrganizeAnalyzeTopCategory | null;
   error: string | null;
 }
 
 export interface OrganizeAnalyzeResponse {
-  results: OrganizeAnalyzeFileResult[];
+  results: Record<string, OrganizeAnalyzeFileResult>;
 }
 
 export interface FileSearchRequest {

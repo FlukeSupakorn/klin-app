@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { History, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,12 @@ import { HistoryEntryCard } from "@/features/history/history-entry-card";
 import { getPathTail, joinPath } from "@/features/history/history-utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 
+const HISTORY_PAGE_SIZE = 20;
+
 const TYPE_FILTERS: Array<{ label: string; value: "all" | HistoryEntryType }> = [
   { label: "All", value: "all" },
   { label: "Organize", value: "organize" },
-  { label: "Summary", value: "summary" },
+  { label: "Note", value: "summary" },
   { label: "Calendar", value: "calendar" },
 ];
 
@@ -22,13 +24,15 @@ export function HistoryPage() {
   const location = useLocation();
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [nextOffset, setNextOffset] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | HistoryEntryType>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [scoreExpandedIds, setScoreExpandedIds] = useState<string[]>([]);
-  const [selectedScoreByEntryId, setSelectedScoreByEntryId] = useState<Record<string, string>>({});
-  const [openedSummaryPath, setOpenedSummaryPath] = useState<string | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const categoryDefaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
 
   const expandedEntryIdFromNavState =
@@ -37,38 +41,83 @@ export function HistoryPage() {
       : "";
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadHistory = async () => {
-      setIsLoading(true);
-      setLoadError(null);
-
-      try {
-        const entries = await historyApiService.list();
-        if (!isMounted) {
-          return;
-        }
-
-        setHistoryEntries(entries);
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        setLoadError(error instanceof Error ? error.message : "Failed to load history");
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void loadHistory();
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 250);
 
     return () => {
-      isMounted = false;
+      window.clearTimeout(timer);
     };
-  }, []);
+  }, [search]);
+
+  const loadHistoryPage = useCallback(async (reset: boolean) => {
+    if (reset) {
+      setIsLoading(true);
+      setLoadError(null);
+    } else {
+      setIsLoadingMore(true);
+    }
+
+    const requestOffset = reset ? 0 : nextOffset;
+
+    try {
+      const page = await historyApiService.list({
+        limit: HISTORY_PAGE_SIZE,
+        offset: requestOffset,
+        search: debouncedSearch,
+      });
+
+      setHistoryEntries((state) => {
+        if (reset) {
+          return page.entries;
+        }
+
+        const merged = [...state, ...page.entries];
+        const deduped = new Map<string, HistoryEntry>();
+        merged.forEach((entry) => {
+          deduped.set(entry.id, entry);
+        });
+
+        return [...deduped.values()];
+      });
+
+      setHasMore(page.hasMore);
+      setNextOffset(requestOffset + page.entries.length);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Failed to load history");
+    } finally {
+      if (reset) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
+    }
+  }, [debouncedSearch, nextOffset]);
+
+  useEffect(() => {
+    void loadHistoryPage(true);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasMore || isLoading || isLoadingMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && hasMore && !isLoadingMore && !isLoading) {
+          void loadHistoryPage(false);
+        }
+      },
+      { rootMargin: "160px" },
+    );
+
+    observer.observe(target);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasMore, isLoading, isLoadingMore, loadHistoryPage]);
 
   useEffect(() => {
     if (!expandedEntryIdFromNavState) {
@@ -138,18 +187,6 @@ export function HistoryPage() {
     applyOrganizeDestinationChange(entryId, joinPath(pickedFolder, fileName), "Destination updated manually");
   };
 
-  const handleUseScoreFolder = (entryId: string, categoryName: string) => {
-    const target = historyEntries.find((entry) => entry.id === entryId && entry.type === "organize");
-    if (!target || target.type !== "organize") {
-      return;
-    }
-
-    setSelectedScoreByEntryId((state) => ({ ...state, [entryId]: categoryName }));
-    const fileName = getPathTail(target.toPath);
-    const nextToPath = joinPath(`${categoryDefaultFolder}/${categoryName}`, fileName);
-    applyOrganizeDestinationChange(entryId, nextToPath, `Destination changed via score: ${categoryName}`);
-  };
-
   const filteredRows = useMemo(() => {
     return historyEntries.filter((entry) => {
       const byType = typeFilter === "all" || entry.type === typeFilter;
@@ -161,11 +198,9 @@ export function HistoryPage() {
     });
   }, [historyEntries, search, typeFilter]);
 
-  const toggleScoreExpansion = (id: string) => {
-    setScoreExpandedIds((state) =>
-      state.includes(id) ? state.filter((itemId) => itemId !== id) : [...state, id],
-    );
-  };
+  const handleOpenSummary = useCallback((path: string) => {
+    void tauriClient.openExternalUrl(path);
+  }, []);
 
   return (
     <div className="space-y-6 pb-10">
@@ -208,15 +243,6 @@ export function HistoryPage() {
         </div>
       </div>
 
-      {openedSummaryPath && (
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-primary/20 bg-primary/10 p-3 text-sm">
-          <p className="truncate text-primary">Mock open summary file: {openedSummaryPath}</p>
-          <Button variant="ghost" size="sm" onClick={() => setOpenedSummaryPath(null)}>
-            Dismiss
-          </Button>
-        </div>
-      )}
-
       <div className="space-y-3">
         {isLoading ? (
           <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
@@ -231,24 +257,36 @@ export function HistoryPage() {
             No history rows found.
           </div>
         ) : (
-          filteredRows.map((entry) => {
-            const isExpanded = expandedId === entry.id;
+          <>
+            {filteredRows.map((entry) => {
+              const isExpanded = expandedId === entry.id;
 
-            return (
-              <HistoryEntryCard
-                key={entry.id}
-                entry={entry}
-                isExpanded={isExpanded}
-                isScoreExpanded={scoreExpandedIds.includes(entry.id)}
-                selectedScoreCategory={selectedScoreByEntryId[entry.id]}
-                onToggleExpand={() => setExpandedId(isExpanded ? null : entry.id)}
-                onToggleScores={() => toggleScoreExpansion(entry.id)}
-                onRequestEditMovedTo={handleRequestEditMovedTo}
-                onUseScoreFolder={handleUseScoreFolder}
-                onOpenSummary={setOpenedSummaryPath}
-              />
-            );
-          })
+              return (
+                <HistoryEntryCard
+                  key={entry.id}
+                  entry={entry}
+                  isExpanded={isExpanded}
+                  onToggleExpand={() => setExpandedId(isExpanded ? null : entry.id)}
+                  onRequestEditMovedTo={handleRequestEditMovedTo}
+                  onOpenSummary={handleOpenSummary}
+                />
+              );
+            })}
+
+            {isLoadingMore && (
+              <div className="rounded-lg border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+                Loading more history...
+              </div>
+            )}
+
+            {!hasMore && historyEntries.length > 0 && (
+              <div className="rounded-lg border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+                End of history.
+              </div>
+            )}
+
+            <div ref={loadMoreRef} className="h-2" />
+          </>
         )}
       </div>
     </div>
