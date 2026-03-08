@@ -9,6 +9,12 @@ export interface NotesSummarizeResult {
   processingTimeMs?: number;
 }
 
+interface NotesStreamCallbacks {
+  onChunk?: (delta: string) => void;
+  onMeta?: (meta: { suggestedTitle?: string }) => void;
+  signal?: AbortSignal;
+}
+
 function buildSuggestedTitleFromPaths(filePaths: string[]): string {
   if (filePaths.length > 1) {
     return `Summary - ${filePaths.length} files`;
@@ -89,5 +95,130 @@ export const notesApiService = {
     }
 
     throw lastError ?? new Error("Notes API unavailable");
+  },
+
+  async summarizeFromFilesStream(
+    filePaths: string[],
+    callbacks: NotesStreamCallbacks = {},
+  ): Promise<NotesSummarizeResult> {
+    let lastError: unknown = null;
+    const fallbackTitle = buildSuggestedTitleFromPaths(filePaths);
+
+    for (const baseUrl of NOTES_API_URL_CANDIDATES) {
+      const url = `${baseUrl}/stream`;
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          body: JSON.stringify({ file_paths: filePaths }),
+          signal: callbacks.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          lastError = new Error(`Notes API stream error: ${response.status} at ${url}`);
+          continue;
+        }
+
+        const decoder = new TextDecoder();
+        const reader = response.body.getReader();
+
+        let suggestedTitle = fallbackTitle;
+        let processingTimeMs: number | undefined;
+        let summary = "";
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split("\n\n");
+          buffer = events.pop() ?? "";
+
+          for (const rawEvent of events) {
+            const lines = rawEvent.split("\n");
+            let eventName = "message";
+            const dataLines: string[] = [];
+
+            for (const line of lines) {
+              if (line.startsWith("event:")) {
+                eventName = line.slice(6).trim();
+              } else if (line.startsWith("data:")) {
+                dataLines.push(line.slice(5).trim());
+              }
+            }
+
+            const dataRaw = dataLines.join("\n");
+            if (!dataRaw) {
+              continue;
+            }
+
+            let payload: unknown = dataRaw;
+            try {
+              payload = JSON.parse(dataRaw);
+            } catch {
+              payload = dataRaw;
+            }
+
+            if (eventName === "meta" && typeof payload === "object" && payload) {
+              const meta = payload as { suggested_title?: unknown };
+              if (typeof meta.suggested_title === "string" && meta.suggested_title.trim().length > 0) {
+                suggestedTitle = meta.suggested_title.trim();
+              }
+              callbacks.onMeta?.({ suggestedTitle });
+            }
+
+            if (eventName === "chunk") {
+              let delta = "";
+              if (typeof payload === "string") {
+                delta = payload;
+              } else if (typeof payload === "object" && payload) {
+                const data = payload as { delta?: unknown };
+                delta = typeof data.delta === "string" ? data.delta : "";
+              }
+
+              if (delta) {
+                summary += delta;
+                callbacks.onChunk?.(delta);
+              }
+            }
+
+            if (eventName === "done" && typeof payload === "object" && payload) {
+              const doneData = payload as { processing_time_ms?: unknown; suggested_title?: unknown };
+              const processingRaw = doneData.processing_time_ms;
+              processingTimeMs = Number.isFinite(Number(processingRaw)) ? Number(processingRaw) : processingTimeMs;
+
+              if (typeof doneData.suggested_title === "string" && doneData.suggested_title.trim().length > 0) {
+                suggestedTitle = doneData.suggested_title.trim();
+              }
+            }
+          }
+        }
+
+        return {
+          summary,
+          suggestedTitle,
+          processingTimeMs,
+        };
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw error;
+        }
+        lastError = error;
+      }
+    }
+
+    // Fallback to existing non-stream call if stream endpoint is unavailable.
+    try {
+      return await notesApiService.summarizeFromFiles(filePaths);
+    } catch {
+      throw lastError ?? new Error("Notes API stream unavailable");
+    }
   },
 };
