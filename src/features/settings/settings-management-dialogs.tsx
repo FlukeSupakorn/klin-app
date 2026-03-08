@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, FolderOpen, FolderPlus, FolderSearch, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, ChevronDown, FolderOpen, FolderPlus, FolderSearch, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { categoryManagementService } from "@/services/category-management-service";
@@ -7,6 +7,7 @@ import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { cn } from "@/lib/utils";
+import { BatchCategoryModal } from "@/features/categories/batch-category-modal";
 import type { ManagedCategory } from "@/types/domain";
 
 function joinDefaultFolderPath(basePath: string, categoryName: string): string {
@@ -57,6 +58,11 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [formState, setFormState] = useState<CategoryFormState>(emptyForm);
+
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchInitialFolders, setBatchInitialFolders] = useState<string[]>([]);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const enabledCount = useMemo(() => categories.filter((category) => category.enabled).length, [categories]);
   const sortedCategories = useMemo(() => {
@@ -126,6 +132,14 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
       enabled: category.enabled,
       aiLearned: category.aiLearned,
     });
+  };
+
+  const openBatchModal = async () => {
+    setShowDropdown(false);
+    const picked = await tauriClient.pickFoldersForBatch().catch(() => [] as string[]);
+    if (!picked.length) return;
+    setBatchInitialFolders(picked);
+    setShowBatchModal(true);
   };
 
   const openAddModal = () => {
@@ -327,19 +341,49 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">AI Classification</p>
                     <h3 className="font-black">Categories</h3>
                   </div>
-                  <Button className="h-8 gap-2 text-xs" onClick={openAddModal}>
-                    <Plus className="h-3.5 w-3.5" /> Add Category
-                  </Button>
+                  <div ref={dropdownRef} className="relative flex">
+                    <Button
+                      className="h-8 gap-2 rounded-r-none border-r border-primary/30 text-xs"
+                      onClick={openAddModal}
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add Category
+                    </Button>
+                    <Button
+                      className="h-8 w-7 rounded-l-none px-1.5 text-xs"
+                      onClick={() => setShowDropdown((prev) => !prev)}
+                      aria-label="More import options"
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                    {showDropdown && (
+                      <div className="absolute right-0 top-full z-10 mt-1 w-52 overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+                        <button
+                          type="button"
+                          onClick={() => void openBatchModal()}
+                          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/60"
+                        >
+                          <FolderSearch className="h-4 w-4 text-primary" />
+                          Import from Folders
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   {sortedCategories.map((category) => (
                     <div
                       key={category.id}
                       className={cn(
-                        "rounded-lg border border-border p-3 transition-colors",
+                        "relative rounded-lg border border-border p-3 transition-colors",
                         category.enabled ? "bg-muted/30" : "bg-muted/10 opacity-60",
                       )}
                     >
+                      {category.isAutoDescription && (
+                        <span
+                          className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-amber-400"
+                          title="Description auto-generated from folder path — edit to customize"
+                        />
+                      )}
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
@@ -398,6 +442,19 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
           </div>
         </div>
       </div>
+
+      {showBatchModal && (
+        <BatchCategoryModal
+          initialFolders={batchInitialFolders}
+          onClose={() => {
+            setShowBatchModal(false);
+            setBatchInitialFolders([]);
+            void categoryManagementService.refreshCategoriesFromWorker().then(() => {
+              categoryManagementService.syncToAutomationStores();
+            });
+          }}
+        />
+      )}
 
       {modalMode && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">

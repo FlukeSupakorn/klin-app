@@ -12,7 +12,6 @@ const SETTINGS_API_URL_CANDIDATES = [
 const CATEGORIES_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/settings/categories",
   "http://localhost:8000/api/settings/categories",
-  // Backward-compatible fallback for older worker builds.
   "http://127.0.0.1:8000/api/categories",
   "http://localhost:8000/api/categories",
 ];
@@ -27,6 +26,7 @@ interface WorkerCategory {
   enabled?: boolean;
   is_active?: boolean;
   learning?: boolean | number | null;
+  is_auto_description?: boolean;
 }
 
 interface WorkerDefaultBasePathResponse {
@@ -71,6 +71,14 @@ function joinFolderPath(basePath: string, categoryName: string): string {
   return normalized ? `${normalized}/${categoryName}` : categoryName;
 }
 
+function buildFolderDescription(path: string): string {
+  const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
+  const parts = normalized.split("/").filter(Boolean);
+  const meaningful = parts.filter((part) => !/^[a-zA-Z]:$/.test(part));
+  const breadcrumb = meaningful.join(" › ");
+  return `${breadcrumb}\n${path}`;
+}
+
 function toManagedCategory(category: WorkerCategory, defaultFolder: string): ManagedCategory {
   const folderPath = category.folder_path?.trim() || category.destination_path?.trim() || joinFolderPath(defaultFolder, category.name);
   const color = (category.color?.trim() || "#6366f1").toLowerCase();
@@ -93,6 +101,7 @@ function toManagedCategory(category: WorkerCategory, defaultFolder: string): Man
     folderPath,
     enabled,
     aiLearned,
+    isAutoDescription: category.is_auto_description ?? false,
   };
 }
 
@@ -263,6 +272,32 @@ export class CategoryManagementService {
       });
 
       ensureSuccess(response, "Failed to delete category");
+      return true;
+    });
+
+    await this.refreshCategoriesFromWorker();
+    this.syncToAutomationStores();
+  }
+
+  async batchCreateFromFolders(items: Array<{ name: string; path: string }>): Promise<void> {
+    if (!items.length) return;
+
+    const categories = items.map((item) => ({
+      name: item.name,
+      description: buildFolderDescription(item.path),
+      enabled: true,
+      folder_path: item.path,
+      color: null,
+      is_auto_description: true,
+    }));
+
+    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categories }),
+      });
+      ensureSuccess(response, "Failed to batch create categories");
       return true;
     });
 

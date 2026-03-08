@@ -16,6 +16,7 @@ export interface ManagedCategory {
   folderPath: string;
   enabled: boolean;
   aiLearned: boolean;
+  isAutoDescription: boolean;
 }
 
 export interface CategoryScore {
