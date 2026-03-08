@@ -10,6 +10,10 @@ export interface NotesSummarizeResult {
 }
 
 function buildSuggestedTitleFromPaths(filePaths: string[]): string {
+  if (filePaths.length > 1) {
+    return `Summary - ${filePaths.length} files`;
+  }
+
   const first = filePaths[0];
   if (!first) {
     return "Quick-Note";

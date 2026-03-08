@@ -120,10 +120,19 @@ export function NotesPage() {
         return;
       }
 
+      const loadingTitle = filePaths.length > 1
+        ? `Summary - ${filePaths.length} files`
+        : createDefaultTitle("Summary");
+      const loadingContent = `# ${loadingTitle}\n\nSummarizing selected files...`;
+      openEditorForDraft(loadingTitle, loadingContent, filePaths);
+      setEditorNotice("Summarizing files. Please wait...");
+
       const summarizeResult = await notesApiService.summarizeFromFiles(filePaths);
       const nextTitle = summarizeResult.suggestedTitle || createDefaultTitle("Summary");
       const nextContent = `# ${nextTitle}\n\n${summarizeResult.summary}\n`;
-      openEditorForDraft(nextTitle, nextContent, filePaths);
+      setTitle(nextTitle);
+      setContent(nextContent);
+      setEditorNotice("Summary generated.");
     } catch (error) {
       setEditorError(error instanceof Error ? error.message : "Failed to summarize selected files");
     } finally {
@@ -280,11 +289,16 @@ export function NotesPage() {
               />
             </div>
 
-            <Button size="sm" onClick={() => void handleSaveToAppFolder()} disabled={isSaving}>
+            <Button size="sm" onClick={() => void handleSaveToAppFolder()} disabled={isSaving || isSummarizing}>
               {isSaving ? "Saving..." : "Save"}
             </Button>
 
-            <Button size="sm" variant="outline" onClick={() => void handleSaveToPickedFolder()} disabled={isSaving}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void handleSaveToPickedFolder()}
+              disabled={isSaving || isSummarizing}
+            >
               Save to Folder
             </Button>
 
@@ -308,7 +322,7 @@ export function NotesPage() {
               size="sm"
               variant="secondary"
               onClick={() => void handleSaveToCategory()}
-              disabled={isSaving || !selectedCategoryId}
+              disabled={isSaving || isSummarizing || !selectedCategoryId}
             >
               Save to Category
             </Button>
