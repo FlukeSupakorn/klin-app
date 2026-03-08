@@ -27,10 +27,13 @@ export function HistorySummaryDetails({ entry, onOpenSummary }: HistorySummaryDe
         <p className="text-xs text-muted-foreground">Created</p>
         <p className="mt-1 truncate">{new Date(entry.timestamp).toLocaleString()}</p>
       </div>
-      <div className="flex items-center justify-end rounded-xl border border-border/60 bg-background p-3">
-        <Button size="sm" onClick={() => onOpenSummary(entry.summaryPath)}>
+      <div className="rounded-xl border border-border/60 bg-background p-3">
+        <p className="text-sm text-muted-foreground" title={entry.summaryPath}>Note file: {entry.summaryPath}</p>
+        <div className="mt-3 flex justify-end">
+          <Button size="sm" onClick={() => onOpenSummary(entry.summaryPath)}>
           Open Note File
-        </Button>
+          </Button>
+        </div>
       </div>
     </div>
   );
