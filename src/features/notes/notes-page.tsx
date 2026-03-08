@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import "@uiw/react-md-editor/markdown-editor.css";
-import { ArrowLeft, FilePlus2, Files, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeft, FilePlus2, Files, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import { notesApiService } from "@/services/notes-api-service";
 import { notesFileService, type NoteFileItem } from "@/services/notes-file-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
+import { usePrivacyStore } from "@/stores/use-privacy-store";
 
 type NotesView = "list" | "editor";
 
@@ -50,6 +51,18 @@ function getPathTail(path: string): string {
   return value && value.trim().length > 0 ? value : "Quick-Note.md";
 }
 
+const LOCK_NOTICE_DETAILS_SEPARATOR = "\n__DETAILS__\n";
+
+function splitLockNotice(message: string): { summary: string; details: string[] } {
+  const [summaryPart, detailsPart] = message.split(LOCK_NOTICE_DETAILS_SEPARATOR);
+  const summary = (summaryPart ?? "").trim();
+  const details = (detailsPart ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return { summary, details };
+}
+
 export function NotesPage() {
   const categories = useCategoryManagementStore((state) => state.categories);
 
@@ -73,11 +86,19 @@ export function NotesPage() {
   const [activeStreamController, setActiveStreamController] = useState<AbortController | null>(null);
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
+  const [showNoticeDetails, setShowNoticeDetails] = useState(false);
 
   const categoryOptions = useMemo(
     () => categories.filter((category) => category.enabled && category.folderPath.trim().length > 0),
     [categories],
   );
+  const getLockMatch = usePrivacyStore((state) => state.getLockMatch);
+  const isLockWarningNotice = Boolean(editorNotice?.startsWith("Skipped "));
+  const parsedEditorNotice = editorNotice ? splitLockNotice(editorNotice) : null;
+
+  useEffect(() => {
+    setShowNoticeDetails(false);
+  }, [editorNotice]);
 
   const refreshNotes = async () => {
     setIsLoadingNotes(true);
@@ -148,12 +169,53 @@ export function NotesPage() {
         return;
       }
 
-      const loadingTitle = filePaths.length > 1
-        ? `Summary - ${filePaths.length} files`
+      const blocked: Array<{ source: "file" | "folder"; fileName: string; lockedByName: string }> = [];
+      const allowed: string[] = [];
+      for (const path of filePaths) {
+        const match = getLockMatch(path);
+        if (match) {
+          blocked.push({
+            source: match.source,
+            fileName: getPathTail(path),
+            lockedByName: getPathTail(match.lockedPath),
+          });
+          continue;
+        }
+
+        allowed.push(path);
+      }
+
+      const blockedNotice = blocked.length > 0
+        ? (() => {
+          const previewNames = blocked.slice(0, 2).map((item) => item.fileName);
+          const remaining = blocked.length - previewNames.length;
+          const head = previewNames.join(", ");
+          const summary = `Skipped ${blocked.length} locked file(s): ${head}${remaining > 0 ? ` +${remaining} more` : ""}`;
+          const detailLines = blocked.map((item) => (
+            item.source === "folder"
+              ? `${item.fileName} - locked by folder ${item.lockedByName}`
+              : `${item.fileName} - locked file`
+          ));
+          return `${summary}${LOCK_NOTICE_DETAILS_SEPARATOR}${detailLines.join("\n")}`;
+        })()
+        : null;
+
+      if (blockedNotice) {
+        setEditorNotice(blockedNotice);
+      }
+
+      if (!allowed.length) {
+        return;
+      }
+
+      const loadingTitle = allowed.length > 1
+        ? `Summary - ${allowed.length} files`
         : createDefaultTitle("Summary");
       const loadingContent = `# ${loadingTitle}\n\n_Summarizing selected files._`;
-      openEditorForDraft(loadingTitle, loadingContent, filePaths);
-      setEditorNotice("Summarizing files. Please wait...");
+      openEditorForDraft(loadingTitle, loadingContent, allowed);
+      setEditorNotice(blockedNotice
+        ? `${blockedNotice} | Summarizing remaining files...`
+        : "Summarizing files. Please wait...");
 
       let liveTitle = loadingTitle;
       let streamed = "";
@@ -173,7 +235,7 @@ export function NotesPage() {
       renderWaiting();
       waitingTimer = setInterval(renderWaiting, 350);
 
-      const summarizeResult = await notesApiService.summarizeFromFilesStream(filePaths, {
+      const summarizeResult = await notesApiService.summarizeFromFilesStream(allowed, {
         signal: streamController.signal,
         onMeta: (meta) => {
           if (meta.suggestedTitle?.trim()) {
@@ -329,8 +391,45 @@ export function NotesPage() {
       )}
 
       {editorNotice && (
-        <div className="rounded-lg border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
-          {editorNotice}
+        <div
+          className={cn(
+            "rounded-lg border px-4 py-3 text-sm",
+            isLockWarningNotice
+              ? "border-amber-500/40 bg-amber-500/10 text-amber-700"
+              : "border-primary/20 bg-primary/10 text-primary",
+          )}
+        >
+          <div className="flex items-start gap-2">
+            {isLockWarningNotice && <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />}
+            <div className="space-y-2">
+              <p className="leading-5">
+                {parsedEditorNotice?.summary ?? editorNotice}
+                {isLockWarningNotice && (parsedEditorNotice?.details.length ?? 0) > 0 && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      onClick={() => setShowNoticeDetails((prev) => !prev)}
+                      className="text-xs font-semibold underline underline-offset-2"
+                    >
+                      {showNoticeDetails ? "Hide details" : "Read more"}
+                    </button>
+                  </>
+                )}
+              </p>
+              {isLockWarningNotice && (parsedEditorNotice?.details.length ?? 0) > 0 && (
+                <div className="space-y-2">
+                  {showNoticeDetails && (
+                    <ul className="list-disc space-y-1 pl-4 text-xs">
+                      {parsedEditorNotice?.details.map((detail) => (
+                        <li key={detail}>{detail}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

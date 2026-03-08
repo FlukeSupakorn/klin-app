@@ -27,17 +27,21 @@ export function SettingsPage() {
   const queueRef = useRef(new AsyncProcessingQueue(concurrencyLimit));
 
   const lockedPaths = usePrivacyStore((state) => state.lockedPaths);
-  const lockPath = usePrivacyStore((state) => state.lockPath);
+  const lockFile = usePrivacyStore((state) => state.lockFile);
+  const lockFolder = usePrivacyStore((state) => state.lockFolder);
   const unlockPath = usePrivacyStore((state) => state.unlockPath);
+  const hydrateLocks = usePrivacyStore((state) => state.hydrateFromApi);
 
   const handleLockFiles = async () => {
     const files = await tauriClient.pickFilesForOrganize().catch(() => []);
-    files.forEach((f) => lockPath(f));
+    await Promise.all(files.map((filePath) => lockFile(filePath).catch(() => undefined)));
   };
 
   const handleLockFolder = async () => {
     const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
-    if (folder) lockPath(folder);
+    if (folder) {
+      await lockFolder(folder).catch(() => undefined);
+    }
   };
 
   const checkWorkerApiHealth = async () => {
@@ -148,6 +152,10 @@ export function SettingsPage() {
   useEffect(() => {
     void initializeAuth();
   }, [initializeAuth]);
+
+  useEffect(() => {
+    void hydrateLocks().catch(() => undefined);
+  }, [hydrateLocks]);
 
   const isLoggedIn = useMemo(() => {
     if (!accessToken) {
