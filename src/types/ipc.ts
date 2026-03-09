@@ -37,6 +37,12 @@ export interface AutomationConfigDto {
 export interface TauriClient {
   moveFile(input: MoveFileDto): Promise<void>;
   readFolder(input: ReadFolderDto): Promise<string[]>;
+  ensureLlamaServer(): Promise<void>;
+  /**
+   * Explicitly stop the llama-server process to free RAM/VRAM.
+   * It will be re-spawned automatically on the next `ensureLlamaServer()` call.
+   */
+  stopLlamaServer(): Promise<void>;
   pickFilesForOrganize(): Promise<string[]>;
   pickFolderForOrganize(): Promise<string | null>;
   saveNoteFile(input: { folderPath: string; fileName: string; content: string }): Promise<string>;

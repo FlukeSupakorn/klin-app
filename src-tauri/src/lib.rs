@@ -6,8 +6,10 @@ mod repositories;
 mod services;
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::net::{SocketAddr, TcpStream};
+use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use tauri::{Emitter, Manager};
@@ -32,6 +34,9 @@ pub struct AppState {
     pub app_data_dir: PathBuf,
     pub llama_server_child: Arc<Mutex<Option<CommandChild>>>,
     pub worker_child: Arc<Mutex<Option<CommandChild>>>,
+    /// Timestamp of the last `ensure_llama_server` call.
+    /// Used by the idle-timeout task to auto-stop llama-server.
+    pub llama_last_used: Arc<Mutex<Option<Instant>>>,
 }
 
 fn env_flag(name: &str) -> bool {
@@ -45,11 +50,107 @@ fn env_flag(name: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn llama_port() -> u16 {
+    std::env::var("KLIN_LLAMA_PORT")
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .unwrap_or(8080)
+}
+
+fn llama_socket_addr() -> SocketAddr {
+    SocketAddr::from(([127, 0, 0, 1], llama_port()))
+}
+
+fn is_llama_server_ready() -> bool {
+    TcpStream::connect_timeout(&llama_socket_addr(), Duration::from_millis(250)).is_ok()
+}
+
+fn wait_for_llama_server_ready(timeout: Duration, is_alive: &Arc<AtomicBool>) -> Result<(), String> {
+    let started_at = std::time::Instant::now();
+
+    while started_at.elapsed() < timeout {
+        if !is_alive.load(Ordering::SeqCst) {
+            return Err("llama-server sidecar crashed or exited immediately".to_string());
+        }
+
+        if is_llama_server_ready() {
+            return Ok(());
+        }
+
+        std::thread::sleep(Duration::from_millis(250));
+    }
+
+    Err(format!(
+        "Timed out waiting for llama-server to listen on {}",
+        llama_socket_addr()
+    ))
+}
+
+fn stop_sidecar(name: &str, child_slot: &Arc<Mutex<Option<CommandChild>>>) {
+    let child = child_slot.lock().take();
+
+    if let Some(child) = child {
+        if let Err(error) = child.kill() {
+            eprintln!("[shutdown] {} kill failed: {}", name, error);
+        } else {
+            eprintln!("[shutdown] {} stopped", name);
+        }
+    }
+}
+
+pub(crate) fn ensure_llama_server_running<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    state: &AppState,
+) -> Result<(), String> {
+    if is_llama_server_ready() {
+        *state.llama_last_used.lock() = Some(Instant::now());
+        return Ok(());
+    }
+
+    let mut child_slot = state.llama_server_child.lock();
+
+    if is_llama_server_ready() {
+        *state.llama_last_used.lock() = Some(Instant::now());
+        return Ok(());
+    }
+
+    if let Some(existing_child) = child_slot.take() {
+        if let Err(error) = existing_child.kill() {
+            eprintln!("[llama-server] stale child cleanup failed: {}", error);
+        }
+    }
+
+    let (child, is_alive) = spawn_llama_server(app)?;
+    *child_slot = Some(child);
+
+    if let Err(error) = wait_for_llama_server_ready(Duration::from_secs(60), &is_alive) {
+        if let Some(failed_child) = child_slot.take() {
+            let _ = failed_child.kill();
+        }
+        return Err(error);
+    }
+
+    *state.llama_last_used.lock() = Some(Instant::now());
+    Ok(())
+}
+
+/// Stop a running llama-server and clear its idle timer.
+pub(crate) fn stop_llama_server_process(state: &AppState) {
+    stop_sidecar("llama-server", &state.llama_server_child);
+    *state.llama_last_used.lock() = None;
+}
+
+fn cleanup_sidecars<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    let state = app.state::<AppState>();
+    stop_sidecar("llama-server", &state.llama_server_child);
+    stop_sidecar("klin-worker", &state.worker_child);
+}
+
 // ── Sidecar Management ─────────────────────────────────────────────────
 
 fn spawn_llama_server<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-) -> Result<CommandChild, String> {
+) -> Result<(CommandChild, Arc<AtomicBool>), String> {
     let model_path = std::env::var("KLIN_MODEL_PATH").unwrap_or_default();
 
     if model_path.is_empty() {
@@ -74,6 +175,7 @@ fn spawn_llama_server<R: tauri::Runtime>(
         "--embedding".to_string(),
         "--pooling".to_string(),
         "mean".to_string(),
+        "--no-webui".to_string(),
     ];
 
     let mmproj_path = std::env::var("KLIN_MMPROJ_PATH").unwrap_or_default();
@@ -92,6 +194,9 @@ fn spawn_llama_server<R: tauri::Runtime>(
         .spawn()
         .map_err(|e| format!("Failed to spawn llama-server: {e}"))?;
 
+    let is_alive = Arc::new(AtomicBool::new(true));
+    let is_alive_clone = is_alive.clone();
+
     // Forward llama-server output to stderr for Tauri dev console
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
@@ -107,6 +212,7 @@ fn spawn_llama_server<R: tauri::Runtime>(
                         "[llama-server] terminated (code: {:?}, signal: {:?})",
                         payload.code, payload.signal
                     );
+                    is_alive_clone.store(false, Ordering::SeqCst);
                     break;
                 }
                 _ => {}
@@ -119,7 +225,7 @@ fn spawn_llama_server<R: tauri::Runtime>(
         model_path, n_gpu_layers, ctx_size, port
     );
 
-    Ok(child)
+    Ok((child, is_alive))
 }
 
 fn spawn_klin_worker<R: tauri::Runtime>(
@@ -196,13 +302,8 @@ pub fn run() {
             let use_external_worker = env_flag("KLIN_WORKER_EXTERNAL");
 
             // ── Spawn sidecars ──────────────────────────────────────
-            let llama_child: Option<CommandChild> = match spawn_llama_server(app.handle()) {
-                Ok(child) => Some(child),
-                Err(e) => {
-                    eprintln!("[startup] llama-server: {}", e);
-                    None
-                }
-            };
+            eprintln!("[startup] llama-server: lazy startup enabled");
+            let llama_child: Option<CommandChild> = None;
 
             let worker_child: Option<CommandChild> = if use_external_worker {
                 eprintln!("[startup] klin-worker: external mode enabled, skipping sidecar spawn");
@@ -222,14 +323,69 @@ pub fn run() {
             let rule_repo = JsonRuleRepository::new(app_data_dir.join("rules.json"));
             let category_repo = JsonCategoryRepository::new(app_data_dir.join("categories.json"));
 
+            let llama_server_child = Arc::new(Mutex::new(llama_child));
+            let llama_last_used: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
+
             app.manage(AppState {
                 log_service: Arc::new(Mutex::new(LogService::new(log_repo))),
                 rule_service: Arc::new(Mutex::new(RuleService::new(rule_repo))),
                 category_service: Arc::new(Mutex::new(CategoryService::new(category_repo))),
                 app_data_dir: app_data_dir.clone(),
-                llama_server_child: Arc::new(Mutex::new(llama_child)),
+                llama_server_child: llama_server_child.clone(),
                 worker_child: Arc::new(Mutex::new(worker_child)),
+                llama_last_used: llama_last_used.clone(),
             });
+
+            // ── Idle-timeout task for llama-server ───────────────
+            {
+                let idle_timeout_secs: u64 = std::env::var("KLIN_LLAMA_IDLE_TIMEOUT")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(300); // default 5 minutes
+
+                let idle_child = llama_server_child.clone();
+                let idle_last_used = llama_last_used.clone();
+
+                tauri::async_runtime::spawn_blocking(move || {
+                    let poll_interval = Duration::from_secs(30);
+                    let idle_limit = Duration::from_secs(idle_timeout_secs);
+
+                    eprintln!(
+                        "[idle-timer] llama-server idle timeout: {}s (poll every {}s)",
+                        idle_timeout_secs,
+                        poll_interval.as_secs()
+                    );
+
+                    loop {
+                        std::thread::sleep(poll_interval);
+
+                        let should_stop = {
+                            let guard = idle_last_used.lock();
+                            match *guard {
+                                Some(last) => last.elapsed() > idle_limit,
+                                None => false, // never started or already stopped
+                            }
+                        };
+
+                        if should_stop {
+                            eprintln!(
+                                "[idle-timer] llama-server idle for >{}s — stopping",
+                                idle_timeout_secs
+                            );
+                            // Stop the child process
+                            let child = idle_child.lock().take();
+                            if let Some(child) = child {
+                                if let Err(e) = child.kill() {
+                                    eprintln!("[idle-timer] kill failed: {}", e);
+                                } else {
+                                    eprintln!("[idle-timer] llama-server stopped");
+                                }
+                            }
+                            *idle_last_used.lock() = None;
+                        }
+                    }
+                });
+            }
 
             // ── Deep link ───────────────────────────────────────────
             #[cfg(any(windows, target_os = "linux"))]
@@ -301,6 +457,8 @@ pub fn run() {
             commands::watch_folder,
             commands::move_file,
             commands::read_folder,
+            commands::ensure_llama_server,
+            commands::stop_llama_server,
             commands::pick_files_for_organize,
             commands::pick_folder_for_organize,
             commands::save_note_file,
@@ -318,6 +476,11 @@ pub fn run() {
             commands::save_automation_config,
             commands::load_automation_config,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
+                cleanup_sidecars(app);
+            }
+        });
 }

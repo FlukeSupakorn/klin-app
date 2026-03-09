@@ -30,6 +30,19 @@ pub fn read_folder(input: ReadFolderDto) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub fn ensure_llama_server<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: State<AppState>,
+) -> Result<(), String> {
+    crate::ensure_llama_server_running(&app, state.inner())
+}
+
+#[tauri::command]
+pub fn stop_llama_server(state: State<AppState>) {
+    crate::stop_llama_server_process(state.inner());
+}
+
+#[tauri::command]
 pub fn pick_files_for_organize() -> Result<Vec<String>, String> {
     let selected = rfd::FileDialog::new().pick_files();
     Ok(selected

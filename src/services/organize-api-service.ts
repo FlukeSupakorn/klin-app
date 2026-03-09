@@ -5,6 +5,7 @@ import type {
   OrganizeAnalyzeRequest,
   OrganizePreviewItem,
 } from "@/types/domain";
+import { tauriClient } from "@/services/tauri-client";
 
 const ORGANIZE_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/organize",
@@ -176,6 +177,8 @@ async function postAnalyze(requestPayload: OrganizeAnalyzeRequest, signal?: Abor
   }
 
   let lastError: unknown = null;
+
+  await tauriClient.ensureLlamaServer();
 
   for (const url of ORGANIZE_API_URL_CANDIDATES) {
     try {

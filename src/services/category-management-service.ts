@@ -33,11 +33,6 @@ interface WorkerDefaultBasePathResponse {
   default_base_path: string | null;
 }
 
-interface WorkerInitialBasePathResponse {
-  default_base_path: string;
-  categories: WorkerCategory[];
-}
-
 export interface CategoryManagementRepository {
   getDefaultFolder(): string;
   setManagementState(defaultFolder: string, categories: ManagedCategory[]): void;
@@ -124,39 +119,38 @@ async function getDefaultBasePathFromWorker(fallback: string): Promise<string> {
   });
 }
 
+async function upsertDefaultBasePath(basePath: string, label: string): Promise<string> {
+  await tauriClient.ensureLlamaServer();
+
+  return fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
+    const response = ensureSuccess(
+      await fetch(`${baseUrl}/default-base-path`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ default_base_path: basePath }),
+      }),
+      label,
+    );
+    const payload = (await response.json()) as WorkerDefaultBasePathResponse;
+    return (payload.default_base_path?.trim() || basePath.trim()).trim();
+  });
+}
+
 export class CategoryManagementService {
   constructor(private repository: CategoryManagementRepository) {}
 
   async initializeFromWorker(): Promise<void> {
     const fallbackBasePath = await tauriClient.getDownloadsFolder().catch(() => "");
 
-    const state = await fetchFromCandidates(
-      SETTINGS_API_URL_CANDIDATES,
-      async (baseUrl): Promise<{ defaultFolder: string; categories: ManagedCategory[] }> => {
-        const defaultFolder = await getDefaultBasePathFromWorker(fallbackBasePath);
-
-        const initialResponse = ensureSuccess(
-          await fetch(`${baseUrl}/initial-base-path`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ default_base_path: defaultFolder }),
-          }),
-          "Failed to initialize base path",
-        );
-
-        const initialPayload = (await initialResponse.json()) as WorkerInitialBasePathResponse;
-        const effectiveDefault = initialPayload.default_base_path?.trim() || defaultFolder;
-
-        return {
-          defaultFolder: effectiveDefault,
-          categories: initialPayload.categories.map((category) => toManagedCategory(category, effectiveDefault)),
-        };
-      },
+    const defaultFolder = await getDefaultBasePathFromWorker(fallbackBasePath);
+    const effectiveDefault = await upsertDefaultBasePath(
+      defaultFolder,
+      "Failed to initialize base path",
     );
 
-    this.repository.setManagementState(state.defaultFolder, state.categories);
+    await this.refreshCategoriesFromWorker(effectiveDefault);
     this.syncToAutomationStores();
   }
 
@@ -166,20 +160,12 @@ export class CategoryManagementService {
       return;
     }
 
-    await fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/default-base-path`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ default_base_path: normalized }),
-      });
+    const effectiveDefault = await upsertDefaultBasePath(
+      normalized,
+      "Failed to save default base path",
+    );
 
-      ensureSuccess(response, "Failed to save default base path");
-      return true;
-    });
-
-    await this.refreshCategoriesFromWorker(normalized);
+    await this.refreshCategoriesFromWorker(effectiveDefault);
     this.syncToAutomationStores();
   }
 
@@ -193,6 +179,8 @@ export class CategoryManagementService {
     const fallbackPath = this.repository.getDefaultFolder();
     const normalizedFolderPath = category.folderPath.trim();
     const inferredFolderPath = normalizedFolderPath || joinFolderPath(fallbackPath, normalizedName);
+
+    await tauriClient.ensureLlamaServer();
 
     await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(baseUrl, {
@@ -238,6 +226,8 @@ export class CategoryManagementService {
     if (Object.keys(payload).length === 0) {
       return;
     }
+
+    await tauriClient.ensureLlamaServer();
 
     await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(`${baseUrl}/${id}`, {

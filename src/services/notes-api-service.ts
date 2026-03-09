@@ -8,6 +8,8 @@ const NOTE_HISTORY_API_URL_CANDIDATES = [
   "http://localhost:8000/api/history/note",
 ];
 
+import { tauriClient } from "@/services/tauri-client";
+
 export interface NotesSummarizeResult {
   summary: string;
   suggestedTitle: string;
@@ -76,6 +78,9 @@ function normalizeResponse(payload: unknown): NotesSummarizeResult {
 
 export const notesApiService = {
   async summarizeFromFiles(filePaths: string[]): Promise<NotesSummarizeResult> {
+    // Ensure llama-server is running before hitting the AI endpoint
+    await tauriClient.ensureLlamaServer();
+
     let lastError: unknown = null;
     const fallbackTitle = buildSuggestedTitleFromPaths(filePaths);
 
@@ -113,6 +118,9 @@ export const notesApiService = {
     filePaths: string[],
     callbacks: NotesStreamCallbacks = {},
   ): Promise<NotesSummarizeResult> {
+    // Ensure llama-server is running before hitting the AI endpoint.
+    await tauriClient.ensureLlamaServer();
+
     let lastError: unknown = null;
     const fallbackTitle = buildSuggestedTitleFromPaths(filePaths);
 
