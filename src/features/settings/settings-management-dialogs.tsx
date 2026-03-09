@@ -16,6 +16,14 @@ function joinDefaultFolderPath(basePath: string, categoryName: string): string {
   return normalizedBase ? `${normalizedBase}/${normalizedName}` : normalizedName;
 }
 
+function normalizeHexColor(value: string, fallback = "#6366f1"): string {
+  const trimmed = value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return fallback;
+}
+
 export type SettingsDialogSection = "default-folder" | "watched-folders" | "categories";
 
 type ModalMode = "edit" | "add";
@@ -327,9 +335,11 @@ interface CategoryEditorModalProps {
   onFormChange: Dispatch<SetStateAction<CategoryFormState>>;
   onClose: () => void;
   onSave: () => Promise<void>;
+  saveError: string | null;
+  isSaving: boolean;
 }
 
-function CategoryEditorModal({ mode, formState, onFormChange, onClose, onSave }: CategoryEditorModalProps) {
+function CategoryEditorModal({ mode, formState, onFormChange, onClose, onSave, saveError, isSaving }: CategoryEditorModalProps) {
   const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
 
   return (
@@ -426,12 +436,13 @@ function CategoryEditorModal({ mode, formState, onFormChange, onClose, onSave }:
               {formState.aiLearned ? "AI learned" : "AI learning"}
             </span>
           </div>
+          {saveError && <p className="text-xs text-destructive">{saveError}</p>}
           <div className="flex justify-between pt-1">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} disabled={isSaving}>
               Cancel
             </Button>
-            <Button onClick={() => void onSave()}>
-              {mode === "edit" ? "Save Changes" : "Add Category"}
+            <Button onClick={() => void onSave()} disabled={isSaving}>
+              {isSaving ? "Saving..." : mode === "edit" ? "Save Changes" : "Add Category"}
             </Button>
           </div>
         </div>
@@ -452,6 +463,8 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [formState, setFormState] = useState<CategoryFormState>(emptyForm);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchInitialFolders, setBatchInitialFolders] = useState<string[]>([]);
 
@@ -469,12 +482,16 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
   const openAddModal = () => {
     setModalMode("add");
     setEditingCategoryId(null);
+    setSaveError(null);
+    setIsSavingCategory(false);
     setFormState({ ...emptyForm, folderPath: joinDefaultFolderPath(defaultFolder, "New Category") });
   };
 
   const openEditModal = (category: ManagedCategory) => {
     setModalMode("edit");
     setEditingCategoryId(category.id);
+    setSaveError(null);
+    setIsSavingCategory(false);
     setFormState({
       name: category.name,
       description: category.description,
@@ -488,6 +505,8 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
   const closeCategoryEditor = () => {
     setModalMode(null);
     setEditingCategoryId(null);
+    setSaveError(null);
+    setIsSavingCategory(false);
     setFormState(emptyForm);
   };
 
@@ -499,37 +518,55 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
   };
 
   const handleSaveCategory = async () => {
-    if (!formState.name.trim() || !formState.description.trim()) return;
-
     const normalizedName = formState.name.trim();
+    if (!normalizedName) {
+      setSaveError("Category name is required");
+      return;
+    }
+
+    if (modalMode === "edit" && !editingCategoryId) {
+      setSaveError("Category ID is missing");
+      return;
+    }
+
     const normalizedDescription = formState.description.trim();
+    const normalizedColor = normalizeHexColor(formState.color, "#6366f1");
     const normalizedFolderPath = formState.folderPath.trim() || joinDefaultFolderPath(defaultFolder, normalizedName);
 
-    if (modalMode === "edit" && editingCategoryId) {
-      await categoryManagementService.updateCategoryInWorker(editingCategoryId, {
-        name: normalizedName,
-        description: normalizedDescription,
-        color: formState.color,
-        folderPath: normalizedFolderPath,
-        enabled: formState.enabled,
-        aiLearned: formState.aiLearned,
-      });
-    }
+    setSaveError(null);
+    setIsSavingCategory(true);
 
-    if (modalMode === "add") {
-      await categoryManagementService.addCategoryToWorker({
-        name: normalizedName,
-        description: normalizedDescription,
-        color: formState.color,
-        folderPath: normalizedFolderPath,
-        enabled: formState.enabled,
-        aiLearned: formState.aiLearned,
-        isAutoDescription: false,
-      });
-    }
+    try {
+      if (modalMode === "edit" && editingCategoryId) {
+        await categoryManagementService.updateCategoryInWorker(editingCategoryId, {
+          name: normalizedName,
+          description: normalizedDescription,
+          color: normalizedColor,
+          folderPath: normalizedFolderPath,
+          enabled: formState.enabled,
+          aiLearned: formState.aiLearned,
+        });
+      }
 
-    categoryManagementService.syncToAutomationStores();
-    closeCategoryEditor();
+      if (modalMode === "add") {
+        await categoryManagementService.addCategoryToWorker({
+          name: normalizedName,
+          description: normalizedDescription,
+          color: normalizedColor,
+          folderPath: normalizedFolderPath,
+          enabled: formState.enabled,
+          aiLearned: formState.aiLearned,
+          isAutoDescription: false,
+        });
+      }
+
+      categoryManagementService.syncToAutomationStores();
+      closeCategoryEditor();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Failed to save category");
+    } finally {
+      setIsSavingCategory(false);
+    }
   };
 
   if (!open) return null;
@@ -585,6 +622,8 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
           onFormChange={setFormState}
           onClose={closeCategoryEditor}
           onSave={handleSaveCategory}
+          saveError={saveError}
+          isSaving={isSavingCategory}
         />
       )}
     </>

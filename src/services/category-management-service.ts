@@ -228,20 +228,30 @@ export class CategoryManagementService {
 
   async updateCategoryInWorker(id: string, updates: Partial<ManagedCategory>): Promise<void> {
     const payload: Record<string, unknown> = {};
+    const normalizedUpdates: Partial<ManagedCategory> = {};
     if (typeof updates.name === "string") {
-      payload.name = updates.name.trim();
+      const value = updates.name.trim();
+      payload.name = value;
+      normalizedUpdates.name = value;
     }
     if (typeof updates.description === "string") {
-      payload.description = updates.description.trim();
+      const value = updates.description.trim();
+      payload.description = value;
+      normalizedUpdates.description = value;
     }
     if (typeof updates.folderPath === "string") {
-      payload.folder_path = updates.folderPath.trim();
+      const value = updates.folderPath.trim();
+      payload.folder_path = value;
+      normalizedUpdates.folderPath = value;
     }
     if (typeof updates.enabled === "boolean") {
       payload.enabled = updates.enabled;
+      normalizedUpdates.enabled = updates.enabled;
     }
     if (typeof updates.color === "string") {
-      payload.color = updates.color.trim();
+      const value = updates.color.trim().toLowerCase();
+      payload.color = value;
+      normalizedUpdates.color = value;
     }
 
     if (Object.keys(payload).length === 0) {
@@ -261,8 +271,14 @@ export class CategoryManagementService {
       return true;
     });
 
-    await this.refreshCategoriesFromWorker();
+    const currentCategories = this.repository.listCategories();
+    const nextCategories = currentCategories.map((category) =>
+      category.id === id ? { ...category, ...normalizedUpdates } : category,
+    );
+    this.repository.setManagementState(this.repository.getDefaultFolder(), nextCategories);
     this.syncToAutomationStores();
+
+    await this.refreshCategoriesFromWorker().catch(() => undefined);
   }
 
   async deleteCategoryInWorker(id: string): Promise<void> {

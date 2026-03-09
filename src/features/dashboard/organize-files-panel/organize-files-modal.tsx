@@ -38,31 +38,6 @@ function findCategoryColor(name: string, palette: Array<{ name: string; color: s
   return matched?.color ?? null;
 }
 
-function hexToRgba(hex: string, alpha: number): string | null {
-  const normalized = hex.trim().replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
-    return null;
-  }
-
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function getContrastTextColor(hex: string): string {
-  const normalized = hex.trim().replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
-    return "#111827";
-  }
-
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.62 ? "#111827" : "#f8fafc";
-}
-
 function splitDestinationPath(destinationPath: string): { folderPath: string; fileName: string } {
   const slashIndex = Math.max(destinationPath.lastIndexOf("/"), destinationPath.lastIndexOf("\\"));
   if (slashIndex < 0) {
@@ -269,23 +244,22 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
               (() => {
                 const isSelected = item.selectedCategory === score.name;
                 const categoryColor = findCategoryColor(score.name, categories);
-                const tintedBackground = categoryColor ? hexToRgba(categoryColor, isSelected ? 0.98 : 0.18) : null;
-                const tintedBorder = categoryColor ? hexToRgba(categoryColor, 0.45) : null;
                 return (
                   <button
                     type="button"
                     key={score.name}
                     onClick={() => workflow.applyCategory(item.id, score.name)}
                     className={cn(
-                      "rounded-full border px-3 py-1 text-xs transition-colors",
-                      !categoryColor && (isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"),
+                      "relative rounded-full border px-3 py-1 pl-5 text-xs transition-colors",
+                      isSelected
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground hover:bg-muted/80",
                     )}
-                    style={categoryColor ? {
-                      backgroundColor: tintedBackground ?? undefined,
-                      borderColor: tintedBorder ?? undefined,
-                      color: isSelected ? getContrastTextColor(categoryColor) : categoryColor,
-                    } : undefined}
                   >
+                    <span
+                      className="absolute left-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full"
+                      style={{ backgroundColor: categoryColor ?? "currentColor" }}
+                    />
                     {score.name} · {Math.round(score.score * 100)}%
                   </button>
                 );
