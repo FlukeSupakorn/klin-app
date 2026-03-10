@@ -27,7 +27,8 @@ export const useApiLogStore = create<ApiLogStoreState>()(
   persist(
     (set) => ({
       logs: [],
-      addLog: (log) =>
+      addLog: (log) => {
+        if (!import.meta.env.DEV) return;
         set((state) => {
           const newLog = { ...log, id: crypto.randomUUID() };
           const now = Date.now();
@@ -36,7 +37,8 @@ export const useApiLogStore = create<ApiLogStoreState>()(
           );
           const newLogs = [newLog, ...filteredLogs].slice(0, MAX_LOGS);
           return { logs: newLogs };
-        }),
+        });
+      },
       clearLogs: () => set({ logs: [] }),
       cleanupOldLogs: () =>
         set((state) => {
