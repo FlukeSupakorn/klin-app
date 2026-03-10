@@ -4,6 +4,7 @@ import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useLogStore } from "@/stores/use-log-store";
+import { usePrivacyStore } from "@/stores/use-privacy-store";
 import type { AutomationLog, OrganizePreviewItem } from "@/types/domain";
 import {
   applyCategoryToItem,
@@ -30,6 +31,13 @@ function isAbortError(error: unknown): boolean {
 
   return false;
 }
+
+function getPathName(path: string): string {
+  const name = path.split(/[\\/]/).pop()?.trim();
+  return name && name.length > 0 ? name : path;
+}
+
+const LOCK_NOTICE_DETAILS_SEPARATOR = "\n__DETAILS__\n";
 
 export interface OrganizeWorkflow {
   items: OrganizePreviewItem[];
@@ -234,13 +242,52 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
       return;
     }
 
+    const privacyStore = usePrivacyStore.getState();
+    const blocked: Array<{ source: "file" | "folder"; fileName: string; lockedByName: string }> = [];
+    const allowed: string[] = [];
+    for (const path of selectedPaths) {
+      const match = privacyStore.getLockMatch(path);
+      if (match) {
+        blocked.push({
+          source: match.source,
+          fileName: getPathName(path),
+          lockedByName: getPathName(match.lockedPath),
+        });
+        continue;
+      }
+
+      allowed.push(path);
+    }
+
+    if (blocked.length > 0) {
+      const previewNames = blocked.slice(0, 2).map((item) => item.fileName);
+      const remaining = blocked.length - previewNames.length;
+      const head = previewNames.join(", ");
+      const summary = `Skipped ${blocked.length} locked file(s): ${head}${remaining > 0 ? ` +${remaining} more` : ""}`;
+      const detailLines = blocked.map((item) => (
+        item.source === "folder"
+          ? `${item.fileName} - locked by folder ${item.lockedByName}`
+          : `${item.fileName} - locked file`
+      ));
+      const withDetails = `${summary}${LOCK_NOTICE_DETAILS_SEPARATOR}${detailLines.join("\n")}`;
+
+      setErrorMessage(withDetails);
+    }
+
+    if (allowed.length === 0) {
+      setModalOpen(true);
+      return;
+    }
+
     resetResumeDismissed();
     setModalOpen(true);
-    setErrorMessage(null);
+    if (blocked.length === 0) {
+      setErrorMessage(null);
+    }
 
     setItems((state) => {
       const existingPaths = new Set(state.map((item) => item.currentPath));
-      const queuedItems = selectedPaths
+      const queuedItems = allowed
         .filter((path) => !existingPaths.has(path))
         .map((path) => buildQueuedItem(path, categories, defaultFolder));
       return queuedItems.length > 0 ? [...state, ...queuedItems] : state;
@@ -391,6 +438,9 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
     try {
       const selectedScore = item.topScores.find((score) => score.name === item.selectedCategory) ?? item.topScores[0];
       const categoryByName = categories.find((category) => category.name === item.selectedCategory);
+      const currentName = splitDestinationPath(item.currentPath).fileName;
+      const destinationName = splitDestinationPath(item.destinationPath).fileName;
+      const selectedNameForApi = item.suggestedName ?? (destinationName !== currentName ? destinationName : null);
       const selectedCategoryPayload = item.selectedCategory === "No category"
         ? null
         : {
@@ -410,7 +460,7 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
       // Persist the user decision in worker first, then perform local file move.
       await organizeApiService.applyDecision({
         fileId: item.workerFileId,
-        selectedName: item.suggestedName,
+        selectedName: selectedNameForApi,
         selectedCategory: selectedCategoryPayload,
       });
 

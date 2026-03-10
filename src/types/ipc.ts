@@ -34,6 +34,12 @@ export interface AutomationConfigDto {
   scan_interval_seconds: number;
 }
 
+export interface SubdirEntry {
+  name: string;
+  path: string;
+  has_children: boolean;
+}
+
 export interface TauriClient {
   moveFile(input: MoveFileDto): Promise<void>;
   readFolder(input: ReadFolderDto): Promise<string[]>;
@@ -60,4 +66,7 @@ export interface TauriClient {
   startOAuthListener(): Promise<void>;
   saveAutomationConfig(config: AutomationConfigDto): Promise<void>;
   loadAutomationConfig(): Promise<AutomationConfigDto>;
+  pickFoldersForBatch(): Promise<string[]>;
+  listSubdirectories(path: string): Promise<SubdirEntry[]>;
+  listAllSubdirectories(path: string): Promise<string[]>;
 }

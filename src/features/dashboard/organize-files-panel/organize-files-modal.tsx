@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pencil, Sparkles } from "lucide-react";
+import { AlertTriangle, Pencil, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,18 @@ import type { OrganizeWorkflow } from "./use-organize-workflow";
 
 interface OrganizeFilesModalProps {
   workflow: OrganizeWorkflow;
+}
+
+const LOCK_NOTICE_DETAILS_SEPARATOR = "\n__DETAILS__\n";
+
+function splitLockNotice(message: string): { summary: string; details: string[] } {
+  const [summaryPart, detailsPart] = message.split(LOCK_NOTICE_DETAILS_SEPARATOR);
+  const summary = (summaryPart ?? "").trim();
+  const details = (detailsPart ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return { summary, details };
 }
 
 function normalizeCategoryName(value: string): string {
@@ -24,31 +36,6 @@ function findCategoryColor(name: string, palette: Array<{ name: string; color: s
 
   const matched = palette.find((item) => normalizeCategoryName(item.name) === normalized);
   return matched?.color ?? null;
-}
-
-function hexToRgba(hex: string, alpha: number): string | null {
-  const normalized = hex.trim().replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
-    return null;
-  }
-
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function getContrastTextColor(hex: string): string {
-  const normalized = hex.trim().replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
-    return "#111827";
-  }
-
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.62 ? "#111827" : "#f8fafc";
 }
 
 function splitDestinationPath(destinationPath: string): { folderPath: string; fileName: string } {
@@ -257,23 +244,22 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
               (() => {
                 const isSelected = item.selectedCategory === score.name;
                 const categoryColor = findCategoryColor(score.name, categories);
-                const tintedBackground = categoryColor ? hexToRgba(categoryColor, isSelected ? 0.98 : 0.18) : null;
-                const tintedBorder = categoryColor ? hexToRgba(categoryColor, 0.45) : null;
                 return (
                   <button
                     type="button"
                     key={score.name}
                     onClick={() => workflow.applyCategory(item.id, score.name)}
                     className={cn(
-                      "rounded-full border px-3 py-1 text-xs transition-colors",
-                      !categoryColor && (isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"),
+                      "relative rounded-full border px-3 py-1 pl-5 text-xs transition-colors",
+                      isSelected
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground hover:bg-muted/80",
                     )}
-                    style={categoryColor ? {
-                      backgroundColor: tintedBackground ?? undefined,
-                      borderColor: tintedBorder ?? undefined,
-                      color: isSelected ? getContrastTextColor(categoryColor) : categoryColor,
-                    } : undefined}
                   >
+                    <span
+                      className="absolute left-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full"
+                      style={{ backgroundColor: categoryColor ?? "currentColor" }}
+                    />
                     {score.name} · {Math.round(score.score * 100)}%
                   </button>
                 );
@@ -371,6 +357,14 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
     return null;
   }
 
+  const isLockWarning = Boolean(workflow.errorMessage?.startsWith("Skipped "));
+  const [showWarningDetails, setShowWarningDetails] = useState(false);
+  const parsedWarning = workflow.errorMessage ? splitLockNotice(workflow.errorMessage) : null;
+
+  useEffect(() => {
+    setShowWarningDetails(false);
+  }, [workflow.errorMessage]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <Card className="h-[80vh] w-full max-w-5xl overflow-hidden border border-border bg-card">
@@ -384,8 +378,45 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
           <Input placeholder="Search files..." />
 
           {workflow.errorMessage && (
-            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {workflow.errorMessage}
+            <div
+              className={cn(
+                "rounded-lg border px-3 py-2 text-sm",
+                isLockWarning
+                  ? "border-amber-500/40 bg-amber-500/10 text-amber-700"
+                  : "border-destructive/40 bg-destructive/10 text-destructive",
+              )}
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <div className="space-y-2">
+                  <p className="leading-5">
+                    {parsedWarning?.summary ?? workflow.errorMessage}
+                    {isLockWarning && (parsedWarning?.details.length ?? 0) > 0 && (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          onClick={() => setShowWarningDetails((prev) => !prev)}
+                          className="text-xs font-semibold underline underline-offset-2"
+                        >
+                          {showWarningDetails ? "Hide details" : "Read more"}
+                        </button>
+                      </>
+                    )}
+                  </p>
+                  {isLockWarning && (parsedWarning?.details.length ?? 0) > 0 && (
+                    <div className="space-y-2">
+                      {showWarningDetails && (
+                        <ul className="list-disc space-y-1 pl-4 text-xs">
+                          {parsedWarning?.details.map((detail) => (
+                            <li key={detail}>{detail}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

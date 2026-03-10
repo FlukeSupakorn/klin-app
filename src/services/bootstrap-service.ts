@@ -2,6 +2,7 @@ import { tauriClient } from "@/services/tauri-client";
 import { categoryManagementService } from "@/services/category-management-service";
 import { useCategoryStore } from "@/stores/use-category-store";
 import { useLogStore } from "@/stores/use-log-store";
+import { usePrivacyStore } from "@/stores/use-privacy-store";
 
 let didBootstrap = false;
 
@@ -25,6 +26,7 @@ export async function bootstrapAppData() {
 
   await categoryManagementService.initializeFromWorker().catch(() => undefined);
   categoryManagementService.syncToAutomationStores();
+  await usePrivacyStore.getState().hydrateFromApi().catch(() => undefined);
 
   didBootstrap = true;
 }

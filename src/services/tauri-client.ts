@@ -5,6 +5,7 @@ import type {
   NoteFileEntryDto,
   ReadFolderDto,
   SaveRuleMappingDto,
+  SubdirEntry,
   TauriClient,
   WatchFolderDto,
   WriteLogDto,
@@ -101,6 +102,18 @@ class TauriCommandClient implements TauriClient {
 
   loadAutomationConfig(): Promise<AutomationConfigDto> {
     return invoke("load_automation_config");
+  }
+
+  pickFoldersForBatch(): Promise<string[]> {
+    return invoke("pick_folders_for_batch");
+  }
+
+  listSubdirectories(path: string): Promise<SubdirEntry[]> {
+    return invoke("list_subdirectories", { path });
+  }
+
+  listAllSubdirectories(path: string): Promise<string[]> {
+    return invoke("list_all_subdirectories", { path });
   }
 }
 

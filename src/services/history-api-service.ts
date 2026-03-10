@@ -265,6 +265,11 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
               ? [String(entry.file_name)]
           : [];
         const categoryName = "category_name" in entry ? String(entry.category_name ?? "") : "";
+        const noteSubtitle = fileNames.length === 0
+          ? (categoryName ? `Saved to ${categoryName}` : "Note saved")
+          : fileNames.length === 1
+            ? `Source: ${fileNames[0]}`
+            : `Sources: ${fileNames[0]} +${fileNames.length - 1} more`;
 
         if (!summaryPath) {
           return null;
@@ -275,7 +280,7 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
           type: "summary",
           title,
           subtitle: action === "note"
-            ? (categoryName ? `Saved to ${categoryName}` : "Note saved")
+            ? noteSubtitle
             : subtitle,
           timestamp,
           summaryPath,

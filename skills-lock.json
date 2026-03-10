@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "embedding-tauri-sidecars": {
+      "source": "dchuk/claude-code-tauri-skills",
+      "sourceType": "github",
+      "computedHash": "abaed98d5bea4674fbf5c17e9b2bc64c579425a57f57738a0e1b527178c91733"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",

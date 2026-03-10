@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Activity, FileX2, FolderLock, Mail, RefreshCw, Server, ShieldCheck, SlidersHorizontal, Terminal, UserCircle2, X } from "lucide-react";
+import { FileX2, FolderLock, Mail, RefreshCw, Server, ShieldCheck, SlidersHorizontal, Terminal, UserCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { cn } from "@/lib/utils";
@@ -17,8 +16,8 @@ export function SettingsPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [isCountingWatcherFiles, setIsCountingWatcherFiles] = useState(false);
   const [watcherFolderStats, setWatcherFolderStats] = useState<Array<{ folderPath: string; fileCount: number }>>([]);
-  const [isCheckingApi, setIsCheckingApi] = useState(false);
-  const [apiHealthSummary, setApiHealthSummary] = useState<string | null>(null);
+  const [fastApiStatus, setFastApiStatus] = useState<"checking" | "online" | "offline">("checking");
+  const [isRefreshingDevHealth, setIsRefreshingDevHealth] = useState(false);
 
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
   const isRunning = useAutomationStore((state) => state.isRunning);
@@ -28,52 +27,49 @@ export function SettingsPage() {
   const queueRef = useRef(new AsyncProcessingQueue(concurrencyLimit));
 
   const lockedPaths = usePrivacyStore((state) => state.lockedPaths);
-  const lockPath = usePrivacyStore((state) => state.lockPath);
+  const lockFile = usePrivacyStore((state) => state.lockFile);
+  const lockFolder = usePrivacyStore((state) => state.lockFolder);
   const unlockPath = usePrivacyStore((state) => state.unlockPath);
+  const hydrateLocks = usePrivacyStore((state) => state.hydrateFromApi);
 
   const handleLockFiles = async () => {
     const files = await tauriClient.pickFilesForOrganize().catch(() => []);
-    files.forEach((f) => lockPath(f));
+    await Promise.all(files.map((filePath) => lockFile(filePath).catch(() => undefined)));
   };
 
   const handleLockFolder = async () => {
     const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
-    if (folder) lockPath(folder);
+    if (folder) {
+      await lockFolder(folder).catch(() => undefined);
+    }
   };
 
-  const checkWorkerApiHealth = async () => {
-    setIsCheckingApi(true);
-    setApiHealthSummary(null);
+  const checkFastApiHealth = async (showRefreshState = false) => {
+    if (showRefreshState) {
+      setIsRefreshingDevHealth(true);
+      setFastApiStatus("checking");
+    }
 
-    const candidates = [
-      "http://127.0.0.1:8000/health",
-      "http://localhost:8000/health",
-    ];
+    const candidates = ["http://127.0.0.1:8000/health", "http://localhost:8000/health"];
 
-    let lastError: unknown = null;
     for (const url of candidates) {
       try {
-        const response = await fetch(url, { method: "GET" });
-        if (!response.ok) {
-          lastError = new Error(`HTTP ${response.status}`);
-          continue;
+        const response = await fetch(url, { method: "GET", signal: AbortSignal.timeout(2000) });
+        if (response.ok) {
+          setFastApiStatus("online");
+          if (showRefreshState) {
+            setIsRefreshingDevHealth(false);
+          }
+          return;
         }
-
-        const payload = (await response.json()) as { status?: string; version?: string; rag_ready?: boolean };
-        const status = payload.status ?? "unknown";
-        const version = payload.version ?? "n/a";
-        const rag = payload.rag_ready ? "ready" : "not ready";
-        setApiHealthSummary(`Connected: ${url} | status=${status} | version=${version} | rag=${rag}`);
-        setIsCheckingApi(false);
-        return;
-      } catch (error) {
-        lastError = error;
+      } catch {
       }
     }
 
-    const message = lastError instanceof Error ? lastError.message : "Worker API unavailable";
-    setApiHealthSummary(`Check failed: ${message}`);
-    setIsCheckingApi(false);
+    setFastApiStatus("offline");
+    if (showRefreshState) {
+      setIsRefreshingDevHealth(false);
+    }
   };
 
   const runScanCycle = async () => {
@@ -149,6 +145,23 @@ export function SettingsPage() {
   useEffect(() => {
     void initializeAuth();
   }, [initializeAuth]);
+
+  useEffect(() => {
+    void hydrateLocks().catch(() => undefined);
+  }, [hydrateLocks]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    void checkFastApiHealth();
+    const interval = setInterval(() => {
+      void checkFastApiHealth();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const isLoggedIn = useMemo(() => {
     if (!accessToken) {
@@ -232,23 +245,6 @@ export function SettingsPage() {
       </section>
 
       <section className="space-y-5 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-4">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Backend</p>
-            <h3 className="font-semibold">Worker API Health</h3>
-          </div>
-          <Button variant="outline" className="h-9 gap-2" onClick={() => void checkWorkerApiHealth()} disabled={isCheckingApi}>
-            <RefreshCw className={cn("h-3.5 w-3.5", isCheckingApi && "animate-spin")} />
-            {isCheckingApi ? "Checking..." : "Check API"}
-          </Button>
-        </div>
-
-        {apiHealthSummary && (
-          <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            {apiHealthSummary}
-          </div>
-        )}
-
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Automation</p>
@@ -394,7 +390,60 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {import.meta.env.DEV && <DeveloperSettingsSection />}
+      {import.meta.env.DEV && (
+        <section className="space-y-5 rounded-2xl border border-primary/20 bg-primary/5 p-5 shadow-sm ring-1 ring-primary/20">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary opacity-80">
+                <Terminal className="h-3 w-3" /> Developer Mode
+              </p>
+              <h3 className="font-semibold text-primary">Debug Environment</h3>
+            </div>
+            <Button
+              variant="outline"
+              className="h-9 gap-2 border-primary/20 shadow-sm hover:bg-primary/10"
+              onClick={() => void checkFastApiHealth(true)}
+              disabled={isRefreshingDevHealth}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", isRefreshingDevHealth && "animate-spin")} />
+              Refresh
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 border-t border-primary/10 pt-4">
+            <div className="flex items-center justify-between rounded-lg border border-primary/10 bg-background/50 px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <Server className="h-4 w-4 text-primary/70" />
+                <span className="text-sm font-medium">FastAPI Backend</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    fastApiStatus === "checking"
+                      ? "animate-pulse bg-muted-foreground"
+                      : fastApiStatus === "online"
+                        ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                        : "bg-destructive",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "text-xs font-bold uppercase tracking-wider",
+                    fastApiStatus === "online"
+                      ? "text-green-600 dark:text-green-500"
+                      : fastApiStatus === "offline"
+                        ? "text-destructive"
+                        : "text-muted-foreground",
+                  )}
+                >
+                  {fastApiStatus}
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <SettingsManagementDialogs
         open={open}

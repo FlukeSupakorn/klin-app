@@ -475,6 +475,9 @@ pub fn run() {
             commands::start_oauth_listener,
             commands::save_automation_config,
             commands::load_automation_config,
+            commands::pick_folders_for_batch,
+            commands::list_subdirectories,
+            commands::list_all_subdirectories,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
