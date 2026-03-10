@@ -2,6 +2,7 @@ import { useCategoryManagementStore } from "@/stores/use-category-management-sto
 import { useCategoryStore } from "@/stores/use-category-store";
 import { useRuleStore } from "@/stores/use-rule-store";
 import { tauriClient } from "@/services/tauri-client";
+import { withLlama } from "@/hooks/useLlama";
 import type { ManagedCategory } from "@/types/domain";
 
 const SETTINGS_API_URL_CANDIDATES = [
@@ -118,20 +119,18 @@ async function fetchFromCandidates<T>(
 }
 
 async function getDefaultBasePathFromWorker(fallback: string): Promise<string> {
-  return fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
+  return withLlama(() => fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
     const response = ensureSuccess(
       await fetch(`${baseUrl}/default-base-path`),
       "Failed to load default base path",
     );
     const payload = (await response.json()) as WorkerDefaultBasePathResponse;
     return (payload.default_base_path?.trim() || fallback.trim()).trim();
-  });
+  }));
 }
 
 async function upsertDefaultBasePath(basePath: string, label: string): Promise<string> {
-  await tauriClient.ensureLlamaServer();
-
-  return fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
+  return withLlama(() => fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
     const response = ensureSuccess(
       await fetch(`${baseUrl}/default-base-path`, {
         method: "PUT",
@@ -144,7 +143,7 @@ async function upsertDefaultBasePath(basePath: string, label: string): Promise<s
     );
     const payload = (await response.json()) as WorkerDefaultBasePathResponse;
     return (payload.default_base_path?.trim() || basePath.trim()).trim();
-  });
+  }));
 }
 
 export class CategoryManagementService {
@@ -189,9 +188,7 @@ export class CategoryManagementService {
     const normalizedFolderPath = category.folderPath.trim();
     const inferredFolderPath = normalizedFolderPath || joinFolderPath(fallbackPath, normalizedName);
 
-    await tauriClient.ensureLlamaServer();
-
-    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+    await withLlama(() => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(baseUrl, {
         method: "POST",
         headers: {
@@ -208,7 +205,7 @@ export class CategoryManagementService {
 
       ensureSuccess(response, "Failed to create category");
       return true;
-    });
+    }));
 
     await this.refreshCategoriesFromWorker();
     this.syncToAutomationStores();
@@ -246,9 +243,7 @@ export class CategoryManagementService {
       return;
     }
 
-    await tauriClient.ensureLlamaServer();
-
-    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+    await withLlama(() => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(`${baseUrl}/${id}`, {
         method: "PATCH",
         headers: {
@@ -259,7 +254,7 @@ export class CategoryManagementService {
 
       ensureSuccess(response, "Failed to update category");
       return true;
-    });
+    }));
 
     const currentCategories = this.repository.listCategories();
     const nextCategories = currentCategories.map((category) =>
@@ -297,7 +292,7 @@ export class CategoryManagementService {
       is_auto_description: true,
     }));
 
-    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+    await withLlama(() => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(`${baseUrl}/batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -305,7 +300,7 @@ export class CategoryManagementService {
       });
       ensureSuccess(response, "Failed to batch create categories");
       return true;
-    });
+    }));
 
     await this.refreshCategoriesFromWorker();
     this.syncToAutomationStores();

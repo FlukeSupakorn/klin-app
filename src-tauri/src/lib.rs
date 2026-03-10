@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use parking_lot::Mutex;
+use parking_lot::{Condvar, Mutex};
 use tauri::{Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_shell::process::CommandChild;
@@ -35,6 +35,11 @@ pub struct AppState {
     /// Timestamp of the last `ensure_llama_server` call.
     /// Used by the idle-timeout task to auto-stop llama-server.
     pub llama_last_used: Arc<Mutex<Option<Instant>>>,
+    /// Authoritative lifecycle phase of the llama-server process.
+    /// Guards concurrent startup and crash detection.
+    pub llama_phase: Arc<Mutex<sidecars::llama_server::LaunchPhase>>,
+    /// Condvar paired with `llama_phase`; notified on every phase transition.
+    pub llama_phase_condvar: Arc<Condvar>,
 }
 
 fn env_flag(name: &str) -> bool {
@@ -97,6 +102,10 @@ pub fn run() {
 
             let llama_server_child = Arc::new(Mutex::new(llama_child));
             let llama_last_used: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
+            let llama_phase = Arc::new(Mutex::new(
+                sidecars::llama_server::LaunchPhase::Idle,
+            ));
+            let llama_phase_condvar = Arc::new(Condvar::new());
 
             app.manage(AppState {
                 log_service: Arc::new(Mutex::new(LogService::new(log_repo))),
@@ -106,12 +115,16 @@ pub fn run() {
                 llama_server_child: llama_server_child.clone(),
                 worker_child: Arc::new(Mutex::new(worker_child)),
                 llama_last_used: llama_last_used.clone(),
+                llama_phase: llama_phase.clone(),
+                llama_phase_condvar: llama_phase_condvar.clone(),
             });
 
             // ── Idle-timeout task for llama-server ───────────────
             sidecars::spawn_idle_timeout_task(
                 llama_server_child.clone(),
                 llama_last_used.clone(),
+                llama_phase.clone(),
+                llama_phase_condvar.clone(),
             );
 
             // ── Deep link ───────────────────────────────────────────

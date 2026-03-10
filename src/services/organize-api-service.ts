@@ -5,7 +5,7 @@ import type {
   OrganizeAnalyzeRequest,
   OrganizePreviewItem,
 } from "@/types/domain";
-import { tauriClient } from "@/services/tauri-client";
+import { withLlama } from "@/hooks/useLlama";
 
 const ORGANIZE_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/organize",
@@ -176,40 +176,40 @@ async function postAnalyze(requestPayload: OrganizeAnalyzeRequest, signal?: Abor
     throw new DOMException("Request aborted", "AbortError");
   }
 
-  let lastError: unknown = null;
+  return withLlama(async () => {
+    let lastError: unknown = null;
 
-  await tauriClient.ensureLlamaServer();
+    for (const url of ORGANIZE_API_URL_CANDIDATES) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestPayload),
+          signal,
+        });
 
-  for (const url of ORGANIZE_API_URL_CANDIDATES) {
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestPayload),
-        signal,
-      });
-
-      if (!response.ok) {
-        if (signal?.aborted) {
-          throw new DOMException("Request aborted", "AbortError");
+        if (!response.ok) {
+          if (signal?.aborted) {
+            throw new DOMException("Request aborted", "AbortError");
+          }
+          lastError = new Error(`Organize API error: ${response.status} at ${url}`);
+          continue;
         }
-        lastError = new Error(`Organize API error: ${response.status} at ${url}`);
-        continue;
-      }
 
-      return await response.json();
-    } catch (error) {
-      if (signal?.aborted || isAbortError(error)) {
-        throw error;
-      }
+        return await response.json();
+      } catch (error) {
+        if (signal?.aborted || isAbortError(error)) {
+          throw error;
+        }
 
-      lastError = error;
+        lastError = error;
+      }
     }
-  }
 
-  throw lastError ?? new Error("Organize API unavailable");
+    throw lastError ?? new Error("Organize API unavailable");
+  });
 }
 
 function buildFallbackScores(categoryCatalog: ManagedCategory[]): CategoryScore[] {

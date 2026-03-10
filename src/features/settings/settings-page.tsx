@@ -4,6 +4,7 @@ import {
   FileX2,
   FolderLock,
   Mail,
+  Play,
   RefreshCw,
   Server,
   ShieldCheck,
@@ -39,6 +40,8 @@ export function SettingsPage() {
     "checking" | "online" | "offline"
   >("checking");
   const [isRefreshingDevHealth, setIsRefreshingDevHealth] = useState(false);
+  const [isStartingLlama, setIsStartingLlama] = useState(false);
+  const [llamaDirectHealth, setLlamaDirectHealth] = useState<string | null>(null);
 
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
   const isRunning = useAutomationStore((state) => state.isRunning);
@@ -101,6 +104,31 @@ export function SettingsPage() {
     setLlamaStatus("offline");
     if (showRefreshState) {
       setIsRefreshingDevHealth(false);
+    }
+  };
+
+  const handleStartLlama = async () => {
+    setIsStartingLlama(true);
+    try {
+      await tauriClient.ensureLlamaServer();
+    } catch (e) {
+      console.error("[dev] ensureLlamaServer failed:", e);
+    } finally {
+      setIsStartingLlama(false);
+      void checkFastApiHealth();
+    }
+  };
+
+  const checkLlamaDirectHealth = async () => {
+    setLlamaDirectHealth("checking…");
+    try {
+      const res = await fetch("http://127.0.0.1:8080/health", {
+        signal: AbortSignal.timeout(3000),
+      });
+      const data = (await res.json()) as { status?: string };
+      setLlamaDirectHealth(data.status ?? (res.ok ? "ok" : `http ${res.status}`));
+    } catch {
+      setLlamaDirectHealth("unreachable");
     }
   };
 
@@ -558,34 +586,62 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border border-primary/10 bg-background/50 px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <Server className="h-4 w-4 text-primary/70" />
-                <span className="text-sm font-medium">Llama Server</span>
+            <div className="flex flex-col gap-2 rounded-lg border border-primary/10 bg-background/50 px-3 py-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Server className="h-4 w-4 text-primary/70" />
+                  <span className="text-sm font-medium">Llama Server</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "h-2 w-2 rounded-full",
+                      llamaStatus === "checking"
+                        ? "bg-muted-foreground animate-pulse"
+                        : llamaStatus === "online"
+                          ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                          : "bg-destructive",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-xs uppercase tracking-wider font-bold",
+                      llamaStatus === "online"
+                        ? "text-green-600 dark:text-green-500"
+                        : llamaStatus === "offline"
+                          ? "text-destructive"
+                          : "text-muted-foreground",
+                    )}
+                  >
+                    {llamaStatus}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span
-                  className={cn(
-                    "h-2 w-2 rounded-full",
-                    llamaStatus === "checking"
-                      ? "bg-muted-foreground animate-pulse"
-                      : llamaStatus === "online"
-                        ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                        : "bg-destructive",
-                  )}
-                />
-                <span
-                  className={cn(
-                    "text-xs uppercase tracking-wider font-bold",
-                    llamaStatus === "online"
-                      ? "text-green-600 dark:text-green-500"
-                      : llamaStatus === "offline"
-                        ? "text-destructive"
-                        : "text-muted-foreground",
-                  )}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs border-primary/20"
+                  onClick={() => void handleStartLlama()}
+                  disabled={isStartingLlama}
                 >
-                  {llamaStatus}
-                </span>
+                  <Play className={cn("h-3 w-3", isStartingLlama && "animate-pulse")} />
+                  {isStartingLlama ? "Starting…" : "Start"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs border-primary/20"
+                  onClick={() => void checkLlamaDirectHealth()}
+                >
+                  <Activity className="h-3 w-3" />
+                  /health
+                </Button>
+                {llamaDirectHealth && (
+                  <span className="font-mono text-xs text-muted-foreground">
+                    → {llamaDirectHealth}
+                  </span>
+                )}
               </div>
             </div>
           </div>
