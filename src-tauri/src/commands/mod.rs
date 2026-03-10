@@ -34,12 +34,12 @@ pub fn ensure_llama_server<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     state: State<AppState>,
 ) -> Result<(), String> {
-    crate::ensure_llama_server_running(&app, state.inner())
+    crate::sidecars::ensure_llama_server_running(&app, state.inner())
 }
 
 #[tauri::command]
 pub fn stop_llama_server(state: State<AppState>) {
-    crate::stop_llama_server_process(state.inner());
+    crate::sidecars::stop_llama_server_process(state.inner());
 }
 
 #[tauri::command]
