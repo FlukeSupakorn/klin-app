@@ -2,6 +2,7 @@ import { useCategoryManagementStore } from "@/stores/use-category-management-sto
 import { useCategoryStore } from "@/stores/use-category-store";
 import { useRuleStore } from "@/stores/use-rule-store";
 import { tauriClient } from "@/services/tauri-client";
+import { withLlama } from "@/hooks/useLlama";
 import type { ManagedCategory } from "@/types/domain";
 
 const SETTINGS_API_URL_CANDIDATES = [
@@ -31,11 +32,6 @@ interface WorkerCategory {
 
 interface WorkerDefaultBasePathResponse {
   default_base_path: string | null;
-}
-
-interface WorkerInitialBasePathResponse {
-  default_base_path: string;
-  categories: WorkerCategory[];
 }
 
 export interface CategoryManagementRepository {
@@ -123,14 +119,31 @@ async function fetchFromCandidates<T>(
 }
 
 async function getDefaultBasePathFromWorker(fallback: string): Promise<string> {
-  return fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
+  return withLlama(() => fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
     const response = ensureSuccess(
       await fetch(`${baseUrl}/default-base-path`),
       "Failed to load default base path",
     );
     const payload = (await response.json()) as WorkerDefaultBasePathResponse;
     return (payload.default_base_path?.trim() || fallback.trim()).trim();
-  });
+  }));
+}
+
+async function upsertDefaultBasePath(basePath: string, label: string): Promise<string> {
+  return withLlama(() => fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
+    const response = ensureSuccess(
+      await fetch(`${baseUrl}/default-base-path`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ default_base_path: basePath }),
+      }),
+      label,
+    );
+    const payload = (await response.json()) as WorkerDefaultBasePathResponse;
+    return (payload.default_base_path?.trim() || basePath.trim()).trim();
+  }));
 }
 
 export class CategoryManagementService {
@@ -139,33 +152,13 @@ export class CategoryManagementService {
   async initializeFromWorker(): Promise<void> {
     const fallbackBasePath = await tauriClient.getDownloadsFolder().catch(() => "");
 
-    const state = await fetchFromCandidates(
-      SETTINGS_API_URL_CANDIDATES,
-      async (baseUrl): Promise<{ defaultFolder: string; categories: ManagedCategory[] }> => {
-        const defaultFolder = await getDefaultBasePathFromWorker(fallbackBasePath);
-
-        const initialResponse = ensureSuccess(
-          await fetch(`${baseUrl}/initial-base-path`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ default_base_path: defaultFolder }),
-          }),
-          "Failed to initialize base path",
-        );
-
-        const initialPayload = (await initialResponse.json()) as WorkerInitialBasePathResponse;
-        const effectiveDefault = initialPayload.default_base_path?.trim() || defaultFolder;
-
-        return {
-          defaultFolder: effectiveDefault,
-          categories: initialPayload.categories.map((category) => toManagedCategory(category, effectiveDefault)),
-        };
-      },
+    const defaultFolder = await getDefaultBasePathFromWorker(fallbackBasePath);
+    const effectiveDefault = await upsertDefaultBasePath(
+      defaultFolder,
+      "Failed to initialize base path",
     );
 
-    this.repository.setManagementState(state.defaultFolder, state.categories);
+    await this.refreshCategoriesFromWorker(effectiveDefault);
     this.syncToAutomationStores();
   }
 
@@ -175,20 +168,12 @@ export class CategoryManagementService {
       return;
     }
 
-    await fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/default-base-path`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ default_base_path: normalized }),
-      });
+    const effectiveDefault = await upsertDefaultBasePath(
+      normalized,
+      "Failed to save default base path",
+    );
 
-      ensureSuccess(response, "Failed to save default base path");
-      return true;
-    });
-
-    await this.refreshCategoriesFromWorker(normalized);
+    await this.refreshCategoriesFromWorker(effectiveDefault);
     this.syncToAutomationStores();
   }
 
@@ -203,7 +188,7 @@ export class CategoryManagementService {
     const normalizedFolderPath = category.folderPath.trim();
     const inferredFolderPath = normalizedFolderPath || joinFolderPath(fallbackPath, normalizedName);
 
-    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+    await withLlama(() => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(baseUrl, {
         method: "POST",
         headers: {
@@ -220,7 +205,7 @@ export class CategoryManagementService {
 
       ensureSuccess(response, "Failed to create category");
       return true;
-    });
+    }));
 
     await this.refreshCategoriesFromWorker();
     this.syncToAutomationStores();
@@ -258,7 +243,7 @@ export class CategoryManagementService {
       return;
     }
 
-    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+    await withLlama(() => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(`${baseUrl}/${id}`, {
         method: "PATCH",
         headers: {
@@ -269,7 +254,7 @@ export class CategoryManagementService {
 
       ensureSuccess(response, "Failed to update category");
       return true;
-    });
+    }));
 
     const currentCategories = this.repository.listCategories();
     const nextCategories = currentCategories.map((category) =>
@@ -307,7 +292,7 @@ export class CategoryManagementService {
       is_auto_description: true,
     }));
 
-    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+    await withLlama(() => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(`${baseUrl}/batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -315,7 +300,7 @@ export class CategoryManagementService {
       });
       ensureSuccess(response, "Failed to batch create categories");
       return true;
-    });
+    }));
 
     await this.refreshCategoriesFromWorker();
     this.syncToAutomationStores();

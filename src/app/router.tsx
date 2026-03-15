@@ -8,6 +8,7 @@ import { CalendarPage } from "@/features/calendar/calendar-page";
 import { DeveloperPage } from "@/features/developer/developer-page";
 import { OAuthCallbackPage } from "@/features/auth/oauth-callback-page";
 import { RouteErrorPage } from "@/app/route-error-page";
+import { ApiLogsPage } from "@/features/settings/api-logs-page";
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "calendar", element: <CalendarPage /> },
       { path: "notes", element: <NotesPage /> },
       { path: "settings", element: <SettingsPage /> },
+      { path: "settings/api-logs", element: <ApiLogsPage /> },
       { path: "developer", element: <DeveloperPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],

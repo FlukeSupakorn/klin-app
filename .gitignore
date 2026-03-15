@@ -93,3 +93,6 @@ test-results/
 *.bak
 *.orig
 *.rej
+
+# Models
+models/

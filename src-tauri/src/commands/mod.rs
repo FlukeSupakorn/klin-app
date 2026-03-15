@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State};
 
 use crate::{
-    dto::{CategoryDto, MoveFileDto, ReadFolderDto, SaveRuleMappingDto, WatchFolderDto, WriteLogDto},
+    dto::{
+        CategoryDto, MoveFileDto, ReadFolderDto, SaveRuleMappingDto, WatchFolderDto, WriteLogDto,
+    },
     infrastructure::{app_paths, watcher},
     services::file_service::FileService,
     AppState,
@@ -28,6 +30,27 @@ pub fn read_folder(input: ReadFolderDto) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+pub fn ensure_llama_server<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: State<AppState>,
+) -> Result<(), String> {
+    crate::sidecars::ensure_llama_server_running(&app, state.inner())
+}
+
+#[tauri::command]
+pub fn stop_llama_server(state: State<AppState>) {
+    crate::sidecars::stop_llama_server_process(state.inner());
+}
+
+/// Refresh the idle timer whenever the frontend dispatches a request to
+/// llama-server, preventing premature idle-timeout kills during long
+/// operations (e.g. SSE streaming).
+#[tauri::command]
+pub fn touch_llama_server(state: State<AppState>) {
+    crate::sidecars::touch_llama_last_used(state.inner());
+}
+
+#[tauri::command]
 pub fn pick_files_for_organize() -> Result<Vec<String>, String> {
     let selected = rfd::FileDialog::new().pick_files();
     Ok(selected
@@ -44,7 +67,11 @@ pub fn pick_folder_for_organize() -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-pub fn save_note_file(folder_path: String, file_name: String, content: String) -> Result<String, String> {
+pub fn save_note_file(
+    folder_path: String,
+    file_name: String,
+    content: String,
+) -> Result<String, String> {
     if folder_path.trim().is_empty() {
         return Err("Folder path is required".to_string());
     }
@@ -184,7 +211,9 @@ pub fn save_automation_config<R: tauri::Runtime>(
 }
 
 #[tauri::command]
-pub fn load_automation_config<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<AutomationConfigDto, String> {
+pub fn load_automation_config<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<AutomationConfigDto, String> {
     let app_data_dir = app_paths::resolve_app_data_dir(&app)?;
     let config_path = app_data_dir.join("automation-config.json");
 
@@ -202,7 +231,9 @@ pub fn write_log(state: State<AppState>, input: WriteLogDto) -> Result<(), Strin
 }
 
 #[tauri::command]
-pub fn list_logs(state: State<AppState>) -> Result<Vec<crate::domain::entities::AutomationLog>, String> {
+pub fn list_logs(
+    state: State<AppState>,
+) -> Result<Vec<crate::domain::entities::AutomationLog>, String> {
     state.log_service.lock().list_logs()
 }
 
@@ -333,9 +364,7 @@ pub fn start_oauth_listener(app: tauri::AppHandle) -> Result<(), String> {
         }
     })?;
 
-    listener
-        .set_nonblocking(false)
-        .map_err(|e| e.to_string())?;
+    listener.set_nonblocking(false).map_err(|e| e.to_string())?;
 
     std::thread::spawn(move || {
         let _ = listener.set_nonblocking(false);
