@@ -7,6 +7,7 @@ mod services;
 mod sidecars;
 
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -40,6 +41,12 @@ pub struct AppState {
     pub llama_phase: Arc<Mutex<sidecars::llama_server::LaunchPhase>>,
     /// Condvar paired with `llama_phase`; notified on every phase transition.
     pub llama_phase_condvar: Arc<Condvar>,
+    /// Set by explicit `stop_llama_server_process` to prevent concurrent
+    /// `ensure_llama_server_running` callers from immediately respawning.
+    pub llama_stop_requested: Arc<AtomicBool>,
+    /// Shutdown signal for the idle-timeout background task.
+    pub llama_idle_shutdown: Arc<Mutex<bool>>,
+    pub llama_idle_shutdown_condvar: Arc<Condvar>,
 }
 
 fn env_flag(name: &str) -> bool {
@@ -106,6 +113,8 @@ pub fn run() {
                 sidecars::llama_server::LaunchPhase::Idle,
             ));
             let llama_phase_condvar = Arc::new(Condvar::new());
+            let llama_idle_shutdown = Arc::new(Mutex::new(false));
+            let llama_idle_shutdown_condvar = Arc::new(Condvar::new());
 
             app.manage(AppState {
                 log_service: Arc::new(Mutex::new(LogService::new(log_repo))),
@@ -117,6 +126,9 @@ pub fn run() {
                 llama_last_used: llama_last_used.clone(),
                 llama_phase: llama_phase.clone(),
                 llama_phase_condvar: llama_phase_condvar.clone(),
+                llama_stop_requested: Arc::new(AtomicBool::new(false)),
+                llama_idle_shutdown: llama_idle_shutdown.clone(),
+                llama_idle_shutdown_condvar: llama_idle_shutdown_condvar.clone(),
             });
 
             // ── Idle-timeout task for llama-server ───────────────
@@ -125,6 +137,8 @@ pub fn run() {
                 llama_last_used.clone(),
                 llama_phase.clone(),
                 llama_phase_condvar.clone(),
+                llama_idle_shutdown.clone(),
+                llama_idle_shutdown_condvar.clone(),
             );
 
             // ── Deep link ───────────────────────────────────────────
@@ -199,6 +213,7 @@ pub fn run() {
             commands::read_folder,
             commands::ensure_llama_server,
             commands::stop_llama_server,
+            commands::touch_llama_server,
             commands::pick_files_for_organize,
             commands::pick_folder_for_organize,
             commands::save_note_file,
@@ -223,6 +238,11 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
+                // Signal idle-timeout thread to exit cleanly.
+                let state = app.state::<AppState>();
+                *state.llama_idle_shutdown.lock() = true;
+                state.llama_idle_shutdown_condvar.notify_all();
+
                 sidecars::cleanup_all(app);
             }
         });

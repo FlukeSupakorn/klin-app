@@ -11,5 +11,25 @@ import { tauriClient } from "@/services/tauri-client";
  */
 export async function withLlama<T>(fn: () => Promise<T>): Promise<T> {
   await tauriClient.ensureLlamaServer();
-  return fn();
+  try {
+    return await fn();
+  } finally {
+    // Refresh the idle timer so the server is not killed mid-request.
+    // This matters most for long SSE streams where no further
+    // ensureLlamaServer calls would be made during the operation.
+    tauriClient.touchLlamaServer().catch(() => undefined);
+  }
+}
+
+/**
+ * Create a guard that refreshes the idle timer on each stream chunk read.
+ * Call `onChunkRead()` inside your ReadableStream loop to prevent the
+ * idle-timeout task from killing the server during long SSE streams.
+ */
+export function createLlamaStreamGuard(): { onChunkRead: () => void } {
+  return {
+    onChunkRead: () => {
+      tauriClient.touchLlamaServer().catch(() => undefined);
+    },
+  };
 }

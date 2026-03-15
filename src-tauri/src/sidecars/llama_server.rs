@@ -1,4 +1,5 @@
 use std::net::{SocketAddr, TcpStream};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -48,8 +49,24 @@ pub fn llama_socket_addr() -> SocketAddr {
 
 // ── Readiness probe ────────────────────────────────────────────────────
 
+fn tcp_probe_timeout() -> Duration {
+    match std::env::var("KLIN_TCP_PROBE_TIMEOUT_MS") {
+        Ok(val) => match val.parse::<u64>() {
+            Ok(ms) => Duration::from_millis(ms),
+            Err(_) => {
+                eprintln!(
+                    "[llama-server] KLIN_TCP_PROBE_TIMEOUT_MS={:?} is not a valid u64, using 250ms",
+                    val
+                );
+                Duration::from_millis(250)
+            }
+        },
+        Err(_) => Duration::from_millis(250),
+    }
+}
+
 pub fn is_llama_server_ready() -> bool {
-    TcpStream::connect_timeout(&llama_socket_addr(), Duration::from_millis(250)).is_ok()
+    TcpStream::connect_timeout(&llama_socket_addr(), tcp_probe_timeout()).is_ok()
 }
 
 /// Poll TCP until the port is open, timed out, or the process crashes.
@@ -82,7 +99,7 @@ fn wait_for_llama_server_ready(
             return Ok(());
         }
 
-        std::thread::sleep(Duration::from_millis(250));
+        std::thread::sleep(tcp_probe_timeout());
     }
 
     Err(format!(
@@ -211,6 +228,9 @@ pub fn ensure_llama_server_running<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     state: &AppState,
 ) -> Result<(), String> {
+    // A new caller wants the server — clear any previous explicit stop request.
+    state.llama_stop_requested.store(false, Ordering::SeqCst);
+
     loop {
         let mut phase = state.llama_phase.lock();
 
@@ -242,6 +262,11 @@ pub fn ensure_llama_server_running<R: tauri::Runtime>(
 
             // ── Need to spawn ─────────────────────────────────────────
             LaunchPhase::Idle | LaunchPhase::Crashed(_) => {
+                // If the user explicitly stopped the server, don't respawn.
+                if state.llama_stop_requested.load(Ordering::SeqCst) {
+                    return Err("server stopped by user".to_string());
+                }
+
                 // Claim ownership of the spawn. Any concurrent caller that
                 // enters after this drop will see Starting and wait on the condvar.
                 *phase = LaunchPhase::Starting;
@@ -310,8 +335,22 @@ pub fn ensure_llama_server_running<R: tauri::Runtime>(
     }
 }
 
+/// Refresh the idle timer without a TCP probe.
+///
+/// Call this whenever an API request is dispatched to llama-server so that the
+/// idle-timeout task does not kill the server mid-request.  No-ops if the
+/// server is not in the `Running` state.
+pub fn touch_llama_last_used(state: &AppState) {
+    let phase = state.llama_phase.lock();
+    if matches!(*phase, LaunchPhase::Running) {
+        *state.llama_last_used.lock() = Some(Instant::now());
+    }
+}
+
 /// Stop the running llama-server and clear the idle timer.
 pub fn stop_llama_server_process(state: &AppState) {
+    // Prevent concurrent ensure_llama_server_running callers from respawning.
+    state.llama_stop_requested.store(true, Ordering::SeqCst);
     super::kill_sidecar("llama-server", &state.llama_server_child);
     // Mark Idle *before* notify so the async termination handler
     // (which fires shortly after) sees Idle and skips setting Crashed.
@@ -324,11 +363,16 @@ pub fn stop_llama_server_process(state: &AppState) {
 
 /// Spawn a background thread that stops llama-server after it has been idle
 /// for `KLIN_LLAMA_IDLE_TIMEOUT` seconds (default: 300).
+///
+/// The thread exits cleanly when `shutdown` is set to `true` and
+/// `shutdown_condvar` is notified (done by the app-exit handler).
 pub fn spawn_idle_timeout_task(
     child_slot: Arc<Mutex<Option<CommandChild>>>,
     last_used: Arc<Mutex<Option<Instant>>>,
     phase: Arc<Mutex<LaunchPhase>>,
     condvar: Arc<Condvar>,
+    shutdown: Arc<Mutex<bool>>,
+    shutdown_condvar: Arc<Condvar>,
 ) {
     let idle_timeout_secs: u64 = std::env::var("KLIN_LLAMA_IDLE_TIMEOUT")
         .ok()
@@ -346,7 +390,17 @@ pub fn spawn_idle_timeout_task(
         );
 
         loop {
-            std::thread::sleep(poll_interval);
+            // Wait for poll_interval OR early wake from shutdown signal.
+            {
+                let mut guard = shutdown.lock();
+                if *guard {
+                    break;
+                }
+                shutdown_condvar.wait_for(&mut guard, poll_interval);
+                if *guard {
+                    break;
+                }
+            }
 
             let should_stop = {
                 let guard = last_used.lock();
@@ -377,5 +431,7 @@ pub fn spawn_idle_timeout_task(
                 *last_used.lock() = None;
             }
         }
+
+        eprintln!("[idle-timer] shutdown — exiting");
     });
 }

@@ -42,6 +42,14 @@ pub fn stop_llama_server(state: State<AppState>) {
     crate::sidecars::stop_llama_server_process(state.inner());
 }
 
+/// Refresh the idle timer whenever the frontend dispatches a request to
+/// llama-server, preventing premature idle-timeout kills during long
+/// operations (e.g. SSE streaming).
+#[tauri::command]
+pub fn touch_llama_server(state: State<AppState>) {
+    crate::sidecars::touch_llama_last_used(state.inner());
+}
+
 #[tauri::command]
 pub fn pick_files_for_organize() -> Result<Vec<String>, String> {
     let selected = rfd::FileDialog::new().pick_files();

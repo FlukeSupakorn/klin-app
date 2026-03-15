@@ -21,6 +21,7 @@ use tauri_plugin_shell::process::CommandChild;
 pub use klin_worker::spawn_klin_worker;
 pub use llama_server::{
     ensure_llama_server_running, spawn_idle_timeout_task, stop_llama_server_process,
+    touch_llama_last_used,
 };
 
 // ── Shared utilities ───────────────────────────────────────────────────

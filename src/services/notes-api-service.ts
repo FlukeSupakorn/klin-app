@@ -8,7 +8,7 @@ const NOTE_HISTORY_API_URL_CANDIDATES = [
   "http://localhost:8000/api/history/note",
 ];
 
-import { withLlama } from "@/hooks/useLlama";
+import { withLlama, createLlamaStreamGuard } from "@/hooks/useLlama";
 
 export interface NotesSummarizeResult {
   summary: string;
@@ -142,6 +142,7 @@ export const notesApiService = {
 
           const decoder = new TextDecoder();
           const reader = response.body.getReader();
+          const { onChunkRead } = createLlamaStreamGuard();
 
           let suggestedTitle = fallbackTitle;
           let processingTimeMs: number | undefined;
@@ -153,6 +154,7 @@ export const notesApiService = {
             if (done) {
               break;
             }
+            onChunkRead();
 
             buffer += decoder.decode(value, { stream: true });
             const events = buffer.split("\n\n");

@@ -32,6 +32,10 @@ class TauriCommandClient implements TauriClient {
     return invoke("ensure_llama_server");
   }
 
+  touchLlamaServer(): Promise<void> {
+    return invoke("touch_llama_server");
+  }
+
   stopLlamaServer(): Promise<void> {
     return invoke("stop_llama_server");
   }

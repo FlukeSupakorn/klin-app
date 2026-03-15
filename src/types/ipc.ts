@@ -44,6 +44,10 @@ export interface TauriClient {
   moveFile(input: MoveFileDto): Promise<void>;
   readFolder(input: ReadFolderDto): Promise<string[]>;
   ensureLlamaServer(): Promise<void>;
+  /** Refresh the idle timer without a full TCP probe. Call before/after any
+   *  request to llama-server so the idle-timeout task does not kill the server
+   *  mid-request (e.g. during long SSE streams). */
+  touchLlamaServer(): Promise<void>;
   /**
    * Explicitly stop the llama-server process to free RAM/VRAM.
    * It will be re-spawned automatically on the next `ensureLlamaServer()` call.
