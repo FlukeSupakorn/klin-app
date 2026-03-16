@@ -79,7 +79,7 @@ function normalizeResponse(payload: unknown): NotesSummarizeResult {
 export const notesApiService = {
   async summarizeFromFiles(filePaths: string[]): Promise<NotesSummarizeResult> {
     const fallbackTitle = buildSuggestedTitleFromPaths(filePaths);
-    return withLlama(async () => {
+    return withLlama(['chat'], async () => {
       let lastError: unknown = null;
 
       for (const url of NOTES_API_URL_CANDIDATES) {
@@ -118,7 +118,7 @@ export const notesApiService = {
     callbacks: NotesStreamCallbacks = {},
   ): Promise<NotesSummarizeResult> {
     const fallbackTitle = buildSuggestedTitleFromPaths(filePaths);
-    return withLlama(async () => {
+    return withLlama(['chat'], async () => {
       let lastError: unknown = null;
 
       for (const baseUrl of NOTES_API_URL_CANDIDATES) {
@@ -142,7 +142,7 @@ export const notesApiService = {
 
           const decoder = new TextDecoder();
           const reader = response.body.getReader();
-          const { onChunkRead } = createLlamaStreamGuard();
+          const { onChunkRead } = createLlamaStreamGuard('chat');
 
           let suggestedTitle = fallbackTitle;
           let processingTimeMs: number | undefined;

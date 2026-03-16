@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AutomationConfigDto,
+  ModelSlot,
   MoveFileDto,
   NoteFileEntryDto,
   ReadFolderDto,
@@ -28,16 +29,16 @@ class TauriCommandClient implements TauriClient {
   // (including stream), /api/settings/default-base-path when it seeds
   // or embeds categories, and /api/settings/categories (POST/PATCH/batch).
 
-  ensureLlamaServer(): Promise<void> {
-    return invoke("ensure_llama_server");
+  ensureLlamaServer(slot: ModelSlot): Promise<void> {
+    return invoke("ensure_llama_server", { slot });
   }
 
-  touchLlamaServer(): Promise<void> {
-    return invoke("touch_llama_server");
+  touchLlamaServer(slot: ModelSlot): Promise<void> {
+    return invoke("touch_llama_server", { slot });
   }
 
-  stopLlamaServer(): Promise<void> {
-    return invoke("stop_llama_server");
+  stopLlamaServer(slot: ModelSlot): Promise<void> {
+    return invoke("stop_llama_server", { slot });
   }
 
   pickFilesForOrganize(): Promise<string[]> {

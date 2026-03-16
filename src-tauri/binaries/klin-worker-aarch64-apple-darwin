@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "[DUMMY] This is a dummy script. Replace with the real binary."

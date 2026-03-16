@@ -1,5 +1,5 @@
 use std::net::{SocketAddr, TcpStream};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -7,11 +7,66 @@ use parking_lot::{Condvar, Mutex};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
-use crate::AppState;
+// ── Model slot ───────────────────────────────────────────────────────
+
+/// Identifies which llama-server instance to manage.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ModelSlot {
+    /// Qwen2.5-VL vision+chat model.
+    Chat,
+    /// Text embedding model.
+    Embed,
+}
+
+impl ModelSlot {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "chat" => Ok(Self::Chat),
+            "embed" => Ok(Self::Embed),
+            _ => Err(format!("unknown model slot: {s}")),
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Chat => "chat",
+            Self::Embed => "embed",
+        }
+    }
+}
+
+// ── Per-slot state ───────────────────────────────────────────────────
+
+/// All state needed to manage one llama-server instance.
+pub struct LlamaSlotState {
+    pub slot: ModelSlot,
+    pub child: Arc<Mutex<Option<CommandChild>>>,
+    pub last_used: Arc<Mutex<Option<Instant>>>,
+    pub phase: Arc<Mutex<LaunchPhase>>,
+    pub phase_condvar: Arc<Condvar>,
+    pub stop_requested: Arc<AtomicBool>,
+    pub idle_shutdown: Arc<Mutex<bool>>,
+    pub shutdown_condvar: Arc<Condvar>,
+}
+
+impl LlamaSlotState {
+    pub fn new(slot: ModelSlot) -> Self {
+        Self {
+            slot,
+            child: Arc::new(Mutex::new(None)),
+            last_used: Arc::new(Mutex::new(None)),
+            phase: Arc::new(Mutex::new(LaunchPhase::Idle)),
+            phase_condvar: Arc::new(Condvar::new()),
+            stop_requested: Arc::new(AtomicBool::new(false)),
+            idle_shutdown: Arc::new(Mutex::new(false)),
+            shutdown_condvar: Arc::new(Condvar::new()),
+        }
+    }
+}
 
 // ── Launch phase ───────────────────────────────────────────────────────
 
-/// Authoritative state of the llama-server process.
+/// Authoritative state of a llama-server process.
 ///
 /// Transitions:
 /// ```text
@@ -36,15 +91,22 @@ pub enum LaunchPhase {
 
 // ── Port / address helpers ─────────────────────────────────────────────
 
-pub fn llama_port() -> u16 {
-    std::env::var("KLIN_LLAMA_PORT")
-        .ok()
-        .and_then(|v| v.parse::<u16>().ok())
-        .unwrap_or(8080)
+fn slot_port(slot: &ModelSlot) -> u16 {
+    match slot {
+        ModelSlot::Chat => std::env::var("KLIN_CHAT_PORT")
+            .or_else(|_| std::env::var("KLIN_LLAMA_PORT"))
+            .ok()
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(8080),
+        ModelSlot::Embed => std::env::var("KLIN_EMBED_PORT")
+            .ok()
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(8081),
+    }
 }
 
-pub fn llama_socket_addr() -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], llama_port()))
+fn slot_socket_addr(slot: &ModelSlot) -> SocketAddr {
+    SocketAddr::from(([127, 0, 0, 1], slot_port(slot)))
 }
 
 // ── Readiness probe ────────────────────────────────────────────────────
@@ -65,8 +127,8 @@ fn tcp_probe_timeout() -> Duration {
     }
 }
 
-pub fn is_llama_server_ready() -> bool {
-    TcpStream::connect_timeout(&llama_socket_addr(), tcp_probe_timeout()).is_ok()
+fn is_slot_ready(slot: &ModelSlot) -> bool {
+    TcpStream::connect_timeout(&slot_socket_addr(slot), tcp_probe_timeout()).is_ok()
 }
 
 /// Poll TCP until the port is open, timed out, or the process crashes.
@@ -74,28 +136,27 @@ pub fn is_llama_server_ready() -> bool {
 /// Checks `phase` each interval so a `Crashed` transition (set by the
 /// async termination handler) causes an early exit rather than waiting
 /// for the full timeout.
-///
-/// On success the caller is responsible for transitioning the phase to
-/// `Running` and notifying waiters via the condvar.
-fn wait_for_llama_server_ready(
+fn wait_for_slot_ready(
     timeout: Duration,
     phase: &Arc<Mutex<LaunchPhase>>,
+    slot: &ModelSlot,
 ) -> Result<(), String> {
     let started_at = Instant::now();
+    let label = slot.label();
+    let addr = slot_socket_addr(slot);
 
     while started_at.elapsed() < timeout {
-        // Early exit if the async termination monitor already observed a crash.
         {
             let p = phase.lock();
             if let LaunchPhase::Crashed(ref msg) = *p {
                 return Err(format!(
-                    "llama-server crashed during startup: {}",
-                    msg
+                    "llama-server[{}] crashed during startup: {}",
+                    label, msg
                 ));
             }
         }
 
-        if is_llama_server_ready() {
+        if is_slot_ready(slot) {
             return Ok(());
         }
 
@@ -103,86 +164,129 @@ fn wait_for_llama_server_ready(
     }
 
     Err(format!(
-        "Timed out waiting for llama-server to listen on {}",
-        llama_socket_addr()
+        "Timed out waiting for llama-server[{}] to listen on {}",
+        label, addr
     ))
 }
 
 // ── Spawn ──────────────────────────────────────────────────────────────
 
-/// Spawn the llama-server sidecar.
-///
-/// `phase` and `condvar` are borrowed so the async termination monitor
-/// can transition to `Crashed` and wake any waiting callers.
-///
-/// Returns the `CommandChild` on success.
-pub fn spawn_llama_server<R: tauri::Runtime>(
+/// Spawn the llama-server sidecar for the given slot.
+fn spawn_slot<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-    phase: Arc<Mutex<LaunchPhase>>,
-    condvar: Arc<Condvar>,
+    slot: &LlamaSlotState,
 ) -> Result<CommandChild, String> {
-    let model_path = std::env::var("KLIN_MODEL_PATH").unwrap_or_default();
+    let label = slot.slot.label();
+    let port = slot_port(&slot.slot).to_string();
 
-    if model_path.is_empty() {
-        return Err(
-            "KLIN_MODEL_PATH not set in .env — skipping llama-server.".to_string(),
-        );
-    }
+    let (model_path, args) = match slot.slot {
+        ModelSlot::Chat => {
+            let model_path = std::env::var("KLIN_CHAT_MODEL_PATH")
+                .or_else(|_| std::env::var("KLIN_MODEL_PATH"))
+                .unwrap_or_default();
 
-    let n_gpu_layers =
-        std::env::var("KLIN_N_GPU_LAYERS").unwrap_or_else(|_| "-1".to_string());
-    let ctx_size =
-        std::env::var("KLIN_CTX_SIZE").unwrap_or_else(|_| "4096".to_string());
-    let port =
-        std::env::var("KLIN_LLAMA_PORT").unwrap_or_else(|_| "8080".to_string());
+            if model_path.is_empty() {
+                return Err(format!(
+                    "KLIN_CHAT_MODEL_PATH (or KLIN_MODEL_PATH) not set — skipping llama-server[{}].",
+                    label
+                ));
+            }
 
-    let mut args = vec![
-        "-m".to_string(),
-        model_path.clone(),
-        "-ngl".to_string(),
-        n_gpu_layers.clone(),
-        "-c".to_string(),
-        ctx_size.clone(),
-        "--host".to_string(),
-        "127.0.0.1".to_string(),
-        "--port".to_string(),
-        port.clone(),
-        "--no-webui".to_string(),
-    ];
+            let n_gpu_layers =
+                std::env::var("KLIN_N_GPU_LAYERS").unwrap_or_else(|_| "-1".to_string());
+            let ctx_size =
+                std::env::var("KLIN_CTX_SIZE").unwrap_or_else(|_| "4096".to_string());
 
-    let mmproj_path = std::env::var("KLIN_MMPROJ_PATH").unwrap_or_default();
-    if !mmproj_path.is_empty() {
-        args.push("--mmproj".to_string());
-        args.push(mmproj_path);
-    }
+            let mut args = vec![
+                "-m".to_string(),
+                model_path.clone(),
+                "-ngl".to_string(),
+                n_gpu_layers,
+                "-c".to_string(),
+                ctx_size,
+                "--host".to_string(),
+                "127.0.0.1".to_string(),
+                "--port".to_string(),
+                port.clone(),
+                "--no-webui".to_string(),
+            ];
+
+            let mmproj_path = std::env::var("KLIN_MMPROJ_PATH").unwrap_or_default();
+            if !mmproj_path.is_empty() {
+                args.push("--mmproj".to_string());
+                args.push(mmproj_path);
+            }
+
+            (model_path, args)
+        }
+        ModelSlot::Embed => {
+            let model_path =
+                std::env::var("KLIN_EMBED_MODEL_PATH").unwrap_or_default();
+
+            if model_path.is_empty() {
+                return Err(format!(
+                    "KLIN_EMBED_MODEL_PATH not set — skipping llama-server[{}].",
+                    label
+                ));
+            }
+
+            let n_gpu_layers = std::env::var("KLIN_EMBED_N_GPU_LAYERS")
+                .unwrap_or_else(|_| "0".to_string());
+
+            let args = vec![
+                "-m".to_string(),
+                model_path.clone(),
+                "-ngl".to_string(),
+                n_gpu_layers,
+                "--host".to_string(),
+                "127.0.0.1".to_string(),
+                "--port".to_string(),
+                port.clone(),
+                "--no-webui".to_string(),
+                "--embedding".to_string(),
+                "--pooling".to_string(),
+                "mean".to_string(),
+            ];
+
+            (model_path, args)
+        }
+    };
 
     let sidecar_cmd = app
         .shell()
         .sidecar("llama-server")
-        .map_err(|e| format!("Failed to create llama-server sidecar: {e}"))?
+        .map_err(|e| format!("Failed to create llama-server[{}] sidecar: {e}", label))?
         .args(args);
 
     let (mut rx, child) = sidecar_cmd
         .spawn()
-        .map_err(|e| format!("Failed to spawn llama-server: {e}"))?;
+        .map_err(|e| format!("Failed to spawn llama-server[{}]: {e}", label))?;
 
     // Async monitor: sets phase → Crashed on termination and wakes waiters.
+    let phase = Arc::clone(&slot.phase);
+    let condvar = Arc::clone(&slot.phase_condvar);
+    let log_label = label.to_string();
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(line) => {
-                    eprintln!("[llama-server] {}", String::from_utf8_lossy(&line));
+                    eprintln!(
+                        "[llama-server][{}] {}",
+                        log_label,
+                        String::from_utf8_lossy(&line)
+                    );
                 }
                 CommandEvent::Stderr(line) => {
                     eprintln!(
-                        "[llama-server][stderr] {}",
+                        "[llama-server][{}][stderr] {}",
+                        log_label,
                         String::from_utf8_lossy(&line)
                     );
                 }
                 CommandEvent::Terminated(payload) => {
                     eprintln!(
-                        "[llama-server] terminated (code: {:?}, signal: {:?})",
-                        payload.code, payload.signal
+                        "[llama-server][{}] terminated (code: {:?}, signal: {:?})",
+                        log_label, payload.code, payload.signal
                     );
                     let mut p = phase.lock();
                     // Don't overwrite an intentional Idle (clean stop/idle-kill).
@@ -201,8 +305,8 @@ pub fn spawn_llama_server<R: tauri::Runtime>(
     });
 
     eprintln!(
-        "[llama-server] Spawned — model: {}, ngl: {}, ctx: {}, port: {}",
-        model_path, n_gpu_layers, ctx_size, port
+        "[llama-server][{}] Spawned — model: {}, port: {}",
+        label, model_path, port
     );
 
     Ok(child)
@@ -210,123 +314,102 @@ pub fn spawn_llama_server<R: tauri::Runtime>(
 
 // ── Public lifecycle API ───────────────────────────────────────────────
 
-/// Ensure the llama-server is running and ready to accept requests.
+/// Ensure the llama-server for the given slot is running and ready.
 ///
-/// # Concurrency safety
-///
-/// Uses a [`LaunchPhase`] state machine + `Condvar` so that:
-/// - If the server is **already `Running`** a quick TCP probe is done and
-///   the call returns immediately.
-/// - If a spawn is **already `Starting`** (another caller is warming it
-///   up) this caller waits on the condvar instead of killing the process
-///   and racing to start another one.
-/// - If the server is **`Idle` or `Crashed`** this caller transitions to
-///   `Starting`, drops the phase lock, kills any stale child, spawns a
-///   new one, polls for TCP readiness (no lock held), then transitions to
-///   `Running` / `Crashed` and wakes all waiters.
-pub fn ensure_llama_server_running<R: tauri::Runtime>(
+/// Uses a [`LaunchPhase`] state machine + `Condvar` so that concurrent
+/// callers are handled safely (see original docs for full details).
+pub fn ensure_slot_running<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-    state: &AppState,
+    slot: &LlamaSlotState,
 ) -> Result<(), String> {
+    let label = slot.slot.label();
+
     // A new caller wants the server — clear any previous explicit stop request.
-    state.llama_stop_requested.store(false, Ordering::SeqCst);
+    slot.stop_requested.store(false, Ordering::SeqCst);
 
     loop {
-        let mut phase = state.llama_phase.lock();
+        let mut phase = slot.phase.lock();
 
         match &*phase {
             // ── Already running ───────────────────────────────────────
             LaunchPhase::Running => {
-                // TCP probe to catch crashes that haven't propagated via the
-                // async termination handler yet (e.g. killed externally).
-                // The phase lock is held for ≤250 ms (connect_timeout).
-                if is_llama_server_ready() {
-                    *state.llama_last_used.lock() = Some(Instant::now());
+                if is_slot_ready(&slot.slot) {
+                    *slot.last_used.lock() = Some(Instant::now());
                     return Ok(());
                 }
-                // Port closed but phase still says Running → must have crashed.
                 *phase = LaunchPhase::Crashed(
                     "TCP probe failed on a previously-Running server".to_string(),
                 );
-                state.llama_phase_condvar.notify_all();
-                // Loop back; this caller will now see Crashed and respawn.
+                slot.phase_condvar.notify_all();
             }
 
             // ── Another caller is already starting it ─────────────────
             LaunchPhase::Starting => {
-                // Block until the spawning caller transitions out of Starting.
-                state.llama_phase_condvar.wait(&mut phase);
-                // Re-evaluate — could now be Running, Crashed, or (rarely) Idle.
+                slot.phase_condvar.wait(&mut phase);
                 continue;
             }
 
             // ── Need to spawn ─────────────────────────────────────────
             LaunchPhase::Idle | LaunchPhase::Crashed(_) => {
-                // If the user explicitly stopped the server, don't respawn.
-                if state.llama_stop_requested.load(Ordering::SeqCst) {
-                    return Err("server stopped by user".to_string());
+                if slot.stop_requested.load(Ordering::SeqCst) {
+                    return Err(format!(
+                        "llama-server[{}] stopped by user",
+                        label
+                    ));
                 }
 
-                // Claim ownership of the spawn. Any concurrent caller that
-                // enters after this drop will see Starting and wait on the condvar.
                 *phase = LaunchPhase::Starting;
-                state.llama_phase_condvar.notify_all();
-                drop(phase); // ← phase lock released before any I/O
+                slot.phase_condvar.notify_all();
+                drop(phase);
 
-                // Kill stale child (brief lock, no I/O inside).
+                // Kill stale child.
                 {
-                    let mut child_slot = state.llama_server_child.lock();
+                    let mut child_slot = slot.child.lock();
                     if let Some(existing) = child_slot.take() {
                         if let Err(e) = existing.kill() {
-                            eprintln!("[llama-server] stale child cleanup failed: {}", e);
+                            eprintln!(
+                                "[llama-server][{}] stale child cleanup failed: {}",
+                                label, e
+                            );
                         }
                     }
                 }
 
-                // Spawn. Pass clones of phase + condvar so the async monitor
-                // can transition to Crashed and wake waiters on termination.
-                let spawn_result = spawn_llama_server(
-                    app,
-                    Arc::clone(&state.llama_phase),
-                    Arc::clone(&state.llama_phase_condvar),
-                );
+                let spawn_result = spawn_slot(app, slot);
 
                 let child = match spawn_result {
                     Ok(c) => c,
                     Err(e) => {
-                        let mut p = state.llama_phase.lock();
+                        let mut p = slot.phase.lock();
                         *p = LaunchPhase::Crashed(e.clone());
-                        state.llama_phase_condvar.notify_all();
+                        slot.phase_condvar.notify_all();
                         return Err(e);
                     }
                 };
 
-                *state.llama_server_child.lock() = Some(child);
+                *slot.child.lock() = Some(child);
 
-                // Poll for TCP readiness — no lock held during this wait.
-                match wait_for_llama_server_ready(
+                match wait_for_slot_ready(
                     Duration::from_secs(60),
-                    &state.llama_phase,
+                    &slot.phase,
+                    &slot.slot,
                 ) {
                     Ok(()) => {
-                        let mut p = state.llama_phase.lock();
+                        let mut p = slot.phase.lock();
                         *p = LaunchPhase::Running;
-                        state.llama_phase_condvar.notify_all();
-                        *state.llama_last_used.lock() = Some(Instant::now());
+                        slot.phase_condvar.notify_all();
+                        *slot.last_used.lock() = Some(Instant::now());
                         return Ok(());
                     }
                     Err(e) => {
-                        // Kill the unresponsive child.
-                        if let Some(failed) = state.llama_server_child.lock().take() {
+                        if let Some(failed) = slot.child.lock().take() {
                             let _ = failed.kill();
                         }
-                        // Transition to Crashed only if the async monitor
-                        // hasn't already done so.
-                        let mut p = state.llama_phase.lock();
+                        let mut p = slot.phase.lock();
                         if !matches!(*p, LaunchPhase::Crashed(_)) {
                             *p = LaunchPhase::Crashed(e.clone());
                         }
-                        state.llama_phase_condvar.notify_all();
+                        slot.phase_condvar.notify_all();
                         return Err(e);
                     }
                 }
@@ -337,43 +420,42 @@ pub fn ensure_llama_server_running<R: tauri::Runtime>(
 
 /// Refresh the idle timer without a TCP probe.
 ///
-/// Call this whenever an API request is dispatched to llama-server so that the
-/// idle-timeout task does not kill the server mid-request.  No-ops if the
-/// server is not in the `Running` state.
-pub fn touch_llama_last_used(state: &AppState) {
-    let phase = state.llama_phase.lock();
+/// No-ops if the server is not in the `Running` state.
+pub fn touch_slot_last_used(slot: &LlamaSlotState) {
+    let phase = slot.phase.lock();
     if matches!(*phase, LaunchPhase::Running) {
-        *state.llama_last_used.lock() = Some(Instant::now());
+        *slot.last_used.lock() = Some(Instant::now());
     }
 }
 
-/// Stop the running llama-server and clear the idle timer.
-pub fn stop_llama_server_process(state: &AppState) {
-    // Prevent concurrent ensure_llama_server_running callers from respawning.
-    state.llama_stop_requested.store(true, Ordering::SeqCst);
-    super::kill_sidecar("llama-server", &state.llama_server_child);
+/// Stop the running llama-server for a slot and clear the idle timer.
+pub fn stop_slot(slot: &LlamaSlotState) {
+    let label = slot.slot.label();
+    // Prevent concurrent ensure_slot_running callers from respawning.
+    slot.stop_requested.store(true, Ordering::SeqCst);
+    super::kill_sidecar(
+        &format!("llama-server[{}]", label),
+        &slot.child,
+    );
     // Mark Idle *before* notify so the async termination handler
-    // (which fires shortly after) sees Idle and skips setting Crashed.
-    *state.llama_phase.lock() = LaunchPhase::Idle;
-    state.llama_phase_condvar.notify_all();
-    *state.llama_last_used.lock() = None;
+    // sees Idle and skips setting Crashed.
+    *slot.phase.lock() = LaunchPhase::Idle;
+    slot.phase_condvar.notify_all();
+    *slot.last_used.lock() = None;
 }
 
 // ── Idle-timeout background task ───────────────────────────────────────
 
-/// Spawn a background thread that stops llama-server after it has been idle
-/// for `KLIN_LLAMA_IDLE_TIMEOUT` seconds (default: 300).
-///
-/// The thread exits cleanly when `shutdown` is set to `true` and
-/// `shutdown_condvar` is notified (done by the app-exit handler).
-pub fn spawn_idle_timeout_task(
-    child_slot: Arc<Mutex<Option<CommandChild>>>,
-    last_used: Arc<Mutex<Option<Instant>>>,
-    phase: Arc<Mutex<LaunchPhase>>,
-    condvar: Arc<Condvar>,
-    shutdown: Arc<Mutex<bool>>,
-    shutdown_condvar: Arc<Condvar>,
-) {
+/// Spawn a background thread that stops a slot's llama-server after idle.
+pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
+    let label = slot.slot.label().to_string();
+    let child_slot = Arc::clone(&slot.child);
+    let last_used = Arc::clone(&slot.last_used);
+    let phase = Arc::clone(&slot.phase);
+    let condvar = Arc::clone(&slot.phase_condvar);
+    let shutdown = Arc::clone(&slot.idle_shutdown);
+    let shutdown_condvar = Arc::clone(&slot.shutdown_condvar);
+
     let idle_timeout_secs: u64 = std::env::var("KLIN_LLAMA_IDLE_TIMEOUT")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -384,13 +466,13 @@ pub fn spawn_idle_timeout_task(
         let idle_limit = Duration::from_secs(idle_timeout_secs);
 
         eprintln!(
-            "[idle-timer] llama-server idle timeout: {}s (poll every {}s)",
+            "[idle-timer][{}] idle timeout: {}s (poll every {}s)",
+            label,
             idle_timeout_secs,
             poll_interval.as_secs()
         );
 
         loop {
-            // Wait for poll_interval OR early wake from shutdown signal.
             {
                 let mut guard = shutdown.lock();
                 if *guard {
@@ -412,26 +494,24 @@ pub fn spawn_idle_timeout_task(
 
             if should_stop {
                 eprintln!(
-                    "[idle-timer] llama-server idle for >{}s — stopping",
-                    idle_timeout_secs
+                    "[idle-timer][{}] idle for >{}s — stopping",
+                    label, idle_timeout_secs
                 );
-                // Set Idle first so the async termination handler skips
-                // transitioning to Crashed when the kill signal arrives.
                 *phase.lock() = LaunchPhase::Idle;
                 condvar.notify_all();
 
                 let child = child_slot.lock().take();
                 if let Some(child) = child {
                     if let Err(e) = child.kill() {
-                        eprintln!("[idle-timer] kill failed: {}", e);
+                        eprintln!("[idle-timer][{}] kill failed: {}", label, e);
                     } else {
-                        eprintln!("[idle-timer] llama-server stopped");
+                        eprintln!("[idle-timer][{}] llama-server stopped", label);
                     }
                 }
                 *last_used.lock() = None;
             }
         }
 
-        eprintln!("[idle-timer] shutdown — exiting");
+        eprintln!("[idle-timer][{}] shutdown — exiting", label);
     });
 }

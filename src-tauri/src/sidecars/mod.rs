@@ -1,7 +1,7 @@
 //! Sidecar management module.
 //!
 //! Each submodule owns the lifecycle of one external binary:
-//! - [`llama_server`] – llama.cpp HTTP inference server
+//! - [`llama_server`] – llama.cpp HTTP inference server (multi-slot)
 //! - [`klin_worker`]  – Python FastAPI worker service
 //!
 //! Common helpers (e.g. `kill_sidecar`, `cleanup_all`) live here so
@@ -20,8 +20,8 @@ use tauri_plugin_shell::process::CommandChild;
 
 pub use klin_worker::spawn_klin_worker;
 pub use llama_server::{
-    ensure_llama_server_running, spawn_idle_timeout_task, stop_llama_server_process,
-    touch_llama_last_used,
+    ensure_slot_running, spawn_idle_timeout_task_for_slot, stop_slot, touch_slot_last_used,
+    LlamaSlotState, ModelSlot,
 };
 
 // ── Shared utilities ───────────────────────────────────────────────────
@@ -40,6 +40,11 @@ pub(crate) fn kill_sidecar(name: &str, child_slot: &Arc<Mutex<Option<CommandChil
 /// Stop all sidecars; called from the Tauri `ExitRequested` / `Exit` handler.
 pub fn cleanup_all<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     let state = app.state::<crate::AppState>();
-    kill_sidecar("llama-server", &state.llama_server_child);
+    for slot_state in state.slots.values() {
+        kill_sidecar(
+            &format!("llama-server[{}]", slot_state.slot.label()),
+            &slot_state.child,
+        );
+    }
     kill_sidecar("klin-worker", &state.worker_child);
 }

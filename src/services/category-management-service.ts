@@ -119,7 +119,7 @@ async function fetchFromCandidates<T>(
 }
 
 async function getDefaultBasePathFromWorker(fallback: string): Promise<string> {
-  return withLlama(() => fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
+  return withLlama(['chat'], () => fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
     const response = ensureSuccess(
       await fetch(`${baseUrl}/default-base-path`),
       "Failed to load default base path",
@@ -130,7 +130,7 @@ async function getDefaultBasePathFromWorker(fallback: string): Promise<string> {
 }
 
 async function upsertDefaultBasePath(basePath: string, label: string): Promise<string> {
-  return withLlama(() => fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
+  return withLlama(['chat'], () => fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
     const response = ensureSuccess(
       await fetch(`${baseUrl}/default-base-path`, {
         method: "PUT",
@@ -188,7 +188,7 @@ export class CategoryManagementService {
     const normalizedFolderPath = category.folderPath.trim();
     const inferredFolderPath = normalizedFolderPath || joinFolderPath(fallbackPath, normalizedName);
 
-    await withLlama(() => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+    await withLlama(['chat'], () => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(baseUrl, {
         method: "POST",
         headers: {
@@ -243,7 +243,7 @@ export class CategoryManagementService {
       return;
     }
 
-    await withLlama(() => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+    await withLlama(['chat'], () => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(`${baseUrl}/${id}`, {
         method: "PATCH",
         headers: {
@@ -292,7 +292,7 @@ export class CategoryManagementService {
       is_auto_description: true,
     }));
 
-    await withLlama(() => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+    await withLlama(['chat'], () => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
       const response = await fetch(`${baseUrl}/batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

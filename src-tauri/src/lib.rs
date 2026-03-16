@@ -6,12 +6,12 @@ mod repositories;
 mod services;
 mod sidecars;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use parking_lot::{Condvar, Mutex};
+use parking_lot::Mutex;
 use tauri::{Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_shell::process::CommandChild;
@@ -23,6 +23,7 @@ use repositories::{
 use services::{
     category_service::CategoryService, log_service::LogService, rule_service::RuleService,
 };
+use sidecars::{LlamaSlotState, ModelSlot};
 
 // ── App State ───────────────────────────────────────────────────────────
 
@@ -31,22 +32,16 @@ pub struct AppState {
     pub rule_service: Arc<Mutex<RuleService<JsonRuleRepository>>>,
     pub category_service: Arc<Mutex<CategoryService<JsonCategoryRepository>>>,
     pub app_data_dir: PathBuf,
-    pub llama_server_child: Arc<Mutex<Option<CommandChild>>>,
+    /// Per-slot llama-server lifecycle state.
+    pub slots: HashMap<ModelSlot, LlamaSlotState>,
     pub worker_child: Arc<Mutex<Option<CommandChild>>>,
-    /// Timestamp of the last `ensure_llama_server` call.
-    /// Used by the idle-timeout task to auto-stop llama-server.
-    pub llama_last_used: Arc<Mutex<Option<Instant>>>,
-    /// Authoritative lifecycle phase of the llama-server process.
-    /// Guards concurrent startup and crash detection.
-    pub llama_phase: Arc<Mutex<sidecars::llama_server::LaunchPhase>>,
-    /// Condvar paired with `llama_phase`; notified on every phase transition.
-    pub llama_phase_condvar: Arc<Condvar>,
-    /// Set by explicit `stop_llama_server_process` to prevent concurrent
-    /// `ensure_llama_server_running` callers from immediately respawning.
-    pub llama_stop_requested: Arc<AtomicBool>,
-    /// Shutdown signal for the idle-timeout background task.
-    pub llama_idle_shutdown: Arc<Mutex<bool>>,
-    pub llama_idle_shutdown_condvar: Arc<Condvar>,
+}
+
+impl AppState {
+    /// Get the slot state for the given model slot.
+    pub fn slot(&self, s: ModelSlot) -> &LlamaSlotState {
+        self.slots.get(&s).expect("unknown model slot")
+    }
 }
 
 fn env_flag(name: &str) -> bool {
@@ -86,8 +81,7 @@ pub fn run() {
             let use_external_worker = env_flag("KLIN_WORKER_EXTERNAL");
 
             // ── Spawn sidecars ──────────────────────────────────────
-            eprintln!("[startup] llama-server: lazy startup enabled");
-            let llama_child: Option<CommandChild> = None;
+            eprintln!("[startup] llama-server: lazy startup enabled (multi-slot)");
 
             let worker_child: Option<CommandChild> = if use_external_worker {
                 eprintln!("[startup] klin-worker: external mode enabled, skipping sidecar spawn");
@@ -107,39 +101,22 @@ pub fn run() {
             let rule_repo = JsonRuleRepository::new(app_data_dir.join("rules.json"));
             let category_repo = JsonCategoryRepository::new(app_data_dir.join("categories.json"));
 
-            let llama_server_child = Arc::new(Mutex::new(llama_child));
-            let llama_last_used: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
-            let llama_phase = Arc::new(Mutex::new(
-                sidecars::llama_server::LaunchPhase::Idle,
-            ));
-            let llama_phase_condvar = Arc::new(Condvar::new());
-            let llama_idle_shutdown = Arc::new(Mutex::new(false));
-            let llama_idle_shutdown_condvar = Arc::new(Condvar::new());
+            // ── Llama-server slots ──────────────────────────────────
+            let mut slots = HashMap::new();
+            for s in [ModelSlot::Chat, ModelSlot::Embed] {
+                let slot_state = LlamaSlotState::new(s);
+                sidecars::spawn_idle_timeout_task_for_slot(&slot_state);
+                slots.insert(s, slot_state);
+            }
 
             app.manage(AppState {
                 log_service: Arc::new(Mutex::new(LogService::new(log_repo))),
                 rule_service: Arc::new(Mutex::new(RuleService::new(rule_repo))),
                 category_service: Arc::new(Mutex::new(CategoryService::new(category_repo))),
                 app_data_dir: app_data_dir.clone(),
-                llama_server_child: llama_server_child.clone(),
+                slots,
                 worker_child: Arc::new(Mutex::new(worker_child)),
-                llama_last_used: llama_last_used.clone(),
-                llama_phase: llama_phase.clone(),
-                llama_phase_condvar: llama_phase_condvar.clone(),
-                llama_stop_requested: Arc::new(AtomicBool::new(false)),
-                llama_idle_shutdown: llama_idle_shutdown.clone(),
-                llama_idle_shutdown_condvar: llama_idle_shutdown_condvar.clone(),
             });
-
-            // ── Idle-timeout task for llama-server ───────────────
-            sidecars::spawn_idle_timeout_task(
-                llama_server_child.clone(),
-                llama_last_used.clone(),
-                llama_phase.clone(),
-                llama_phase_condvar.clone(),
-                llama_idle_shutdown.clone(),
-                llama_idle_shutdown_condvar.clone(),
-            );
 
             // ── Deep link ───────────────────────────────────────────
             #[cfg(any(windows, target_os = "linux"))]
@@ -238,10 +215,12 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
-                // Signal idle-timeout thread to exit cleanly.
+                // Signal all idle-timeout threads to exit cleanly.
                 let state = app.state::<AppState>();
-                *state.llama_idle_shutdown.lock() = true;
-                state.llama_idle_shutdown_condvar.notify_all();
+                for slot_state in state.slots.values() {
+                    *slot_state.idle_shutdown.lock() = true;
+                    slot_state.shutdown_condvar.notify_all();
+                }
 
                 sidecars::cleanup_all(app);
             }
