@@ -3,11 +3,37 @@
 ## ภาพรวม
 
 `llama-server` เป็น sidecar process ที่รัน llama.cpp HTTP inference server ภายใน Tauri app
+ตั้งแต่การ refactor เป็น multi-slot สามารถรัน **หลาย instance พร้อมกัน** ได้ แต่ละ slot
+มี lifecycle, port, model, และ idle timer ของตัวเองอย่างอิสระ
+
 การจัดการ lifecycle ทั้งหมดอยู่ใน [`src-tauri/src/sidecars/llama_server.rs`](../src-tauri/src/sidecars/llama_server.rs)
 
 ---
 
+## Model Slots
+
+```rust
+// src-tauri/src/sidecars/llama_server.rs
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ModelSlot {
+    Chat,   // Qwen2.5-VL vision+chat model — port 8080
+    Embed,  // Text embedding model — port 8081
+}
+```
+
+| Slot | ใช้สำหรับ | Port default |
+|---|---|---|
+| `Chat` | chat, vision, summarize, organize | 8080 |
+| `Embed` | text embedding | 8081 |
+
+แต่ละ slot รัน `llama-server` process แยกกันโดยสมบูรณ์ — crash ของ slot หนึ่งไม่กระทบอีก slot
+
+---
+
 ## State Machine — `LaunchPhase`
+
+State machine นี้ใช้ร่วมกันทุก slot แต่แต่ละ slot มี instance แยก
 
 ```
 Idle / Crashed  ──(spawn attempt)──►  Starting
@@ -27,272 +53,259 @@ pub enum LaunchPhase {
 }
 ```
 
-State นี้เก็บไว้ใน `AppState` พร้อม `Condvar` เพื่อให้ concurrent callers รอได้อย่าง
-ปลอดภัยโดยไม่ต้อง busy-wait
-
 ---
 
-## AppState ที่เกี่ยวข้อง
+## LlamaSlotState — state ต่อ slot
+
+state ทั้งหมดที่เกี่ยวกับ lifecycle ถูก extract ออกจาก `AppState` เป็น struct แยก
+แต่ละ slot มี instance ของ struct นี้เป็นของตัวเอง
 
 ```rust
-pub struct AppState {
-    pub llama_server_child:           Arc<Mutex<Option<CommandChild>>>,
-    pub llama_last_used:              Arc<Mutex<Option<Instant>>>,
-    pub llama_phase:                  Arc<Mutex<LaunchPhase>>,
-    pub llama_phase_condvar:          Arc<Condvar>,
-    pub llama_stop_requested:         Arc<AtomicBool>,
-    pub llama_idle_shutdown:          Arc<Mutex<bool>>,
-    pub llama_idle_shutdown_condvar:  Arc<Condvar>,
-    // ...
+pub struct LlamaSlotState {
+    pub slot:             ModelSlot,
+    pub child:            Arc<Mutex<Option<CommandChild>>>,
+    pub last_used:        Arc<Mutex<Option<Instant>>>,
+    pub phase:            Arc<Mutex<LaunchPhase>>,
+    pub phase_condvar:    Arc<Condvar>,
+    pub stop_requested:   Arc<AtomicBool>,
+    pub idle_shutdown:    Arc<Mutex<bool>>,
+    pub shutdown_condvar: Arc<Condvar>,
 }
 ```
 
 | Field | หน้าที่ |
 |---|---|
-| `llama_server_child` | handle ของ process ที่รันอยู่ |
-| `llama_last_used` | timestamp ของการใช้งานล่าสุด ใช้โดย idle timer |
-| `llama_phase` | state ปัจจุบัน |
-| `llama_phase_condvar` | wake up callers ที่รออยู่เมื่อ phase เปลี่ยน |
-| `llama_stop_requested` | ป้องกัน respawn หลัง explicit stop (ไม่ set โดย idle timer) |
-| `llama_idle_shutdown` | สัญญาณ shutdown สำหรับ idle-timeout thread |
-| `llama_idle_shutdown_condvar` | ปลุก idle-timeout thread ให้ออกทันทีเมื่อ app ปิด |
+| `child` | handle ของ process ที่รันอยู่ |
+| `last_used` | timestamp ล่าสุด ใช้โดย idle timer |
+| `phase` | state ปัจจุบัน |
+| `phase_condvar` | wake up callers ที่รออยู่เมื่อ phase เปลี่ยน |
+| `stop_requested` | ป้องกัน respawn หลัง explicit stop (idle timer ไม่ set) |
+| `idle_shutdown` | สัญญาณ shutdown สำหรับ idle-timeout thread ของ slot นี้ |
+| `shutdown_condvar` | ปลุก idle-timeout thread ให้ออกทันทีเมื่อ app ปิด |
+
+---
+
+## AppState
+
+```rust
+pub struct AppState {
+    pub slots: HashMap<ModelSlot, LlamaSlotState>,
+    pub worker_child: Arc<Mutex<Option<CommandChild>>>,
+    // services...
+}
+
+impl AppState {
+    pub fn slot(&self, s: ModelSlot) -> &LlamaSlotState {
+        self.slots.get(&s).expect("unknown model slot")
+    }
+}
+```
+
+Slots ทั้งหมดถูก initialize ตอน app startup พร้อม idle timer แยกกัน:
+
+```rust
+let mut slots = HashMap::new();
+for s in [ModelSlot::Chat, ModelSlot::Embed] {
+    let slot_state = LlamaSlotState::new(s);
+    sidecars::spawn_idle_timeout_task_for_slot(&slot_state);
+    slots.insert(s, slot_state);
+}
+```
 
 ---
 
 ## ฟังก์ชันหลัก
 
-### 1. `ensure_llama_server_running` — เริ่ม / ยืนยัน server
+### 1. `ensure_slot_running` — เริ่ม / ยืนยัน server ของ slot
 
-ฟังก์ชันนี้เป็น entry point หลักสำหรับทุก AI request
-ทำงานใน loop เพื่อ handle concurrent callers อย่างปลอดภัย
+entry point หลักสำหรับทุก AI request รับ `&LlamaSlotState` แทน `&AppState`
 
 ```rust
-pub fn ensure_llama_server_running<R: tauri::Runtime>(
+pub fn ensure_slot_running<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
-    state: &AppState,
+    slot: &LlamaSlotState,
 ) -> Result<(), String>
 ```
 
-**พฤติกรรมตาม phase:**
+**พฤติกรรมตาม phase** (เหมือนเดิม แต่ทำงานต่อ slot):
 
 | Phase | การทำงาน |
 |---|---|
 | `Running` | TCP probe → อัปเดต `last_used` → return OK |
 | `Starting` | รอบน Condvar จนกว่า phase จะเปลี่ยน |
-| `Idle` / `Crashed` | ตรวจ `stop_requested` → ถ้า true return Err → ไม่งั้น claim `Starting` → spawn ใหม่ → poll TCP → `Running` |
+| `Idle` / `Crashed` | ตรวจ `stop_requested` → claim `Starting` → spawn → poll TCP → `Running` |
 
-ที่จุดเริ่มต้นของฟังก์ชัน จะ clear `stop_requested` flag เพื่อให้ caller ใหม่
-สามารถ spawn server ได้ตามปกติ
-
-```rust
-// ตัวอย่างการใช้งานในฝั่ง Rust (Tauri command)
-#[tauri::command]
-pub fn ensure_llama_server<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
-    state: State<AppState>,
-) -> Result<(), String> {
-    crate::sidecars::ensure_llama_server_running(&app, state.inner())
-}
-```
+ที่จุดเริ่มต้นของฟังก์ชัน จะ clear `stop_requested` เพื่อให้ caller ใหม่สามารถ spawn ได้
 
 ---
 
-### 2. `spawn_llama_server` — spawn process จริง
+### 2. `spawn_slot` — spawn process ตาม slot config
 
-อ่าน env vars แล้ว spawn sidecar พร้อม async monitor
-ที่คอย set phase → `Crashed` เมื่อ process ตาย
+อ่าน env vars ตาม slot แล้ว spawn พร้อม async termination monitor
 
-```rust
-pub fn spawn_llama_server<R: tauri::Runtime>(
-    app: &tauri::AppHandle<R>,
-    phase: Arc<Mutex<LaunchPhase>>,
-    condvar: Arc<Condvar>,
-) -> Result<CommandChild, String>
+**Chat slot:**
+```
+llama-server -m {KLIN_CHAT_MODEL_PATH} -ngl {KLIN_N_GPU_LAYERS} -c {KLIN_CTX_SIZE}
+             --host 127.0.0.1 --port {KLIN_CHAT_PORT} --no-webui
+             [--mmproj {KLIN_MMPROJ_PATH}]   ← ถ้า set
 ```
 
-**async termination monitor** ที่ทำงานหลัง spawn:
-
-```rust
-tauri::async_runtime::spawn(async move {
-    while let Some(event) = rx.recv().await {
-        match event {
-            CommandEvent::Terminated(payload) => {
-                let mut p = phase.lock();
-                // ไม่ overwrite Idle (กรณี stop ตั้งใจ)
-                if !matches!(*p, LaunchPhase::Idle) {
-                    *p = LaunchPhase::Crashed(
-                        format!("process terminated (code: {:?})", payload.code)
-                    );
-                }
-                condvar.notify_all(); // ปลุก callers ที่รออยู่
-                break;
-            }
-            // ...
-        }
-    }
-});
+**Embed slot:**
 ```
+llama-server -m {KLIN_EMBED_MODEL_PATH} -ngl {KLIN_EMBED_N_GPU_LAYERS}
+             --host 127.0.0.1 --port {KLIN_EMBED_PORT} --no-webui
+             --embedding --pooling mean
+```
+
+**async termination monitor** (เหมือนเดิม ทุก slot):
+- ดัก `CommandEvent::Terminated`
+- ถ้า phase ไม่ใช่ `Idle` → set `Crashed` → notify condvar
+- ถ้า phase เป็น `Idle` → ไม่ทำอะไร (แปลว่า stop ตั้งใจ)
 
 ---
 
-### 3. `touch_llama_last_used` — refresh idle timer
-
-อัปเดต `last_used` โดยไม่ทำ TCP probe
-ใช้เพื่อป้องกัน idle timer ฆ่า server ระหว่าง long-running request
-เช่น SSE streaming ที่ใช้เวลานาน
+### 3. `touch_slot_last_used` — refresh idle timer
 
 ```rust
-pub fn touch_llama_last_used(state: &AppState) {
-    let phase = state.llama_phase.lock();
+pub fn touch_slot_last_used(slot: &LlamaSlotState) {
+    let phase = slot.phase.lock();
     if matches!(*phase, LaunchPhase::Running) {
-        *state.llama_last_used.lock() = Some(Instant::now());
+        *slot.last_used.lock() = Some(Instant::now());
     }
 }
 ```
 
 ---
 
-### 4. `stop_llama_server_process` — หยุด server
-
-ตั้ง `stop_requested = true` ก่อน kill เพื่อป้องกัน concurrent callers
-ที่กำลังรอบน Condvar จาก respawn server ทันทีหลัง stop
+### 4. `stop_slot` — หยุด server ของ slot
 
 ```rust
-pub fn stop_llama_server_process(state: &AppState) {
-    state.llama_stop_requested.store(true, Ordering::SeqCst);
-    super::kill_sidecar("llama-server", &state.llama_server_child);
-    *state.llama_phase.lock() = LaunchPhase::Idle;
-    state.llama_phase_condvar.notify_all();
-    *state.llama_last_used.lock() = None;
+pub fn stop_slot(slot: &LlamaSlotState) {
+    slot.stop_requested.store(true, Ordering::SeqCst); // ← ก่อน kill เสมอ
+    super::kill_sidecar(&format!("llama-server[{}]", slot.slot.label()), &slot.child);
+    *slot.phase.lock() = LaunchPhase::Idle;
+    slot.phase_condvar.notify_all();
+    *slot.last_used.lock() = None;
 }
 ```
 
-> **หมายเหตุ**: idle timer ไม่ set `stop_requested` — เมื่อ idle timer kill server
-> แล้ว request ใหม่เข้ามา server จะถูก spawn ใหม่ตามปกติ
+> `stop_requested` ต้อง set ก่อน kill เสมอ เพื่อป้องกัน concurrent Condvar waiters
+> จาก respawn ทันทีหลัง stop
 
 ---
 
-### 5. `spawn_idle_timeout_task` — auto-stop เมื่อ idle
+### 5. `spawn_idle_timeout_task_for_slot` — auto-stop เมื่อ idle
 
-Background thread ที่ poll ทุก 30 วินาที
-หาก `last_used` เกิน timeout (default 300s = 5 นาที) จะหยุด server อัตโนมัติ
-
-รองรับ **graceful shutdown** ผ่าน `shutdown` condvar —
-เมื่อ app ปิด จะปลุก thread ให้ออกทันทีแทนที่จะรออีก 30 วินาที
+Background thread แยกต่อ slot poll ทุก 30 วินาที
+หาก `last_used` เกิน timeout (default 300s) จะ set `Idle` → kill child
 
 ```rust
-pub fn spawn_idle_timeout_task(
-    child_slot:       Arc<Mutex<Option<CommandChild>>>,
-    last_used:        Arc<Mutex<Option<Instant>>>,
-    phase:            Arc<Mutex<LaunchPhase>>,
-    condvar:          Arc<Condvar>,
-    shutdown:         Arc<Mutex<bool>>,
-    shutdown_condvar: Arc<Condvar>,
-)
+pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState)
 ```
 
-```
-ทุก 30 วินาที (หรือเมื่อถูกปลุกจาก shutdown signal):
-  shutdown == true      → break ออกจาก loop, log "[idle-timer] shutdown — exiting"
-  last_used == None     → ไม่ทำอะไร (server ยังไม่ถูกใช้)
-  elapsed > timeout     → set Idle → kill child → clear last_used
-  elapsed ≤ timeout     → ไม่ทำอะไร
-```
+**สำคัญ**: idle timer **ไม่** set `stop_requested` — ดังนั้น request ใหม่หลัง idle kill
+จะ spawn server ขึ้นมาใหม่ได้ตามปกติ
 
-**App exit handler** ที่ trigger shutdown:
+---
+
+## App Exit Handler
 
 ```rust
 .run(|app, event| {
     if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
         let state = app.state::<AppState>();
-        *state.llama_idle_shutdown.lock() = true;
-        state.llama_idle_shutdown_condvar.notify_all();
-        sidecars::cleanup_all(app);
+        // ส่ง shutdown signal ทุก slot
+        for slot_state in state.slots.values() {
+            *slot_state.idle_shutdown.lock() = true;
+            slot_state.shutdown_condvar.notify_all();
+        }
+        sidecars::cleanup_all(app); // kill ทุก child process
     }
 });
 ```
 
 ---
 
-### 6. `tcp_probe_timeout` — configurable TCP probe
+## Tauri Commands
 
-TCP connect timeout สำหรับ readiness check
-อ่านจาก env var `KLIN_TCP_PROBE_TIMEOUT_MS` (default: 250ms)
-ใช้ทั้งใน `is_llama_server_ready()` และ poll interval ของ `wait_for_llama_server_ready()`
+Commands ทั้งหมดรับ `slot: String` parameter เพิ่มเติม
 
 ```rust
-fn tcp_probe_timeout() -> Duration {
-    match std::env::var("KLIN_TCP_PROBE_TIMEOUT_MS") {
-        Ok(val) => match val.parse::<u64>() {
-            Ok(ms) => Duration::from_millis(ms),
-            Err(_) => {
-                eprintln!("[llama-server] KLIN_TCP_PROBE_TIMEOUT_MS={:?} is not valid, using 250ms", val);
-                Duration::from_millis(250)
-            }
-        },
-        Err(_) => Duration::from_millis(250),
-    }
+#[tauri::command]
+pub fn ensure_llama_server<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: State<AppState>,
+    slot: String,             // "chat" | "embed"
+) -> Result<(), String> {
+    let model_slot = crate::sidecars::ModelSlot::from_str(&slot)?;
+    crate::sidecars::ensure_slot_running(&app, state.slot(model_slot))
 }
 ```
+
+| Command | Rust function | ใช้เมื่อ |
+|---|---|---|
+| `ensure_llama_server` | `ensure_slot_running` | ก่อน AI request ทุกครั้ง |
+| `touch_llama_server` | `touch_slot_last_used` | หลัง request เสร็จ / ระหว่าง stream chunk |
+| `stop_llama_server` | `stop_slot` | user กด stop |
 
 ---
 
 ## การใช้งานฝั่ง Frontend
 
-### `withLlama` — wrapper สำหรับ AI request ทุกตัว
+### `withLlama` — wrapper สำหรับ AI request
+
+รับ `slots: ModelSlot[]` เป็น argument แรก รองรับ ensure หลาย slot พร้อมกัน
 
 ```typescript
 // src/hooks/useLlama.ts
 
-export async function withLlama<T>(fn: () => Promise<T>): Promise<T> {
-  // 1. ensure server กำลังรันอยู่ (spawn ถ้าจำเป็น)
-  await tauriClient.ensureLlamaServer();
+export async function withLlama<T>(
+  slots: ModelSlot[],
+  fn: () => Promise<T>,
+): Promise<T> {
+  await Promise.all(slots.map((s) => tauriClient.ensureLlamaServer(s)));
   try {
     return await fn();
   } finally {
-    // 2. refresh idle timer หลัง request เสร็จ
-    tauriClient.touchLlamaServer().catch(() => undefined);
+    slots.forEach((s) => tauriClient.touchLlamaServer(s).catch(() => undefined));
   }
 }
 ```
 
 ### `createLlamaStreamGuard` — refresh idle timer ระหว่าง stream
 
-สำหรับ SSE streaming ที่ใช้เวลานาน `withLlama` อย่างเดียวไม่พอ
-เพราะ `finally` จะทำงานหลัง stream จบเท่านั้น
-ใช้ `createLlamaStreamGuard` เพื่อ touch ทุก chunk ที่อ่าน
+รับ `slot: ModelSlot` เพื่อระบุว่า touch slot ไหน
 
 ```typescript
-// src/hooks/useLlama.ts
-
-export function createLlamaStreamGuard(): { onChunkRead: () => void } {
+export function createLlamaStreamGuard(slot: ModelSlot): { onChunkRead: () => void } {
   return {
     onChunkRead: () => {
-      tauriClient.touchLlamaServer().catch(() => undefined);
+      tauriClient.touchLlamaServer(slot).catch(() => undefined);
     },
   };
 }
 ```
 
-### ตัวอย่างการใช้ในบริการต่าง ๆ
+### `ModelSlot` type
 
 ```typescript
-// organize (non-streaming) — withLlama เพียงพอ
-const result = await withLlama(() =>
-  fetch("http://127.0.0.1:8000/api/organize", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  })
+// src/types/ipc.ts
+export type ModelSlot = 'chat' | 'embed';
+```
+
+### ตัวอย่างการใช้งาน
+
+```typescript
+// Chat request (non-streaming)
+const result = await withLlama(['chat'], () =>
+  fetch("http://127.0.0.1:8000/api/organize", { method: "POST", body: ... })
 );
 
-// summary streaming (SSE) — ใช้ทั้ง withLlama + createLlamaStreamGuard
-const result = await withLlama(async () => {
-  const response = await fetch("http://127.0.0.1:8000/api/summary/stream", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+// Chat request (SSE streaming)
+const result = await withLlama(['chat'], async () => {
+  const response = await fetch("http://127.0.0.1:8000/api/summary/stream", { ... });
   const reader = response.body!.getReader();
-  const { onChunkRead } = createLlamaStreamGuard();
+  const { onChunkRead } = createLlamaStreamGuard('chat');
 
   while (true) {
     const { done, value } = await reader.read();
@@ -302,91 +315,60 @@ const result = await withLlama(async () => {
   }
   return result;
 });
+
+// ต้องการทั้ง chat + embed พร้อมกัน
+const result = await withLlama(['chat', 'embed'], () => someRequest());
 ```
 
-### Tauri commands ที่เปิดให้ frontend เรียก
+### `TauriClient` interface
 
-| Command | ฟังก์ชัน Rust | ใช้เมื่อ |
-|---|---|---|
-| `ensure_llama_server` | `ensure_llama_server_running` | ก่อน AI request ทุกครั้ง |
-| `touch_llama_server` | `touch_llama_last_used` | หลัง request เสร็จ / ระหว่าง stream chunk |
-| `stop_llama_server` | `stop_llama_server_process` | user กด stop ใน settings |
-
----
-
-## ปัญหาที่แก้ไป
-
-### 1. Premature Idle Kill ระหว่าง Streaming
-
-**อาการ**: Server ถูก kill ระหว่าง SSE streaming แม้ว่า process ยังรันอยู่
-
-**สาเหตุ**: `last_used` ถูกอัปเดตเพียงครั้งเดียวตอนเริ่ม request
-
+```typescript
+interface TauriClient {
+  ensureLlamaServer(slot: ModelSlot): Promise<void>;
+  touchLlamaServer(slot: ModelSlot): Promise<void>;
+  stopLlamaServer(slot: ModelSlot): Promise<void>;
+  // ...
+}
 ```
-t=0s    withLlama() เรียก ensureLlamaServer → last_used = t+0
-t=0s    SSE stream เริ่ม
-...
-t=300s  idle timer: elapsed > 300s → KILL ← ❌ server ตายระหว่าง stream
-```
-
-**วิธีแก้**: `withLlama` เรียก `touchLlamaServer` ใน `finally` block +
-`createLlamaStreamGuard` เรียก `touchLlamaServer` ทุก chunk ระหว่าง stream
-
-```
-t=0s    ensureLlamaServer → last_used = t+0
-t=0s    SSE stream เริ่ม
-t=30s   onChunkRead() → last_used = t+30
-...
-t=300s  onChunkRead() → last_used = t+300   ← ✅ idle timer เห็น elapsed = 0s
-t=350s  stream จบ → finally: touchLlamaServer → last_used = t+350
-```
-
----
-
-### 2. Stop/Ensure Race Condition
-
-**อาการ**: เรียก `stop_llama_server` แต่ server ถูก respawn ทันทีโดย concurrent caller
-ที่กำลังรอบน Condvar
-
-**สาเหตุ**: `stop` set phase → `Idle` → notify condvar → concurrent caller เห็น `Idle`
-→ spawn ใหม่ทันที
-
-**วิธีแก้**: เพิ่ม `stop_requested: Arc<AtomicBool>` —
-- `stop_llama_server_process` set เป็น `true`
-- `ensure_llama_server_running` ตรวจ flag ก่อน spawn → return `Err("server stopped by user")`
-- caller ใหม่ clear flag ที่จุดเริ่มต้น → สามารถ spawn ได้ตามปกติ
-- idle timer ไม่ set flag → server สามารถ restart หลัง idle kill ได้
-
----
-
-### 3. Idle Timer Graceful Shutdown
-
-**อาการ**: ปิด app แล้ว idle-timeout thread ยังรันอยู่อีก 30 วินาที
-
-**สาเหตุ**: ใช้ `std::thread::sleep(30s)` ที่ไม่สามารถ interrupt ได้
-
-**วิธีแก้**: เปลี่ยนเป็น `parking_lot::Condvar::wait_for` ที่สามารถ
-ปลุกได้ทันทีผ่าน `shutdown_condvar` เมื่อ app exit handler ทำงาน
-
----
-
-### 4. Configurable TCP Probe Timeout
-
-**อาการ**: บน hardware ช้า TCP probe 250ms ไม่พอ ทำให้เกิด false `Crashed` transitions
-
-**วิธีแก้**: อ่านจาก env var `KLIN_TCP_PROBE_TIMEOUT_MS` (default: 250ms)
-log warning ถ้าค่าไม่ถูกต้อง
 
 ---
 
 ## Environment Variables
 
+### Chat Slot
+
 | Variable | Default | คำอธิบาย |
 |---|---|---|
-| `KLIN_MODEL_PATH` | (required) | path ของ model `.gguf` |
-| `KLIN_LLAMA_PORT` | `8080` | port ที่ llama-server ฟัง |
+| `KLIN_CHAT_MODEL_PATH` | (required) | path ของ chat/vision model `.gguf` (fallback: `KLIN_MODEL_PATH`) |
+| `KLIN_CHAT_PORT` | `8080` | port ที่ chat llama-server ฟัง (fallback: `KLIN_LLAMA_PORT`) |
 | `KLIN_N_GPU_LAYERS` | `-1` | จำนวน layer บน GPU (-1 = ทั้งหมด) |
 | `KLIN_CTX_SIZE` | `4096` | context window size |
-| `KLIN_MMPROJ_PATH` | (optional) | path ของ multimodal projector |
-| `KLIN_LLAMA_IDLE_TIMEOUT` | `300` | วินาทีก่อน auto-stop เมื่อ idle |
+| `KLIN_MMPROJ_PATH` | (optional) | path ของ multimodal projector สำหรับ vision |
+
+### Embed Slot
+
+| Variable | Default | คำอธิบาย |
+|---|---|---|
+| `KLIN_EMBED_MODEL_PATH` | (required) | path ของ embedding model `.gguf` |
+| `KLIN_EMBED_PORT` | `8081` | port ที่ embed llama-server ฟัง |
+| `KLIN_EMBED_N_GPU_LAYERS` | `0` | GPU layers สำหรับ embed (default CPU เพื่อประหยัด VRAM) |
+
+### Shared
+
+| Variable | Default | คำอธิบาย |
+|---|---|---|
+| `KLIN_LLAMA_IDLE_TIMEOUT` | `300` | วินาทีก่อน auto-stop เมื่อ idle (ใช้ร่วมกันทุก slot) |
 | `KLIN_TCP_PROBE_TIMEOUT_MS` | `250` | TCP probe timeout (ms) สำหรับ readiness check |
+
+---
+
+## Invariants
+
+| # | Invariant | เหตุผล |
+|---|---|---|
+| 1 | `stop_requested = true` **ก่อน** kill เสมอ | ป้องกัน Condvar waiters respawn ทันทีหลัง stop |
+| 2 | idle timer **ไม่** set `stop_requested` | server restart ได้หลัง idle kill เมื่อมี request ใหม่ |
+| 3 | termination monitor ไม่ overwrite `Idle` | ป้องกัน false `Crashed` หลัง intentional stop |
+| 4 | `ensure_slot_running` clear `stop_requested` ที่ entry | caller ใหม่ spawn ได้เสมอ |
+| 5 | แต่ละ slot เป็นอิสระจากกัน | Chat crash ไม่กระทบ Embed และกลับกัน |
+| 6 | TCP probe timeout ใช้ร่วมกัน | configure ครั้งเดียวผ่าน `KLIN_TCP_PROBE_TIMEOUT_MS` |
