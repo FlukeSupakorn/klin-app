@@ -3,39 +3,80 @@
 set -euo pipefail
 
 # Configuration
-VERSION="b4864" # specify the llama.cpp release version
-BIN_DIR="src-tauri/binaries"
+REPO="ggml-org/llama.cpp"
+REPO_URL="https://github.com/${REPO}.git"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BIN_DIR="${PROJECT_ROOT}/src-tauri/binaries"
 
 mkdir -p "$BIN_DIR"
 
 OS=$(uname -s)
 ARCH=$(uname -m)
 
-# Determine the correct release file based on OS and architecture
+# ── Prerequisites ────────────────────────────────────────────────────
+for cmd in git cmake; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "Error: ${cmd} is required but not installed."
+        exit 1
+    fi
+done
+
+# Verify a C++ compiler is available
+if ! command -v c++ >/dev/null 2>&1 && ! command -v g++ >/dev/null 2>&1 && ! command -v clang++ >/dev/null 2>&1; then
+    echo "Error: A C++ compiler (c++, g++, or clang++) is required."
+    exit 1
+fi
+
+# ── Resolve latest version ───────────────────────────────────────────
+echo "Fetching latest release tag from ${REPO}..."
+if command -v curl >/dev/null 2>&1; then
+    RELEASE_JSON=$(curl -sL "https://api.github.com/repos/${REPO}/releases/latest")
+elif command -v wget >/dev/null 2>&1; then
+    RELEASE_JSON=$(wget -qO- "https://api.github.com/repos/${REPO}/releases/latest")
+else
+    echo "Error: Neither curl nor wget is installed."
+    exit 1
+fi
+
+VERSION=$(echo "$RELEASE_JSON" | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)
+
+if [ -z "$VERSION" ]; then
+    echo "Error: Failed to fetch latest release tag."
+    exit 1
+fi
+
+echo "Latest version: ${VERSION}"
+
+# ── Platform-specific settings ───────────────────────────────────────
+CMAKE_EXTRA_FLAGS=""
 case "$OS" in
     Darwin)
         if [ "$ARCH" = "arm64" ]; then
-            FILE="llama-${VERSION}-bin-macos-arm64.zip"
             TARGET_BIN="${BIN_DIR}/llama-server-aarch64-apple-darwin"
         else
-            FILE="llama-${VERSION}-bin-macos-x64.zip"
             TARGET_BIN="${BIN_DIR}/llama-server-x86_64-apple-darwin"
         fi
+        CMAKE_EXTRA_FLAGS="-DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON"
+        SERVER_BIN="llama-server"
+        NPROC=$(sysctl -n hw.ncpu)
         ;;
     Linux)
-        # Add Linux specific binaries if needed, e.g CUDA
         if [ "$ARCH" = "x86_64" ]; then
-            # Defaulting to ubuntu x64
-            FILE="llama-${VERSION}-bin-ubuntu-x64.zip"
             TARGET_BIN="${BIN_DIR}/llama-server-x86_64-unknown-linux-gnu"
         else
             echo "Unsupported Linux architecture: $ARCH"
             exit 1
         fi
+        CMAKE_EXTRA_FLAGS="-DGGML_METAL=OFF"
+        SERVER_BIN="llama-server"
+        NPROC=$(nproc)
         ;;
     MINGW*|MSYS*|CYGWIN*)
-        FILE="llama-${VERSION}-bin-win-vulkan-x64.zip"
         TARGET_BIN="${BIN_DIR}/llama-server-x86_64-pc-windows-msvc.exe"
+        CMAKE_EXTRA_FLAGS="-DGGML_VULKAN=ON"
+        SERVER_BIN="llama-server.exe"
+        NPROC=$(nproc 2>/dev/null || echo 4)
         ;;
     *)
         echo "Unsupported OS: $OS"
@@ -43,47 +84,33 @@ case "$OS" in
         ;;
 esac
 
-URL="https://github.com/ggml-org/llama.cpp/releases/download/${VERSION}/${FILE}"
+# ── Clone and build ──────────────────────────────────────────────────
 TMP_DIR=$(mktemp -d)
+echo "Cloning llama.cpp ${VERSION}..."
+git clone --depth 1 --branch "$VERSION" "$REPO_URL" "$TMP_DIR"
 
-echo "Downloading llama.cpp ${VERSION} for ${OS} ${ARCH}..."
-echo "URL: $URL"
+echo "Building llama-server (static, release)..."
+cmake -B "${TMP_DIR}/build" -S "$TMP_DIR" \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DLLAMA_BUILD_SERVER=ON \
+    -DCMAKE_BUILD_TYPE=Release \
+    $CMAKE_EXTRA_FLAGS
 
-if command -v curl >/dev/null 2>&1; then
-    curl -L -o "${TMP_DIR}/${FILE}" "$URL"
-elif command -v wget >/dev/null 2>&1; then
-    wget -O "${TMP_DIR}/${FILE}" "$URL"
-else
-    echo "Error: Neither curl nor wget is installed."
+cmake --build "${TMP_DIR}/build" --target llama-server -j"$NPROC"
+
+# ── Install ──────────────────────────────────────────────────────────
+FOUND_BIN=$(find "${TMP_DIR}/build" -name "$SERVER_BIN" -type f | head -1)
+
+if [ -z "$FOUND_BIN" ]; then
+    echo "Error: Build succeeded but could not find ${SERVER_BIN}."
+    rm -rf "$TMP_DIR"
     exit 1
 fi
 
-echo "Extracting..."
-unzip -q -o "${TMP_DIR}/${FILE}" -d "$TMP_DIR"
-
-# Move the llama-server binary to the target location with the Tauri expected name
-# Recent release zips place executables at archive root; older ones used build/bin.
-case "$OS" in
-    MINGW*|MSYS*|CYGWIN*)
-        if [ -f "${TMP_DIR}/llama-server.exe" ]; then
-            mv "${TMP_DIR}/llama-server.exe" "$TARGET_BIN"
-        else
-            mv "${TMP_DIR}/build/bin/llama-server.exe" "$TARGET_BIN"
-        fi
-        ;;
-    *)
-        if [ -f "${TMP_DIR}/llama-server" ]; then
-            mv "${TMP_DIR}/llama-server" "$TARGET_BIN"
-        else
-            mv "${TMP_DIR}/build/bin/llama-server" "$TARGET_BIN"
-        fi
-        ;;
-esac
-
-# Ensure it's executable
+mv "$FOUND_BIN" "$TARGET_BIN"
 chmod +x "$TARGET_BIN"
 
 # Clean up
 rm -rf "$TMP_DIR"
 
-echo "Successfully installed llama-server to ${TARGET_BIN}"
+echo "Successfully built and installed llama-server to ${TARGET_BIN}"
