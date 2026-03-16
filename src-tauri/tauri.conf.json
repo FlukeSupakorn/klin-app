@@ -29,6 +29,7 @@
     "active": true,
     "targets": "all",
     "externalBin": [
+      "binaries/llama-server",
       "binaries/klin-worker"
     ],
     "icon": [

@@ -16,6 +16,9 @@ import { categoryManagementService } from "@/services/category-management-servic
 import { fileSearchApiService } from "@/services/file-search-api-service";
 import { useAuthStore } from "@/features/auth/use-auth-store";
 import { GlobalOrganizeResumeBubble } from "@/features/dashboard/organize-files-panel/global-organize-resume-bubble";
+import { StartupDialogs, runStartupChecks } from "@/features/startup/startup-dialogs";
+import type { FailedService } from "@/features/startup/startup-dialogs";
+import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import type { FileSearchResultItem } from "@/types/domain";
 import klinLogo from "@/assets/klin-logo.svg";
 
@@ -40,9 +43,18 @@ export function AppShell() {
   const searchRef = useRef<HTMLInputElement>(null);
   const searchPanelRef = useRef<HTMLDivElement>(null);
 
+  const [healthIssues, setHealthIssues] = useState<FailedService[]>([]);
+  const [defaultPathSet, setDefaultPathSet] = useState<{ path: string } | null>(null);
+  const [showDefaultFolderSettings, setShowDefaultFolderSettings] = useState(false);
+
   useEffect(() => {
-    void initializeAuth();
-    void bootstrapAppData().catch(() => undefined);
+    void (async () => {
+      void initializeAuth();
+      const checks = await runStartupChecks().catch(() => ({ healthIssues: [], defaultPathSet: null }));
+      setHealthIssues(checks.healthIssues);
+      setDefaultPathSet(checks.defaultPathSet);
+      void bootstrapAppData().catch(() => undefined);
+    })();
   }, [initializeAuth]);
 
   useEffect(() => {
@@ -331,6 +343,20 @@ export function AppShell() {
       </main>
 
       <GlobalOrganizeResumeBubble />
+
+      <StartupDialogs
+        healthIssues={healthIssues}
+        defaultPathSet={defaultPathSet}
+        onDismissHealth={() => setHealthIssues([])}
+        onDismissDefaultPath={() => setDefaultPathSet(null)}
+        onOpenDefaultFolderSettings={() => setShowDefaultFolderSettings(true)}
+      />
+
+      <SettingsManagementDialogs
+        open={showDefaultFolderSettings}
+        sections={["default-folder"]}
+        onClose={() => setShowDefaultFolderSettings(false)}
+      />
     </div>
   );
 }

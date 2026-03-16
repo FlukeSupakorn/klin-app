@@ -4,24 +4,63 @@ mod dto;
 mod infrastructure;
 mod repositories;
 mod services;
+mod sidecars;
 
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
 use tauri::{Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
-use tauri_plugin_shell::{process::CommandEvent, ShellExt};
-use repositories::{json_category_repository::JsonCategoryRepository, json_log_repository::JsonLogRepository, json_rule_repository::JsonRuleRepository};
-use services::{category_service::CategoryService, log_service::LogService, rule_service::RuleService};
+use tauri_plugin_shell::process::CommandChild;
+
+use repositories::{
+    json_category_repository::JsonCategoryRepository, json_log_repository::JsonLogRepository,
+    json_rule_repository::JsonRuleRepository,
+};
+use services::{
+    category_service::CategoryService, log_service::LogService, rule_service::RuleService,
+};
+use sidecars::{LlamaSlotState, ModelSlot};
+
+// ── App State ───────────────────────────────────────────────────────────
 
 pub struct AppState {
     pub log_service: Arc<Mutex<LogService<JsonLogRepository>>>,
     pub rule_service: Arc<Mutex<RuleService<JsonRuleRepository>>>,
     pub category_service: Arc<Mutex<CategoryService<JsonCategoryRepository>>>,
+    pub app_data_dir: PathBuf,
+    /// Per-slot llama-server lifecycle state.
+    pub slots: HashMap<ModelSlot, LlamaSlotState>,
+    pub worker_child: Arc<Mutex<Option<CommandChild>>>,
 }
 
+impl AppState {
+    /// Get the slot state for the given model slot.
+    pub fn slot(&self, s: ModelSlot) -> &LlamaSlotState {
+        self.slots.get(&s).expect("unknown model slot")
+    }
+}
+
+fn env_flag(name: &str) -> bool {
+    std::env::var(name)
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
+}
+
+// ── App Entry Point ─────────────────────────────────────────────────────
+
 pub fn run() {
+    // Load .env file (silently ignore if not found)
+    let _ = dotenvy::dotenv();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(main_window) = app.get_webview_window("main") {
@@ -37,47 +76,49 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let app_data_dir = infrastructure::app_paths::resolve_app_data_dir(app.handle())?;
-            let app_data_dir_arg = app_data_dir.to_string_lossy().to_string();
+            let app_data_dir_str = app_data_dir.to_string_lossy().to_string();
             std::fs::create_dir_all(&app_data_dir)?;
+            let use_external_worker = env_flag("KLIN_WORKER_EXTERNAL");
 
-            let sidecar_cmd = app
-                .shell()
-                .sidecar("klin-worker")?
-                .env("KLIN_APP_DATA_DIR", app_data_dir_arg.clone())
-                .args([
-                    "--host",
-                    "127.0.0.1",
-                    "--port",
-                    "8000",
-                    "--data-dir",
-                    app_data_dir_arg.as_str(),
-                ]);
+            // ── Spawn sidecars ──────────────────────────────────────
+            eprintln!("[startup] llama-server: lazy startup enabled (multi-slot)");
 
-            let (mut rx, _worker_child) = sidecar_cmd.spawn()?;
-            tauri::async_runtime::spawn(async move {
-                while let Some(event) = rx.recv().await {
-                    match event {
-                        CommandEvent::Stdout(line) => {
-                            eprintln!("[klin-worker] {}", String::from_utf8_lossy(&line));
-                        }
-                        CommandEvent::Stderr(line) => {
-                            eprintln!("[klin-worker][stderr] {}", String::from_utf8_lossy(&line));
-                        }
-                        _ => {}
+            let worker_child: Option<CommandChild> = if use_external_worker {
+                eprintln!("[startup] klin-worker: external mode enabled, skipping sidecar spawn");
+                None
+            } else {
+                match sidecars::spawn_klin_worker(app.handle(), &app_data_dir_str) {
+                    Ok(child) => Some(child),
+                    Err(e) => {
+                        eprintln!("[startup] klin-worker: {}", e);
+                        None
                     }
                 }
-            });
+            };
 
+            // ── Repositories & services ─────────────────────────────
             let log_repo = JsonLogRepository::new(app_data_dir.join("logs.json"));
             let rule_repo = JsonRuleRepository::new(app_data_dir.join("rules.json"));
             let category_repo = JsonCategoryRepository::new(app_data_dir.join("categories.json"));
+
+            // ── Llama-server slots ──────────────────────────────────
+            let mut slots = HashMap::new();
+            for s in [ModelSlot::Chat, ModelSlot::Embed] {
+                let slot_state = LlamaSlotState::new(s);
+                sidecars::spawn_idle_timeout_task_for_slot(&slot_state);
+                slots.insert(s, slot_state);
+            }
 
             app.manage(AppState {
                 log_service: Arc::new(Mutex::new(LogService::new(log_repo))),
                 rule_service: Arc::new(Mutex::new(RuleService::new(rule_repo))),
                 category_service: Arc::new(Mutex::new(CategoryService::new(category_repo))),
+                app_data_dir: app_data_dir.clone(),
+                slots,
+                worker_child: Arc::new(Mutex::new(worker_child)),
             });
 
+            // ── Deep link ───────────────────────────────────────────
             #[cfg(any(windows, target_os = "linux"))]
             {
                 app.deep_link().register("klin")?;
@@ -85,11 +126,16 @@ pub fn run() {
 
             let handle = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
-                if let Some(url) = event.urls().iter().find(|url| url.as_str().starts_with("klin://auth")) {
+                if let Some(url) = event
+                    .urls()
+                    .iter()
+                    .find(|url| url.as_str().starts_with("klin://auth"))
+                {
                     let _ = handle.emit("deep-link://oauth-callback", url.to_string());
                 }
             });
 
+            // ── Window close → hide ─────────────────────────────────
             if let Some(main_window) = app.get_webview_window("main") {
                 let close_window = main_window.clone();
                 main_window.on_window_event(move |event| {
@@ -100,6 +146,7 @@ pub fn run() {
                 });
             }
 
+            // ── Background folder scanner ───────────────────────────
             let scanner_app_handle = app.handle().clone();
             std::thread::spawn(move || {
                 let mut previous_has_files = false;
@@ -107,7 +154,8 @@ pub fn run() {
                 loop {
                     std::thread::sleep(Duration::from_secs(60));
 
-                    let config = match commands::load_automation_config(scanner_app_handle.clone()) {
+                    let config = match commands::load_automation_config(scanner_app_handle.clone())
+                    {
                         Ok(config) => config,
                         Err(_) => continue,
                     };
@@ -117,14 +165,11 @@ pub fn run() {
                         continue;
                     }
 
-                    let has_files = config
-                        .watched_folders
-                        .iter()
-                        .any(|folder| {
-                            services::file_service::FileService::read_folder(folder.clone())
-                                .map(|files| !files.is_empty())
-                                .unwrap_or(false)
-                        });
+                    let has_files = config.watched_folders.iter().any(|folder| {
+                        services::file_service::FileService::read_folder(folder.clone())
+                            .map(|files| !files.is_empty())
+                            .unwrap_or(false)
+                    });
 
                     if has_files && !previous_has_files {
                         if let Some(main_window) = scanner_app_handle.get_webview_window("main") {
@@ -143,6 +188,9 @@ pub fn run() {
             commands::watch_folder,
             commands::move_file,
             commands::read_folder,
+            commands::ensure_llama_server,
+            commands::stop_llama_server,
+            commands::touch_llama_server,
             commands::pick_files_for_organize,
             commands::pick_folder_for_organize,
             commands::save_note_file,
@@ -163,6 +211,18 @@ pub fn run() {
             commands::list_subdirectories,
             commands::list_all_subdirectories,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
+                // Signal all idle-timeout threads to exit cleanly.
+                let state = app.state::<AppState>();
+                for slot_state in state.slots.values() {
+                    *slot_state.idle_shutdown.lock() = true;
+                    slot_state.shutdown_condvar.notify_all();
+                }
+
+                sidecars::cleanup_all(app);
+            }
+        });
 }

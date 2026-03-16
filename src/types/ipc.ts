@@ -40,9 +40,21 @@ export interface SubdirEntry {
   has_children: boolean;
 }
 
+export type ModelSlot = 'chat' | 'embed';
+
 export interface TauriClient {
   moveFile(input: MoveFileDto): Promise<void>;
   readFolder(input: ReadFolderDto): Promise<string[]>;
+  ensureLlamaServer(slot: ModelSlot): Promise<void>;
+  /** Refresh the idle timer without a full TCP probe. Call before/after any
+   *  request to llama-server so the idle-timeout task does not kill the server
+   *  mid-request (e.g. during long SSE streams). */
+  touchLlamaServer(slot: ModelSlot): Promise<void>;
+  /**
+   * Explicitly stop the llama-server process to free RAM/VRAM.
+   * It will be re-spawned automatically on the next `ensureLlamaServer()` call.
+   */
+  stopLlamaServer(slot: ModelSlot): Promise<void>;
   pickFilesForOrganize(): Promise<string[]>;
   pickFolderForOrganize(): Promise<string | null>;
   saveNoteFile(input: { folderPath: string; fileName: string; content: string }): Promise<string>;
