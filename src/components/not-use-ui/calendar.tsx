@@ -27,7 +27,7 @@ function Calendar({
         nav: "flex items-center gap-2",
         nav_button: cn(
           "h-9 w-9 rounded-xl p-0 shadow-md transition-all",
-          "bg-gradient-to-r from-fuchsia-500 to-pink-500",
+          "bg-linear-to-r from-fuchsia-500 to-pink-500",
           "text-white hover:scale-105 hover:shadow-lg"
         ),
         nav_button_previous: "",
@@ -49,7 +49,7 @@ function Calendar({
         day_range_start: "day-range-start",
         day_range_end: "day-range-end",
         day_selected:
-          "bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white shadow-md",
+          "bg-linear-to-r from-fuchsia-500 to-pink-500 text-white shadow-md",
 
         day_today:
           "border border-primary text-primary font-semibold",

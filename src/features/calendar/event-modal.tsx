@@ -61,10 +61,10 @@ export function CalendarEventModal() {
   return (
     <Dialog.Root open={isOpen} onOpenChange={(nextOpen) => (!nextOpen ? close() : undefined)}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[80] bg-foreground/30" />
+        <Dialog.Overlay className="fixed inset-0 z-80 bg-foreground/30" />
         <Dialog.Content
           className={cn(
-            "fixed left-1/2 top-1/2 z-[90] w-[min(560px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-5 shadow-xl",
+            "fixed left-1/2 top-1/2 z-90 w-[min(560px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-5 shadow-xl",
             "max-h-[70vh] overflow-y-auto",
           )}
         >

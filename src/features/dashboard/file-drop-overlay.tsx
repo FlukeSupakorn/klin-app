@@ -10,7 +10,7 @@ export function FileDropOverlay({ visible }: FileDropOverlayProps) {
   return createPortal(
     <div
       className={cn(
-        "pointer-events-none fixed inset-0 z-[9999] transition-opacity duration-150",
+        "pointer-events-none fixed inset-0 z-9999 transition-opacity duration-150",
         visible ? "opacity-100" : "opacity-0",
       )}
     >

@@ -15,7 +15,7 @@ function LogEntryRow({ log }: { log: ApiLogEntry }) {
       <button
         type="button"
         className={cn(
-          "flex w-full items-center justify-between p-3 text-left transition-colors hover:bg-muted/30 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary/50",
+          "flex w-full items-center justify-between p-3 text-left transition-colors hover:bg-muted/30 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-primary/50",
           isError && "bg-destructive/5"
         )}
         onClick={() => setExpanded(!expanded)}
@@ -155,7 +155,7 @@ export function ApiLogsPage() {
         </Button>
       </div>
 
-      <div className="flex-1 overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
+      <div className="flex-1 overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xs">
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-border/70 bg-muted/40 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
             <div className="flex items-center gap-10">
