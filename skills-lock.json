@@ -11,6 +11,11 @@
       "sourceType": "github",
       "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
     },
+    "github-actions": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "computedHash": "6f6ace43488e5476241409aeb7636cd926222b146be4255752aded52ce0bc8c6"
+    },
     "shadcn-ui": {
       "source": "giuseppe-trisciuoglio/developer-kit",
       "sourceType": "github",
