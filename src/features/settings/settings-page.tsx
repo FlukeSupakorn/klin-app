@@ -13,7 +13,7 @@ import {
   UserCircle2,
   X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { cn } from "@/lib/utils";
 import { googleAuthService } from "@/features/auth/google-auth-service";
@@ -93,7 +93,7 @@ export function SettingsPage() {
         }
         return;
       }
-    } catch {}
+    } catch { }
 
     setFastApiStatus("offline");
     if (showRefreshState) {

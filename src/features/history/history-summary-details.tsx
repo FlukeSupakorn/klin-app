@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import type { HistoryEntry } from "@/features/history/history-types";
 
 interface HistorySummaryDetailsProps {
@@ -31,7 +31,7 @@ export function HistorySummaryDetails({ entry, onOpenSummary }: HistorySummaryDe
         <p className="text-sm text-muted-foreground" title={entry.summaryPath}>Note file: {entry.summaryPath}</p>
         <div className="mt-3 flex justify-end">
           <Button size="sm" onClick={() => onOpenSummary(entry.summaryPath)}>
-          Open Note File
+            Open Note File
           </Button>
         </div>
       </div>

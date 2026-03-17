@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { History, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/not-use-ui/button";
+import { Input } from "@/components/not-use-ui/input";
 import { cn } from "@/lib/utils";
 import type { HistoryEntry, HistoryEntryType } from "@/features/history/history-types";
 import { tauriClient } from "@/services/tauri-client";

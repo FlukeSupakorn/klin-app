@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import type { CalendarMockEvent } from "@/services/calendar-api-service";
 
 interface FoundSchedulingModalProps {

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { FolderOpen, Plus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import { categoryManagementService } from "@/services/category-management-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
@@ -254,7 +254,7 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
   }, [rootFolders, rootFolderSelected, allKnownPaths, deselectedPaths]);
 
   const handleCreate = async () => {
-    await categoryManagementService.refreshCategoriesFromWorker().catch(() => {});
+    await categoryManagementService.refreshCategoriesFromWorker().catch(() => { });
     const latestPathMap = buildExistingCategoryPathMap(useCategoryManagementStore.getState().categories);
     if (totalCount === 0) return;
     setIsCreating(true);

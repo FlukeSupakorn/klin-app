@@ -1,5 +1,5 @@
 import { Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import type { HistoryEntry } from "@/features/history/history-types";
 
 interface HistoryOrganizeDetailsProps {

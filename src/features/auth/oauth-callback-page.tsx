@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { CheckCircle2, ExternalLink, Loader2, XCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/not-use-ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/not-use-ui/card";
 import { useAuthStore } from "@/features/auth/use-auth-store";
 
 export function OAuthCallbackPage() {

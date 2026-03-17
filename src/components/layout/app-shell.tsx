@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/not-use-ui/badge";
 import { bootstrapAppData } from "@/services/bootstrap-service";
 import { categoryManagementService } from "@/services/category-management-service";
 import { fileSearchApiService } from "@/services/file-search-api-service";

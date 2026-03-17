@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Pencil, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/not-use-ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/not-use-ui/card";
+import { Input } from "@/components/not-use-ui/input";
 import { cn } from "@/lib/utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import type { OrganizePreviewItem } from "@/types/domain";
@@ -218,9 +218,9 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
                   ? "Undo"
                   : isNoChange
                     ? "No Change"
-                  : item.moveStatus === "failed"
-                    ? (isRenameOnly ? "Retry Rename" : "Retry Move")
-                    : (isRenameOnly ? "Rename" : "Move")}
+                    : item.moveStatus === "failed"
+                      ? (isRenameOnly ? "Retry Rename" : "Retry Move")
+                      : (isRenameOnly ? "Rename" : "Move")}
           </Button>
         </div>
       </div>
