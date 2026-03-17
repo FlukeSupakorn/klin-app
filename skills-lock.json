@@ -16,6 +16,11 @@
       "sourceType": "github",
       "computedHash": "6f6ace43488e5476241409aeb7636cd926222b146be4255752aded52ce0bc8c6"
     },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "computedHash": "507f011a70e8b3ae242bdc0bb5b39fd91a1d4049a0f3c281991ccf84973d591c"
+    },
     "shadcn-ui": {
       "source": "giuseppe-trisciuoglio/developer-kit",
       "sourceType": "github",
