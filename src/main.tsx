@@ -2,7 +2,6 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { router } from "@/app/router";
-import "@/styles/theme-variables.css";
 import "@/styles/globals.css";
 
 const isTauri = "__TAURI__" in window;
