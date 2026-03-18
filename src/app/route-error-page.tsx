@@ -1,5 +1,5 @@
 import { isRouteErrorResponse, Link, useRouteError } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 
 export function RouteErrorPage() {
   const error = useRouteError();
@@ -10,7 +10,7 @@ export function RouteErrorPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6">
-      <div className="w-full max-w-lg rounded-2xl border border-border/60 bg-card p-8 text-center shadow-sm">
+      <div className="w-full max-w-lg rounded-2xl border border-border/60 bg-card p-8 text-center shadow-xs">
         <h1 className="text-2xl font-semibold tracking-tight">Page not available</h1>
         <p className="mt-2 text-sm text-muted-foreground">{message}</p>
         <div className="mt-6 flex justify-center gap-3">

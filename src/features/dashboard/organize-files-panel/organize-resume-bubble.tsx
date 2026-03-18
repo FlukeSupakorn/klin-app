@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 
 interface OrganizeResumeBubbleProps {
   show: boolean;
@@ -26,7 +26,7 @@ export function OrganizeResumeBubble({
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 max-w-xs rounded-xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur-sm">
+    <div className="fixed bottom-5 right-5 z-40 max-w-xs rounded-xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur-xs">
       <p className="text-sm font-semibold text-foreground">Organize in progress</p>
       <p className="mt-1 text-xs text-muted-foreground">
         {isAnalyzing

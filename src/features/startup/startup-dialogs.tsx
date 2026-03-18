@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, FolderOpen, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 
@@ -120,7 +120,7 @@ export function StartupDialogs({
   return (
     <>
       {healthIssues.length > 0 && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-background/80 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div>
@@ -145,7 +145,7 @@ export function StartupDialogs({
                     key={service.name}
                     className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5"
                   >
-                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                     <div className="min-w-0">
                       <p className="text-sm font-black text-foreground">{service.name}</p>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">{service.detail}</p>
@@ -162,7 +162,7 @@ export function StartupDialogs({
       )}
 
       {defaultPathSet && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-background/80 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div>
@@ -179,13 +179,13 @@ export function StartupDialogs({
             </div>
             <div className="space-y-4 p-6">
               <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-primary" />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
                 <p className="text-sm text-muted-foreground">
                   Your default folder has been automatically configured.
                 </p>
               </div>
               <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2">
-                <FolderOpen className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="truncate font-mono text-sm text-foreground">{defaultPathSet.path}</span>
               </div>
               <p className="text-xs text-muted-foreground">

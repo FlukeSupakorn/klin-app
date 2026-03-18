@@ -49,7 +49,7 @@ export function DashboardPage() {
         <WatcherOverviewCard />
 
         <Link to="/notes" className="block">
-          <div className="group flex items-center justify-between rounded-2xl bg-card px-6 py-5 shadow-sm ring-1 ring-border/70 transition-all duration-150 hover:bg-accent/70">
+          <div className="group flex items-center justify-between rounded-2xl bg-card px-6 py-5 shadow-xs ring-1 ring-border/70 transition-all duration-150 hover:bg-accent/70">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/15 text-primary">
                 <FileText className="h-4 w-4" />
@@ -64,7 +64,7 @@ export function DashboardPage() {
         </Link>
 
         <Link to="/calendar" className="block">
-          <div className="group flex items-center justify-between rounded-2xl bg-card px-6 py-5 shadow-sm ring-1 ring-border/70 transition-all duration-150 hover:bg-accent/70">
+          <div className="group flex items-center justify-between rounded-2xl bg-card px-6 py-5 shadow-xs ring-1 ring-border/70 transition-all duration-150 hover:bg-accent/70">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-secondary/15 text-secondary">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

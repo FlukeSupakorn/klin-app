@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/not-use-ui/badge";
 import { bootstrapAppData } from "@/services/bootstrap-service";
 import { categoryManagementService } from "@/services/category-management-service";
 import { fileSearchApiService } from "@/services/file-search-api-service";
@@ -198,8 +198,8 @@ export function AppShell() {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
-      <header className="flex h-20 flex-shrink-0 items-center gap-4 px-8 lg:px-10">
-        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center">
+      <header className="flex h-20 shrink-0 items-center gap-4 px-8 lg:px-10">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center">
           <img src={klinLogo} alt="KLIN" className="h-13 w-13 object-contain" />
         </div>
 
@@ -214,7 +214,7 @@ export function AppShell() {
                 cn(
                   "group flex h-11 items-center justify-center gap-2 rounded-full px-4 transition-all duration-150",
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
+                    ? "bg-primary text-primary-foreground shadow-xs"
                     : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )
               }
@@ -255,7 +255,7 @@ export function AppShell() {
                   setSearchOpen(true);
                 }
               }}
-              className="flex-shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+              className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
             >
               {searchOpen ? <X className="h-[17px] w-[17px]" /> : <Search className="h-[17px] w-[17px]" />}
             </button>
@@ -267,13 +267,13 @@ export function AppShell() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={onSearchKeyDown}
                 placeholder="Search…"
-                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
               />
             )}
           </div>
 
           {searchOpen && (searchSubmitted || searchLoading || searchError) && (
-            <div className="absolute left-0 top-14 z-50 w-[30rem] max-w-[80vw] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+            <div className="absolute left-0 top-14 z-50 w-120 max-w-[80vw] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
               <div className="border-b border-border bg-muted/50 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-muted-foreground">
                 Search Results
               </div>
@@ -321,14 +321,14 @@ export function AppShell() {
 
         <div className="flex-1" />
 
-        <div className="flex flex-shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           {profile && (
             <div className="text-right">
               <p className="text-sm font-semibold leading-none text-foreground">{profile.name}</p>
               <p className="mt-0.5 text-[11px] font-black leading-none text-muted-foreground">{profile.email}</p>
             </div>
           )}
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-black text-foreground ring-2 ring-border">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-black text-foreground ring-2 ring-border">
             {profile?.picture ? (
               <img src={profile.picture} alt={profile.name ?? "Profile"} className="h-full w-full rounded-full object-cover" />
             ) : (

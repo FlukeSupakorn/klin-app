@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, CalendarDays, WifiOff, AlertCircle, LogIn } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/not-use-ui/button";
+import { Card, CardContent, CardHeader } from "@/components/not-use-ui/card";
 import { CalendarEventModal } from "@/features/calendar/event-modal";
 import { useCalendarStore } from "@/features/calendar/use-calendar-store";
 import { useAuthStore } from "@/features/auth/use-auth-store";

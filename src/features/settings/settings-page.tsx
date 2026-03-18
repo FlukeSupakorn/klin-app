@@ -13,7 +13,7 @@ import {
   UserCircle2,
   X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { cn } from "@/lib/utils";
 import { googleAuthService } from "@/features/auth/google-auth-service";
@@ -93,7 +93,7 @@ export function SettingsPage() {
         }
         return;
       }
-    } catch {}
+    } catch { }
 
     setFastApiStatus("offline");
     if (showRefreshState) {
@@ -255,7 +255,7 @@ export function SettingsPage() {
         </h2>
       </div>
 
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-card p-5 shadow-xs ring-1 ring-border/70">
         <div className="flex items-center gap-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
             Google Account
@@ -325,7 +325,7 @@ export function SettingsPage() {
 
       {authError && <p className="text-xs text-destructive">{authError}</p>}
 
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-card p-5 shadow-xs ring-1 ring-border/70">
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
             Configuration
@@ -341,7 +341,7 @@ export function SettingsPage() {
         </Button>
       </section>
 
-      <section className="space-y-5 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">
+      <section className="space-y-5 rounded-2xl bg-card p-5 shadow-xs ring-1 ring-border/70">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -370,7 +370,7 @@ export function SettingsPage() {
             >
               <span
                 className={cn(
-                  "h-4 w-4 rounded-full bg-background shadow transition-transform",
+                  "h-4 w-4 rounded-full bg-background shadow-sm transition-transform",
                   isRunning ? "translate-x-4" : "translate-x-0.5",
                 )}
               />
@@ -446,7 +446,7 @@ export function SettingsPage() {
                     >
                       {item.folderPath}
                     </span>
-                    <span className="ml-3 flex-shrink-0 font-black text-foreground">
+                    <span className="ml-3 shrink-0 font-black text-foreground">
                       {item.fileCount} file{item.fileCount !== 1 ? "s" : ""}
                     </span>
                   </div>
@@ -457,7 +457,7 @@ export function SettingsPage() {
         )}
       </section>
 
-      <section className="space-y-5 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border/70">
+      <section className="space-y-5 rounded-2xl bg-card p-5 shadow-xs ring-1 ring-border/70">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -512,7 +512,7 @@ export function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => unlockPath(p)}
-                  className="ml-3 flex-shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  className="ml-3 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -523,7 +523,7 @@ export function SettingsPage() {
       </section>
 
       {import.meta.env.DEV && (
-        <section className="space-y-5 rounded-2xl border border-primary/20 bg-primary/5 p-5 shadow-sm ring-1 ring-primary/20">
+        <section className="space-y-5 rounded-2xl border border-primary/20 bg-primary/5 p-5 shadow-xs ring-1 ring-primary/20">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary opacity-80">
@@ -534,7 +534,7 @@ export function SettingsPage() {
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                className="h-9 gap-2 border-primary/20 shadow-sm hover:bg-primary/10"
+                className="h-9 gap-2 border-primary/20 shadow-xs hover:bg-primary/10"
                 onClick={() => void checkFastApiHealth(true)}
                 disabled={isRefreshingDevHealth}
               >
@@ -548,7 +548,7 @@ export function SettingsPage() {
               </Button>
               <Button
                 variant="default"
-                className="h-9 gap-2 shadow-sm"
+                className="h-9 gap-2 shadow-xs"
                 onClick={() => navigate("/settings/api-logs")}
               >
                 <Activity className="h-3.5 w-3.5" /> Frontend API Logs

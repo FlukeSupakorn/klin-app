@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { FolderOpen, Plus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import { categoryManagementService } from "@/services/category-management-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
@@ -254,7 +254,7 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
   }, [rootFolders, rootFolderSelected, allKnownPaths, deselectedPaths]);
 
   const handleCreate = async () => {
-    await categoryManagementService.refreshCategoriesFromWorker().catch(() => {});
+    await categoryManagementService.refreshCategoriesFromWorker().catch(() => { });
     const latestPathMap = buildExistingCategoryPathMap(useCategoryManagementStore.getState().categories);
     if (totalCount === 0) return;
     setIsCreating(true);
@@ -293,9 +293,9 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
       <div className="flex h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-border px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
               Batch Import
@@ -314,7 +314,7 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
         </div>
 
         <div className="flex flex-1 flex-row overflow-hidden">
-          <div className="flex w-80 flex-shrink-0 flex-col border-r border-border">
+          <div className="flex w-80 shrink-0 flex-col border-r border-border">
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
               <p className="whitespace-nowrap text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 Selected Folders
@@ -455,7 +455,7 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
           </div>
         </div>
 
-        <div className="flex flex-shrink-0 flex-col gap-2 border-t border-border px-6 py-3">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-border px-6 py-3">
           {skippedWarning && (
             <p className="text-xs font-medium text-amber-500">{skippedWarning}</p>
           )}

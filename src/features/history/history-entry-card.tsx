@@ -4,7 +4,7 @@ import {
   Clock,
   Sparkles,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/not-use-ui/badge";
 import { cn } from "@/lib/utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { theme } from "@/theme/theme";

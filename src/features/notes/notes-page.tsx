@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import "@uiw/react-md-editor/markdown-editor.css";
 import { AlertTriangle, ArrowLeft, FilePlus2, Files, Loader2, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/not-use-ui/button";
+import { Input } from "@/components/not-use-ui/input";
 import { cn } from "@/lib/utils";
 import { notesApiService } from "@/services/notes-api-service";
 import { notesFileService, type NoteFileItem } from "@/services/notes-file-service";
@@ -400,7 +400,7 @@ export function NotesPage() {
           )}
         >
           <div className="flex items-start gap-2">
-            {isLockWarningNotice && <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />}
+            {isLockWarningNotice && <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}
             <div className="space-y-2">
               <p className="leading-5">
                 {parsedEditorNotice?.summary ?? editorNotice}
@@ -505,7 +505,7 @@ export function NotesPage() {
               onChange={(event) => setSelectedCategoryId(event.target.value)}
               className={cn(
                 "h-9 min-w-[180px] rounded-full border border-border bg-background px-3 text-sm text-foreground",
-                "focus:outline-none focus:ring-2 focus:ring-primary",
+                "focus:outline-hidden focus:ring-2 focus:ring-primary",
               )}
             >
               <option value="">Select category</option>
@@ -568,7 +568,7 @@ export function NotesPage() {
                 onChange={(event) => setContent(event.target.value)}
                 className={cn(
                   "min-h-[460px] w-full resize-none bg-card px-4 py-3 text-sm text-foreground",
-                  "focus:outline-none focus:ring-2 focus:ring-primary/40",
+                  "focus:outline-hidden focus:ring-2 focus:ring-primary/40",
                 )}
                 placeholder="Write markdown content..."
               />

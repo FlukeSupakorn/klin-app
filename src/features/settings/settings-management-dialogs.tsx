@@ -1,7 +1,7 @@
 import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, ChevronDown, FolderOpen, FolderPlus, FolderSearch, Pencil, Plus, Trash2, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/not-use-ui/button";
+import { Input } from "@/components/not-use-ui/input";
 import { categoryManagementService } from "@/services/category-management-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
@@ -172,13 +172,13 @@ function WatchedFoldersSection() {
           watchedFolders.map((folder) => (
             <div key={folder} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2.5">
               <div className="flex min-w-0 items-center gap-3">
-                <FolderSearch className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <FolderSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <p className="truncate font-mono text-sm">{folder}</p>
               </div>
               <button
                 type="button"
                 onClick={() => removeWatchedFolder(folder)}
-                className="ml-3 flex-shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                className="ml-3 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -296,7 +296,7 @@ function CategoriesSection({ onOpenAdd, onOpenEdit, onOpenBatch }: CategoriesSec
                   <span className="truncate font-mono">{category.folderPath}</span>
                 </div>
               </div>
-              <div className="flex flex-shrink-0 items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <span
                   className={cn(
                     "flex items-center gap-1 text-[10px] font-black uppercase tracking-widest",
@@ -343,7 +343,7 @@ function CategoryEditorModal({ mode, formState, onFormChange, onClose, onSave, s
   const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-background/80 p-4 backdrop-blur-xs">
       <div className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
@@ -388,7 +388,7 @@ function CategoryEditorModal({ mode, formState, onFormChange, onClose, onSave, s
             <textarea
               value={formState.description}
               onChange={(e) => onFormChange((state) => ({ ...state, description: e.target.value }))}
-              className="min-h-[100px] w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none"
+              className="min-h-[100px] w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-hidden"
             />
           </div>
           <div className="space-y-1.5">
@@ -424,7 +424,7 @@ function CategoryEditorModal({ mode, formState, onFormChange, onClose, onSave, s
                   if (!folder) return;
                   onFormChange((state) => ({ ...state, folderPath: folder }));
                 }}
-                className="flex-shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
@@ -573,9 +573,9 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-xs">
         <div className="flex w-full max-w-2xl flex-col rounded-2xl border border-border bg-card shadow-2xl" style={{ maxHeight: "85vh" }}>
-          <div className="flex flex-shrink-0 items-center justify-between border-b border-border px-6 py-4">
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Configuration</p>
               <h2 className="font-syne text-xl font-black uppercase tracking-tight">Manage Settings</h2>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Pencil, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/not-use-ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/not-use-ui/card";
+import { Input } from "@/components/not-use-ui/input";
 import { cn } from "@/lib/utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import type { OrganizePreviewItem } from "@/types/domain";
@@ -193,7 +193,7 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
           )}
           <Button
             size="sm"
-            variant={item.moveStatus === "completed" ? "outline" : "default"}
+            variant={item.moveStatus === "completed" ? "outline-solid" : "default"}
             onClick={() => {
               if (item.moveStatus === "completed") {
                 void workflow.undoSingleItem(item);
@@ -218,9 +218,9 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
                   ? "Undo"
                   : isNoChange
                     ? "No Change"
-                  : item.moveStatus === "failed"
-                    ? (isRenameOnly ? "Retry Rename" : "Retry Move")
-                    : (isRenameOnly ? "Rename" : "Move")}
+                    : item.moveStatus === "failed"
+                      ? (isRenameOnly ? "Retry Rename" : "Retry Move")
+                      : (isRenameOnly ? "Rename" : "Move")}
           </Button>
         </div>
       </div>
@@ -366,7 +366,7 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
   }, [workflow.errorMessage]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
       <Card className="h-[80vh] w-full max-w-5xl overflow-hidden border border-border bg-card">
         <CardHeader>
           <CardTitle>Files to organize</CardTitle>
@@ -387,7 +387,7 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
               )}
             >
               <div className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <div className="space-y-2">
                   <p className="leading-5">
                     {parsedWarning?.summary ?? workflow.errorMessage}
