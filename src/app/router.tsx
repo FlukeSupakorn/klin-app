@@ -1,5 +1,4 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
-import { AppShell } from "@/components/layout/app-shell";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { HistoryPage } from "@/features/history/history-page";
 import { SettingsPage } from "@/features/settings/settings-page";
@@ -9,6 +8,8 @@ import { DeveloperPage } from "@/features/developer/developer-page";
 import { OAuthCallbackPage } from "@/features/auth/oauth-callback-page";
 import { RouteErrorPage } from "@/app/route-error-page";
 import { ApiLogsPage } from "@/features/settings/api-logs-page";
+import { OnboardingPage } from "@/features/onboarding/onboarding-page";
+import { OnboardingGuard } from "@/features/onboarding/onboarding-guard";
 
 export const router = createBrowserRouter([
   {
@@ -17,8 +18,14 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
   },
   {
+    path: "/onboarding",
+    element: <OnboardingPage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
     path: "/",
-    element: <AppShell />,
+    // This already wraps the entire app in a guard that checks onboarding status, AppShell already inside.
+    element: <OnboardingGuard />,
     errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <DashboardPage /> },
@@ -32,4 +39,3 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
-
