@@ -1,55 +1,19 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import { cn } from "@/lib/utils";
 import type { Category } from "../types";
 import {
-  Archive,
-  BarChart2,
-  Check,
-  Code2,
-  Film,
-  FileText,
-  Image,
-  Music,
-  Palette,
+  CATEGORY_COLOR_OPTIONS,
+  CATEGORY_ICON_OPTIONS,
+  getCategoryIcon,
+  withAlpha,
+} from "@/features/categories/category-appearance";
+import {
   Plus,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
-
-const ICON_MAP: Record<string, React.ElementType> = {
-  FileText,
-  Image,
-  Film,
-  Music,
-  Code2,
-  Archive,
-  Palette,
-  BarChart2,
-};
-
-const COLOR_MAP: Record<string, string> = {
-  blue: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  purple: "text-purple-400 bg-purple-400/10 border-purple-400/20",
-  red: "text-red-400 bg-red-400/10 border-red-400/20",
-  green: "text-green-400 bg-green-400/10 border-green-400/20",
-  cyan: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20",
-  orange: "text-orange-400 bg-orange-400/10 border-orange-400/20",
-  pink: "text-pink-400 bg-pink-400/10 border-pink-400/20",
-  yellow: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
-};
-
-const CUSTOM_COLORS = [
-  "blue",
-  "purple",
-  "red",
-  "green",
-  "cyan",
-  "orange",
-  "pink",
-  "yellow",
-];
 
 interface CategoriesStepProps {
   categories: Category[];
@@ -63,6 +27,7 @@ interface AddFormState {
   name: string;
   description: string;
   color: string;
+  icon: string;
 }
 
 export function CategoriesStep({
@@ -76,7 +41,8 @@ export function CategoriesStep({
   const [form, setForm] = useState<AddFormState>({
     name: "",
     description: "",
-    color: "blue",
+    color: "#3b82f6",
+    icon: "FileText",
   });
 
   const removeCategory = (id: string) => {
@@ -88,13 +54,13 @@ export function CategoriesStep({
     const newCat: Category = {
       id: `custom-${Date.now()}`,
       name: form.name.trim(),
-      icon: "FileText",
+      icon: form.icon,
       description: form.description.trim() || "Custom category",
       color: form.color,
       isDefault: false,
     };
     onCategoriesChange([...categories, newCat]);
-    setForm({ name: "", description: "", color: "blue" });
+    setForm({ name: "", description: "", color: "#3b82f6", icon: "FileText" });
     setShowAddForm(false);
   };
 
@@ -104,9 +70,9 @@ export function CategoriesStep({
     <div className="flex flex-col gap-6 w-full max-w-lg">
       {/* Header */}
       <div className="space-y-1.5">
-        <div className="flex items-center gap-2 text-[--brand] mb-1">
+        <div className="mb-1 flex items-center gap-2 text-primary">
           <Sparkles className="w-4 h-4" />
-          <span className="text-xs font-mono uppercase tracking-widest">
+          <span className="text-[10px] font-black uppercase tracking-widest">
             Step 3 of 4
           </span>
         </div>
@@ -124,23 +90,23 @@ export function CategoriesStep({
       {/* Category grid */}
       <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1 custom-scroll">
         {categories.map((cat) => {
-          const Icon = ICON_MAP[cat.icon] ?? FileText;
-          const colorClass = COLOR_MAP[cat.color] ?? COLOR_MAP.blue;
+          const Icon = getCategoryIcon(cat.icon);
           return (
             <div
               key={cat.id}
               className={cn(
-                "group relative flex items-start gap-3 p-3 rounded-xl border transition-all duration-200",
-                "bg-[--surface-2] hover:bg-[--surface-3]",
-                "border-[--border] hover:border-[--brand]/30"
+                "group relative flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-3 transition-all duration-200",
+                "hover:border-primary/30"
               )}
             >
               {/* Icon badge */}
               <div
-                className={cn(
-                  "w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0",
-                  colorClass
-                )}
+                className="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0"
+                style={{
+                  color: cat.color,
+                  borderColor: withAlpha(cat.color, "66"),
+                  backgroundColor: withAlpha(cat.color, "1a"),
+                }}
               >
                 <Icon className="w-3.5 h-3.5" />
               </div>
@@ -172,7 +138,7 @@ export function CategoriesStep({
         {/* Add new tile */}
         <button
           onClick={() => setShowAddForm(true)}
-          className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-[--border] hover:border-[--brand]/50 hover:bg-[--brand-dim] transition-all duration-200 text-muted-foreground hover:text-[--brand] min-h-[72px]"
+          className="min-h-18 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border p-3 text-muted-foreground transition-all duration-200 hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
         >
           <Plus className="w-4 h-4" />
           <span className="text-[11px] font-medium">Add category</span>
@@ -181,9 +147,9 @@ export function CategoriesStep({
 
       {/* Add form */}
       {showAddForm && (
-        <div className="p-4 rounded-xl border border-[--brand]/30 bg-[--brand-dim] space-y-3">
+        <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/10 p-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-[--brand] font-mono uppercase tracking-widest">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary">
               New Category
             </p>
             <button
@@ -198,40 +164,54 @@ export function CategoriesStep({
             placeholder="Category name"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg bg-[--surface-2] border border-[--border] focus:border-[--brand] focus:ring-2 focus:ring-[--brand]/20 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-all"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
           <input
             type="text"
             placeholder="Short description (optional)"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg bg-[--surface-2] border border-[--border] focus:border-[--brand] focus:ring-2 focus:ring-[--brand]/20 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-all"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+              Icon
+            </p>
+            <div className="grid grid-cols-8 gap-1.5">
+              {CATEGORY_ICON_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                return (
+                  <button
+                    key={option.name}
+                    onClick={() => setForm({ ...form, icon: option.name })}
+                    className={cn(
+                      "h-7 w-7 rounded-md border flex items-center justify-center transition-all",
+                      form.icon === option.name
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                    )}
+                    title={option.label}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="space-y-1.5">
             <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
               Color
             </p>
             <div className="flex gap-2 flex-wrap">
-              {CUSTOM_COLORS.map((color) => (
+              {CATEGORY_COLOR_OPTIONS.map((option) => (
                 <button
-                  key={color}
-                  onClick={() => setForm({ ...form, color })}
-                  className={cn(
-                    "w-6 h-6 rounded-full border-2 transition-all",
-                    {
-                      blue: "bg-blue-400",
-                      purple: "bg-purple-400",
-                      red: "bg-red-400",
-                      green: "bg-green-400",
-                      cyan: "bg-cyan-400",
-                      orange: "bg-orange-400",
-                      pink: "bg-pink-400",
-                      yellow: "bg-yellow-400",
-                    }[color],
-                    form.color === color
-                      ? "border-foreground scale-110"
-                      : "border-transparent scale-100"
-                  )}
+                  key={option.value}
+                  onClick={() => setForm({ ...form, color: option.value })}
+                  className={cn("w-6 h-6 rounded-full border-2 transition-all", form.color === option.value
+                    ? "border-foreground scale-110"
+                    : "border-transparent scale-100")}
+                  style={{ backgroundColor: option.value }}
+                  title={option.name}
                 />
               ))}
             </div>
@@ -239,7 +219,7 @@ export function CategoriesStep({
           <Button
             onClick={addCategory}
             disabled={!form.name.trim()}
-            className="w-full h-9 bg-[--brand] hover:bg-[--brand]/90 text-[--brand-foreground] text-xs font-semibold border-0"
+            className="h-9 w-full text-xs font-semibold"
           >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
             Add Category
@@ -248,11 +228,11 @@ export function CategoriesStep({
       )}
 
       {/* Stats bar */}
-      <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-[--surface-2] border border-[--border]">
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-2.5">
         <span className="text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">{enabledCount}</span> categories active
         </span>
-        <div className="flex-1 h-px bg-[--border]" />
+        <div className="flex-1 h-px bg-border" />
         <span className="text-[11px] text-muted-foreground font-mono">
           KLIN will create {enabledCount} subfolders in your base path
         </span>
@@ -260,16 +240,12 @@ export function CategoriesStep({
 
       {/* Actions */}
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          onClick={onBack}
-          className="flex-1 px-5 text-muted-foreground hover:text-foreground border border-[--border] bg-transparent hover:bg-[--surface-2]"
-        >
+        <Button variant="ghost" onClick={onBack} className="flex-1 border border-border bg-transparent px-5 text-muted-foreground hover:bg-muted hover:text-foreground">
           Back
         </Button>
         <Button
           onClick={onNext}
-          className="flex-[2] font-semibold border-0"
+          className="flex-2 font-semibold"
         >
           Continue
         </Button>

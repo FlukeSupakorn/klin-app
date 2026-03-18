@@ -89,6 +89,7 @@ export function OnboardingPage() {
             description: cat.description,
             folderPath: `${state.basePath}/${cat.name}`,
             color: cat.color,
+            icon: cat.icon,
             enabled: true,
             aiLearned: false,
             isAutoDescription: false,
@@ -117,70 +118,72 @@ export function OnboardingPage() {
   const showProgress = state.step !== "welcome" && state.step !== "complete";
 
   return (
-    <div className="h-screen bg-background flex flex-col items-center justify-center px-4">
-      {/* Step progress — hidden on welcome and complete */}
-      {showProgress && (
-        <div className="w-full max-w-lg flex justify-center mb-10">
-          <StepProgress currentStep={state.step} />
+    <div className="min-h-screen bg-background px-4 py-8 md:py-10">
+      <div className="mx-auto flex w-full max-w-4xl flex-col">
+        {/* Step progress — hidden on welcome and complete */}
+        {showProgress && (
+          <div className="mb-8 w-full px-1 md:px-3">
+            <StepProgress currentStep={state.step} />
+          </div>
+        )}
+
+        {/* Step content with slide transition */}
+        <div
+          className={cn(
+            "flex w-full justify-center transition-all",
+            animating && direction === "forward"
+              ? "opacity-0 translate-x-8"
+              : animating && direction === "back"
+              ? "opacity-0 -translate-x-8"
+              : "opacity-100 translate-x-0"
+          )}
+          style={{ transitionDuration: "220ms" }}
+        >
+          {state.step === "welcome" && <WelcomeStep onNext={goNext} />}
+
+          {state.step === "base-path" && (
+            <DefaultFolderStep
+              value={state.basePath}
+              onChange={(val) =>
+                setState((prev) => ({ ...prev, basePath: val }))
+              }
+              onNext={goNext}
+              onBack={goBack}
+            />
+          )}
+
+          {state.step === "categories" && (
+            <CategoriesStep
+              categories={state.categories}
+              onCategoriesChange={(cats) =>
+                setState((prev) => ({ ...prev, categories: cats }))
+              }
+              onNext={goNext}
+              onBack={goBack}
+              onSkip={goNext}
+            />
+          )}
+
+          {state.step === "watcher" && (
+            <WatcherStep
+              basePath={state.basePath}
+              folders={state.watcherFolders}
+              onFoldersChange={(folders) =>
+                setState((prev) => ({ ...prev, watcherFolders: folders }))
+              }
+              onNext={goNext}
+              onBack={goBack}
+            />
+          )}
+
+          {state.step === "complete" && (
+            <CompleteStep
+              state={state}
+              onLaunch={handleLaunch}
+              isLaunching={isLaunching}
+            />
+          )}
         </div>
-      )}
-
-      {/* Step content with slide transition */}
-      <div
-        className={cn(
-          "w-full flex justify-center transition-all",
-          animating && direction === "forward"
-            ? "opacity-0 translate-x-8"
-            : animating && direction === "back"
-            ? "opacity-0 -translate-x-8"
-            : "opacity-100 translate-x-0"
-        )}
-        style={{ transitionDuration: "220ms" }}
-      >
-        {state.step === "welcome" && <WelcomeStep onNext={goNext} />}
-
-        {state.step === "base-path" && (
-          <DefaultFolderStep
-            value={state.basePath}
-            onChange={(val) =>
-              setState((prev) => ({ ...prev, basePath: val }))
-            }
-            onNext={goNext}
-            onBack={goBack}
-          />
-        )}
-
-        {state.step === "categories" && (
-          <CategoriesStep
-            categories={state.categories}
-            onCategoriesChange={(cats) =>
-              setState((prev) => ({ ...prev, categories: cats }))
-            }
-            onNext={goNext}
-            onBack={goBack}
-            onSkip={goNext}
-          />
-        )}
-
-        {state.step === "watcher" && (
-          <WatcherStep
-            basePath={state.basePath}
-            folders={state.watcherFolders}
-            onFoldersChange={(folders) =>
-              setState((prev) => ({ ...prev, watcherFolders: folders }))
-            }
-            onNext={goNext}
-            onBack={goBack}
-          />
-        )}
-
-        {state.step === "complete" && (
-          <CompleteStep
-            state={state}
-            onLaunch={handleLaunch}
-            isLaunching={isLaunching}
-          />
-        )}
       </div>
     </div>
   );

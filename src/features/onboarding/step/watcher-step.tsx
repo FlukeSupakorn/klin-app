@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import { cn } from "@/lib/utils";
 import { tauriClient } from "@/services/tauri-client";
 import type { WatcherFolder } from "../types";
@@ -85,13 +85,13 @@ export function WatcherStep({
     <div className="flex flex-col gap-6 w-full max-w-lg">
       {/* Header */}
       <div className="space-y-1.5">
-        <div className="flex items-center gap-2 text-[--brand] mb-1">
+        <div className="mb-1 flex items-center gap-2 text-primary">
           <Eye className="w-4 h-4" />
-          <span className="text-xs font-mono uppercase tracking-widest">
+          <span className="text-[10px] font-black uppercase tracking-widest">
             Step 4 of 4
           </span>
         </div>
-        <h2 className="text-2xl font-bold text-foreground">Watcher Folders</h2>
+        <h2 className="font-syne text-2xl font-black uppercase tracking-tight text-foreground">Watcher Folders</h2>
         <p className="text-sm text-muted-foreground leading-relaxed text-pretty">
           KLIN monitors these directories in real-time. New files dropped in
           will be sorted automatically into your base path.
@@ -119,9 +119,9 @@ export function WatcherStep({
               placeholder="Downloads"
               spellCheck={false}
               className={cn(
-                "w-full pl-8 pr-3 py-3 rounded-xl bg-[--surface-2] border font-mono text-sm text-foreground placeholder:text-muted-foreground/50 outline-none transition-all duration-200",
-                "focus:border-[--brand] focus:ring-2 focus:ring-[--brand]/20",
-                error ? "border-destructive" : "border-[--border]"
+                "w-full rounded-xl border bg-muted/30 py-3 pl-8 pr-3 font-mono text-sm text-foreground outline-none transition-all duration-200 placeholder:text-muted-foreground/50",
+                "focus:border-primary focus:ring-2 focus:ring-primary/20",
+                error ? "border-destructive" : "border-border"
               )}
             />
           </div>
@@ -130,7 +130,7 @@ export function WatcherStep({
             type="button"
             onClick={handleBrowse}
             title="Browse for folder"
-            className="h-11 w-11 p-0 bg-[--surface-2] hover:bg-[--brand-dim] text-muted-foreground hover:text-[--brand] border border-[--border] hover:border-[--brand]/40 flex-shrink-0 rounded-xl"
+            className="h-11 w-11 shrink-0 rounded-xl border border-border bg-muted/30 p-0 text-muted-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
             variant="ghost"
           >
             <FolderOpen className="w-4 h-4" />
@@ -144,13 +144,13 @@ export function WatcherStep({
         )}
 
         {/* Recursive toggle */}
-        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[--surface-2] border border-[--border]">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/30 px-3 py-2.5">
           <button
             onClick={() => setNewRecursive(!newRecursive)}
             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             {newRecursive ? (
-              <ToggleRight className="w-5 h-5 text-[--brand]" />
+              <ToggleRight className="h-5 w-5 text-primary" />
             ) : (
               <ToggleLeft className="w-5 h-5" />
             )}
@@ -165,7 +165,7 @@ export function WatcherStep({
       {/* Folder list */}
       <div className="space-y-2">
         {folders.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-8 rounded-xl border border-dashed border-[--border] text-center">
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-8 text-center">
             <FolderInput className="w-8 h-8 text-muted-foreground/40" />
             <p className="text-xs text-muted-foreground">
               No watch folders yet. Add one above or skip this step.
@@ -176,9 +176,9 @@ export function WatcherStep({
             {folders.map((folder) => (
               <div
                 key={folder.id}
-                className="group flex items-center gap-3 px-3.5 py-3 rounded-xl bg-[--surface-2] border border-[--border] hover:border-[--brand]/30 transition-all duration-200"
+                className="group flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-3.5 py-3 transition-all duration-200 hover:border-primary/30"
               >
-                <FolderInput className="w-4 h-4 text-[--brand] flex-shrink-0" />
+                <FolderInput className="h-4 w-4 shrink-0 text-primary" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-mono text-foreground truncate">
                     {folder.path}
@@ -191,7 +191,7 @@ export function WatcherStep({
                   <button
                     onClick={() => toggleRecursive(folder.id)}
                     title={folder.recursive ? "Disable recursive" : "Enable recursive"}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[--surface-3] text-muted-foreground hover:text-[--brand] transition-colors"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
                   >
                     <RefreshCw className="w-3 h-3" />
                   </button>
@@ -209,13 +209,13 @@ export function WatcherStep({
       </div>
 
       {/* Output preview */}
-      <div className="flex gap-2.5 p-3.5 rounded-xl bg-[--surface-2] border border-[--border]">
-        <Info className="w-4 h-4 text-[--brand] flex-shrink-0 mt-0.5" />
+      <div className="flex gap-2.5 rounded-xl border border-border bg-muted/30 p-3.5">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <div className="space-y-1 text-xs">
           <p className="font-semibold text-foreground">Output destination</p>
-          <p className="font-mono text-muted-foreground bg-[--surface-3] px-2 py-1 rounded-md inline-block">
+          <p className="inline-block rounded-md bg-muted px-2 py-1 font-mono text-muted-foreground">
             {basePath || "~/KLIN"}/
-            <span className="text-[--brand]">[category]</span>/
+            <span className="text-primary">[category]</span>/
             <span className="text-muted-foreground/60">[year-month]/</span>
           </p>
         </div>
@@ -226,13 +226,13 @@ export function WatcherStep({
         <Button
           variant="ghost"
           onClick={onBack}
-          className=" px-5 text-muted-foreground hover:text-foreground border border-[--border] bg-transparent hover:bg-[--surface-2]"
+          className="border border-border bg-transparent px-5 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           Back
         </Button>
         <Button
           onClick={onNext}
-          className="flex-1 font-semibold border-0"
+          className="flex-1 font-semibold"
         >
           Finish Setup
         </Button>

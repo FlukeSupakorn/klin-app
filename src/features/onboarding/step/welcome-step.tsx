@@ -1,5 +1,5 @@
 import { BrainCircuit, Cpu, Files, Folder, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 
 interface WelcomeStepProps {
   onNext: () => void;
@@ -30,23 +30,23 @@ const features = [
 
 export function WelcomeStep({ onNext }: WelcomeStepProps) {
   return (
-    <div className="flex flex-col items-center text-center gap-8">
+    <div className="flex w-full max-w-2xl flex-col items-center gap-8 text-center">
       {/* Logo / brand mark */}
       <div className="relative">
-        <div className="w-20 h-20 rounded-2xl bg-[--brand-dim] border border-[--brand]/30 flex items-center justify-center shadow-lg shadow-[--brand]/10">
-          <Sparkles className="w-9 h-9 text-[--brand]" />
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-primary/30 bg-primary/10 shadow-lg shadow-primary/10">
+          <Sparkles className="h-9 w-9 text-primary" />
         </div>
-        <div className="absolute -inset-2 rounded-3xl bg-[--brand]/5 blur-xl -z-10" />
+        <div className="absolute -inset-2 -z-10 rounded-3xl bg-primary/5 blur-xl" />
       </div>
 
       {/* Heading */}
       <div className="space-y-3 max-w-sm">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[--brand-dim] border border-[--brand]/20 text-[--brand] text-xs font-mono uppercase tracking-widest">
-          <span className="w-1.5 h-1.5 rounded-full bg-[--brand] animate-pulse" />
+        <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-primary">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
           Quick Setup — 3 minutes
         </div>
-        <h1 className="text-3xl font-bold text-balance text-foreground leading-tight">
-          Welcome to <span className="text-[--brand]">KLIN</span>
+        <h1 className="font-syne text-4xl font-black uppercase tracking-tight text-foreground">
+          Welcome To <span className="text-primary">KLIN</span>
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed text-pretty">
           Your intelligent file organization assistant. Let&apos;s configure
@@ -56,14 +56,14 @@ export function WelcomeStep({ onNext }: WelcomeStepProps) {
       </div>
 
       {/* Feature grid */}
-      <div className="w-full max-w-sm grid grid-cols-2 gap-3">
+      <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
         {features.map(({ icon: Icon, label, desc }) => (
           <div
             key={label}
-            className="group p-3.5 rounded-xl bg-[--surface-2] border border-[--border] hover:border-[--brand]/40 hover:bg-[--brand-dim] transition-all duration-200 text-left"
+            className="group rounded-xl border border-border bg-muted/30 p-3.5 text-left transition-all duration-200 hover:border-primary/40"
           >
-            <div className="w-8 h-8 rounded-lg bg-[--surface-3] border border-[--border] flex items-center justify-center mb-2.5 group-hover:border-[--brand]/30 group-hover:bg-[--brand]/10 transition-all duration-200">
-              <Icon className="w-4 h-4 text-[--brand]" />
+            <div className="mb-2.5 flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background transition-all duration-200 group-hover:border-primary/30 group-hover:bg-primary/10">
+              <Icon className="h-4 w-4 text-primary" />
             </div>
             <p className="text-xs font-semibold text-foreground mb-0.5">{label}</p>
             <p className="text-[11px] text-muted-foreground leading-relaxed">{desc}</p>
@@ -73,10 +73,7 @@ export function WelcomeStep({ onNext }: WelcomeStepProps) {
 
       {/* CTA */}
       <div className="flex flex-col items-center gap-3 w-full max-w-xs">
-        <Button
-          onClick={onNext}
-          className="w-full h-11 font-semibold text-sm border-0"
-        >
+        <Button onClick={onNext} className="h-11 w-full text-sm font-semibold">
           Get Started
         </Button>
         <p className="text-[11px] text-muted-foreground">
