@@ -47,7 +47,7 @@
 .wmde-markdown h4,
 .wmde-markdown h5,
 .wmde-markdown h6 {
-  color: hsl(var(--foreground));
+  color: var(--foreground);
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1.25;
@@ -69,7 +69,7 @@
 
 .wmde-markdown p,
 .wmde-markdown li {
-  color: hsl(var(--foreground));
+  color: var(--foreground);
 }
 
 .wmde-markdown ul {
@@ -109,15 +109,13 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
+  background: var(--border);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+  background: var(--muted-foreground);
 }
-
-@custom-variant dark (&:is(.dark *));
 
 :root {
   --background: oklch(1.0000 0 0);
