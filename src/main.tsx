@@ -55,17 +55,21 @@ if (import.meta.env.DEV) {
       throw error;
     } finally {
       const endTime = performance.now();
-      const { useApiLogStore } = await import("@/stores/use-api-log-store");
-      useApiLogStore.getState().addLog({
-        timestamp: new Date().toISOString(),
-        method,
-        url,
-        status,
-        latencyMs: Math.round(endTime - startTime),
-        requestBody,
-        responseBody,
-        error: errorMsg,
-      });
+      try {
+        const { useApiLogStore } = await import("@/stores/use-api-log-store");
+        useApiLogStore.getState().addLog({
+          timestamp: new Date().toISOString(),
+          method,
+          url,
+          status,
+          latencyMs: Math.round(endTime - startTime),
+          requestBody,
+          responseBody,
+          error: errorMsg,
+        });
+      } catch {
+        // Never let debug logging failures (e.g. localStorage quota) break API calls.
+      }
     }
   };
 }
