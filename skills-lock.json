@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "deployment-pipeline-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "c7dddefd50c9904a883b7471fb64b7b129e976d5d3c6066b3545cac13a324d16"
+    },
     "embedding-tauri-sidecars": {
       "source": "dchuk/claude-code-tauri-skills",
       "sourceType": "github",
