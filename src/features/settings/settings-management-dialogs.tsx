@@ -8,6 +8,11 @@ import { useCategoryManagementStore } from "@/stores/use-category-management-sto
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { cn } from "@/lib/utils";
 import { BatchCategoryModal } from "@/features/categories/batch-category-modal";
+import {
+  CATEGORY_ICON_OPTIONS,
+  getCategoryIcon,
+  withAlpha,
+} from "@/features/categories/category-appearance";
 import type { ManagedCategory } from "@/types/domain";
 
 function joinDefaultFolderPath(basePath: string, categoryName: string): string {
@@ -32,6 +37,7 @@ interface CategoryFormState {
   name: string;
   description: string;
   color: string;
+  icon: string;
   folderPath: string;
   enabled: boolean;
   aiLearned: boolean;
@@ -41,6 +47,7 @@ const emptyForm: CategoryFormState = {
   name: "",
   description: "",
   color: "#6366f1",
+  icon: "FileText",
   folderPath: "",
   enabled: true,
   aiLearned: true,
@@ -273,6 +280,22 @@ function CategoriesSection({ onOpenAdd, onOpenEdit, onOpenBatch }: CategoriesSec
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
+                  {(() => {
+                    const Icon = getCategoryIcon(category.icon);
+                    return (
+                      <span
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-md border"
+                        style={{
+                          color: category.color,
+                          borderColor: withAlpha(category.color, "66"),
+                          backgroundColor: withAlpha(category.color, "1a"),
+                        }}
+                        title={category.icon}
+                      >
+                        <Icon className="h-3 w-3" />
+                      </span>
+                    );
+                  })()}
                   <span
                     className="inline-block h-3 w-3 rounded-full border border-border"
                     style={{ backgroundColor: category.color }}
@@ -388,8 +411,32 @@ function CategoryEditorModal({ mode, formState, onFormChange, onClose, onSave, s
             <textarea
               value={formState.description}
               onChange={(e) => onFormChange((state) => ({ ...state, description: e.target.value }))}
-              className="min-h-[100px] w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-hidden"
+              className="min-h-25 w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-hidden"
             />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Icon</label>
+            <div className="grid grid-cols-8 gap-1.5">
+              {CATEGORY_ICON_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                return (
+                  <button
+                    key={option.name}
+                    type="button"
+                    onClick={() => onFormChange((state) => ({ ...state, icon: option.name }))}
+                    className={cn(
+                      "h-8 w-8 rounded-md border flex items-center justify-center transition-all",
+                      formState.icon === option.name
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-muted/30 text-muted-foreground hover:text-foreground",
+                    )}
+                    title={option.label}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Color</label>
@@ -496,6 +543,7 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
       name: category.name,
       description: category.description,
       color: category.color,
+      icon: category.icon,
       folderPath: category.folderPath,
       enabled: category.enabled,
       aiLearned: category.aiLearned,
@@ -542,6 +590,7 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
           name: normalizedName,
           description: normalizedDescription,
           color: normalizedColor,
+          icon: formState.icon,
           folderPath: normalizedFolderPath,
           enabled: formState.enabled,
           aiLearned: formState.aiLearned,
@@ -553,6 +602,7 @@ export function SettingsManagementDialogs({ open, sections, onClose }: SettingsM
           name: normalizedName,
           description: normalizedDescription,
           color: normalizedColor,
+          icon: formState.icon,
           folderPath: normalizedFolderPath,
           enabled: formState.enabled,
           aiLearned: formState.aiLearned,

@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import { cn } from "@/lib/utils";
 import { tauriClient } from "@/services/tauri-client";
 import {
-  AlertCircle,
-  CheckCircle2,
-  ChevronRight,
   FolderOpen,
   Info,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/not-use-ui/input";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { categoryManagementService } from "@/services/category-management-service";
 
@@ -85,11 +82,11 @@ export function DefaultFolderStep({
     <div className="flex flex-col gap-7 w-full max-w-md">
       {/* Header */}
       <div className="space-y-1.5">
-        <div className="flex items-center gap-2 text-[--brand] mb-1">
+        <div className="mb-1 flex items-center gap-2 text-primary">
           <FolderOpen className="w-4 h-4" />
-          <span className="text-xs uppercase tracking-widest">Step 2 of 4</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-primary">Step 2 of 4</span>
         </div>
-        <h2 className="text-2xl font-bold text-foreground">Default Folder</h2>
+        <h2 className="font-syne text-2xl font-black uppercase tracking-tight text-foreground">Default Folder</h2>
         <p className="text-sm text-muted-foreground leading-relaxed text-pretty">
           KLIN will create organized subfolders here. All sorted files will be
           moved into your chosen base directory.
@@ -106,7 +103,7 @@ export function DefaultFolderStep({
             value={draftDefaultFolder}
             onChange={(e) => setDraftDefaultFolder(e.target.value)}
             placeholder="Base path for categories"
-            className="border-border bg-muted"
+            className="border-border bg-muted/30"
           />
           <Button
             variant="outline"
@@ -132,8 +129,8 @@ export function DefaultFolderStep({
               className={cn(
                 "flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-lg border text-left transition-all duration-200",
                 value === path
-                  ? "border-[--brand] bg-[--brand-dim] text-[--brand]"
-                  : "border-[--border] bg-[--surface-2] hover:border-[--brand]/40 hover:bg-[--brand-dim] text-muted-foreground hover:text-[--brand]",
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-primary",
               )}
             >
               <span className="text-[11px] font-medium text-foreground">
@@ -146,8 +143,8 @@ export function DefaultFolderStep({
       </div>
 
       {/* Info notice */}
-      <div className="flex gap-2.5 p-3.5 rounded-xl bg-[--surface-2] border border-[--border]">
-        <Info className="w-4 h-4 text-[--brand] flex-shrink-0 mt-0.5" />
+      <div className="flex gap-2.5 rounded-xl border border-border bg-muted/30 p-3.5">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <p className="text-xs text-muted-foreground leading-relaxed">
           KLIN will automatically create category subfolders inside this base
           path. You can change this at any time from Settings.
@@ -159,13 +156,13 @@ export function DefaultFolderStep({
         <Button
           variant="ghost"
           onClick={onBack}
-          className="flex-1 text-muted-foreground hover:text-foreground border border-[--border] bg-transparent hover:bg-[--surface-2]"
+          className="flex-1 border border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           Back
         </Button>
         <Button
           onClick={handleNext}
-          className="flex-[2] font-semibold border-0"
+          className="flex-2 font-semibold"
           disabled={isSaving}
         >
           {isSaving ? "Initializing..." : "Continue"}

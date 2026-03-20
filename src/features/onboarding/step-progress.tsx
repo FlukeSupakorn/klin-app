@@ -17,10 +17,10 @@ export function StepProgress({ currentStep }: StepProgressProps) {
   return (
     <div className="relative flex items-start w-full">
       {/* Background line */}
-      <div className="absolute top-4 left-4 right-4 h-px bg-[--border]" />
+      <div className="absolute left-4 right-4 top-4 h-px bg-border" />
       {/* Progress line */}
       <div
-        className="absolute top-4 left-4 h-px bg-[--brand] transition-all duration-500"
+        className="absolute left-4 top-4 h-px bg-primary transition-all duration-500"
         style={{ width: `calc((100% - 2rem) * ${progressPercent / 100})` }}
       />
 
@@ -34,12 +34,12 @@ export function StepProgress({ currentStep }: StepProgressProps) {
               className={cn(
                 "relative flex items-center justify-center w-8 h-8 rounded-full border-2 text-xs font-mono font-semibold transition-all duration-300",
                 isCompleted &&
-                  "bg-[--brand] border-[--brand] text-[--brand-foreground]",
+                  "border-primary bg-primary text-primary-foreground",
                 isActive &&
-                  "bg-transparent border-[--brand] text-[--brand]",
+                  "border-primary bg-transparent text-primary",
                 !isCompleted &&
                   !isActive &&
-                  "bg-transparent border-[--border] text-[--muted-foreground]"
+                  "border-border bg-transparent text-muted-foreground"
               )}
             >
               {isCompleted ? (
@@ -48,14 +48,14 @@ export function StepProgress({ currentStep }: StepProgressProps) {
                 <span>{index + 1}</span>
               )}
               {isActive && (
-                <span className="absolute inset-0 rounded-full animate-ping bg-[--brand] opacity-20" />
+                <span className="absolute inset-0 animate-ping rounded-full bg-primary opacity-20" />
               )}
             </div>
             <span
               className={cn(
-                "text-[10px] font-mono uppercase tracking-widest transition-colors duration-300 text-center",
-                isActive ? "text-[--brand]" : "text-[--muted-foreground]",
-                isCompleted && "text-[--foreground]"
+                "text-center text-[10px] font-black uppercase tracking-widest transition-colors duration-300",
+                isActive ? "text-primary" : "text-muted-foreground",
+                isCompleted && "text-foreground"
               )}
             >
               {step.shortLabel}

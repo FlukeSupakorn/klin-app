@@ -13,6 +13,7 @@ export interface ManagedCategory {
   name: string;
   description: string;
   color: string;
+  icon: string;
   folderPath: string;
   enabled: boolean;
   aiLearned: boolean;

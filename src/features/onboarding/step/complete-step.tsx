@@ -1,32 +1,14 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/not-use-ui/button";
 import type { OnboardingState } from "../types";
+import { getCategoryIcon } from "@/features/categories/category-appearance";
 import {
-  Archive,
-  BarChart2,
   CheckCircle2,
-  Code2,
   Eye,
-  FileText,
-  Film,
   FolderOpen,
-  Image,
   Loader2,
-  Music,
-  Palette,
   Rocket,
   Sparkles,
 } from "lucide-react";
-
-const ICON_MAP: Record<string, React.ElementType> = {
-  FileText,
-  Image,
-  Film,
-  Music,
-  Code2,
-  Archive,
-  Palette,
-  BarChart2,
-};
 
 interface CompleteStepProps {
   state: OnboardingState;
@@ -60,15 +42,15 @@ export function CompleteStep({ state, onLaunch, isLaunching = false }: CompleteS
     <div className="flex flex-col items-center gap-8 w-full max-w-md text-center">
       {/* Success icon */}
       <div className="relative">
-        <div className="w-20 h-20 rounded-full bg-[--success-dim] border border-[--success]/30 flex items-center justify-center shadow-lg shadow-[--success]/10">
-          <CheckCircle2 className="w-9 h-9 text-[--success]" />
+        <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/10 shadow-lg shadow-primary/10">
+          <CheckCircle2 className="h-9 w-9 text-primary" />
         </div>
-        <div className="absolute -inset-3 rounded-full bg-[--success]/5 blur-xl -z-10" />
+        <div className="absolute -inset-3 -z-10 rounded-full bg-primary/5 blur-xl" />
       </div>
 
       {/* Text */}
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold text-foreground text-balance">
+        <h2 className="font-syne text-3xl font-black uppercase tracking-tight text-foreground text-balance">
           You&apos;re all set!
         </h2>
         <p className="text-sm text-muted-foreground leading-relaxed text-pretty">
@@ -82,10 +64,10 @@ export function CompleteStep({ state, onLaunch, isLaunching = false }: CompleteS
         {summaryItems.map(({ icon: Icon, label, value }) => (
           <div
             key={label}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[--surface-2] border border-[--border]"
+            className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3"
           >
-            <div className="w-8 h-8 rounded-lg bg-[--brand-dim] border border-[--brand]/20 flex items-center justify-center flex-shrink-0">
-              <Icon className="w-4 h-4 text-[--brand]" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10">
+              <Icon className="h-4 w-4 text-primary" />
             </div>
             <div>
               <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
@@ -104,13 +86,13 @@ export function CompleteStep({ state, onLaunch, isLaunching = false }: CompleteS
         </p>
         <div className="flex flex-wrap gap-1.5">
           {state.categories.map((cat) => {
-            const Icon = ICON_MAP[cat.icon] ?? FileText;
+            const Icon = getCategoryIcon(cat.icon);
             return (
               <div
                 key={cat.id}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[--surface-2] border border-[--border] text-xs text-muted-foreground"
+                className="flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground"
               >
-                <Icon className="w-3 h-3 text-[--brand]" />
+                <Icon className="h-3 w-3 text-primary" />
                 {cat.name}
               </div>
             );
@@ -122,7 +104,7 @@ export function CompleteStep({ state, onLaunch, isLaunching = false }: CompleteS
       <Button
         onClick={onLaunch}
         disabled={isLaunching}
-        className="w-full h-12 bg-[--brand] hover:bg-[--brand]/90 text-[--brand-foreground] font-bold text-base border-0 shadow-lg shadow-[--brand]/20"
+        className="h-12 w-full text-base font-bold"
       >
         {isLaunching ? (
           <>

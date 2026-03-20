@@ -22,6 +22,7 @@ interface WorkerCategory {
   name: string;
   description: string;
   color?: string | null;
+  icon?: string | null;
   folder_path?: string | null;
   destination_path?: string | null;
   enabled?: boolean;
@@ -94,6 +95,7 @@ function toManagedCategory(category: WorkerCategory, defaultFolder: string): Man
     name: category.name,
     description: category.description,
     color,
+    icon: (category.icon?.trim() || "FileText"),
     folderPath,
     enabled,
     aiLearned,
@@ -200,6 +202,7 @@ export class CategoryManagementService {
           enabled: category.enabled,
           folder_path: inferredFolderPath,
           color: category.color,
+          icon: category.icon,
         }),
       });
 
@@ -237,6 +240,11 @@ export class CategoryManagementService {
       const value = updates.color.trim().toLowerCase();
       payload.color = value;
       normalizedUpdates.color = value;
+    }
+    if (typeof updates.icon === "string") {
+      const value = updates.icon.trim();
+      payload.icon = value;
+      normalizedUpdates.icon = value;
     }
 
     if (Object.keys(payload).length === 0) {
