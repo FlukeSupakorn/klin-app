@@ -2,6 +2,38 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::entities::{AutomationLog, Category, RuleMapping};
 
+#[derive(Serialize)]
+pub struct NoteFileEntryDto {
+    pub path: String,
+    pub file_name: String,
+    pub size_bytes: u64,
+    pub last_modified_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutomationConfigDto {
+    pub auto_organize_enabled: bool,
+    pub watched_folders: Vec<String>,
+    pub scan_interval_seconds: u64,
+}
+
+impl Default for AutomationConfigDto {
+    fn default() -> Self {
+        Self {
+            auto_organize_enabled: false,
+            watched_folders: Vec::new(),
+            scan_interval_seconds: 60,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct SubdirEntry {
+    pub name: String,
+    pub path: String,
+    pub has_children: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveFileDto {
