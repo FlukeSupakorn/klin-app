@@ -9,7 +9,7 @@ import type {
   SubdirEntry,
   TauriClient,
   WatchFolderDto,
-  WriteLogDto,
+  WriteHistoryDto,
 } from "@/types/ipc";
 import type { AutomationLog, Category } from "@/types/domain";
 
@@ -81,12 +81,12 @@ class TauriCommandClient implements TauriClient {
     return invoke("get_app_data_dir");
   }
 
-  writeLog(input: WriteLogDto): Promise<void> {
-    return invoke("write_log", { input });
+  writeHistory(input: WriteHistoryDto): Promise<void> {
+    return invoke("write_history", { input });
   }
 
-  listLogs(): Promise<AutomationLog[]> {
-    return invoke("list_logs");
+  listHistory(): Promise<AutomationLog[]> {
+    return invoke("list_history");
   }
 
   getCategories(): Promise<Category[]> {

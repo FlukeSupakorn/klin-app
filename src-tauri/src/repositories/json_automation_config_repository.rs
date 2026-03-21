@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::domain::repository_traits::AutomationConfigRepository;
-use crate::dto::AutomationConfigDto;
+use crate::domain::dto::AutomationConfigDto;
 
 pub struct JsonAutomationConfigRepository {
     path: PathBuf,

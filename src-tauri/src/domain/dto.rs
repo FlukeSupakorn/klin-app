@@ -55,7 +55,7 @@ pub struct WatchFolderDto {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WriteLogDto {
+pub struct WriteHistoryDto {
     pub log: AutomationLog,
 }
 

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/not-use-u
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { useCategoryStore } from "@/stores/use-category-store";
 import { useRuleStore } from "@/stores/use-rule-store";
-import { useLogStore } from "@/stores/use-log-store";
+import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 
 export function DeveloperPage() {
@@ -11,7 +11,7 @@ export function DeveloperPage() {
   const lastScanTime = useAutomationStore((state) => state.lastScanTime);
   const categories = useCategoryStore((state) => state.categories);
   const rules = useRuleStore((state) => state.categoryToFolderMap);
-  const logs = useLogStore((state) => state.logs);
+  const logs = useHistoryStore((state) => state.logs);
   const lockedPaths = usePrivacyStore((state) => state.lockedPaths);
 
   return (

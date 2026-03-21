@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::{
-    dto::{CategoryDto, SaveRuleMappingDto},
+    domain::dto::{CategoryDto, SaveRuleMappingDto},
     AppState,
 };
 

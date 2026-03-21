@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { AutomationLog, LogFilter, PaginationState } from "@/types/domain";
 
-interface LogStoreState {
+interface HistoryStoreState {
   logs: AutomationLog[];
   filters: LogFilter;
   pagination: PaginationState;
@@ -15,7 +15,7 @@ interface LogStoreState {
   pagedLogs: () => AutomationLog[];
 }
 
-export const useLogStore = create<LogStoreState>()(
+export const useHistoryStore = create<HistoryStoreState>()(
   persist(
     (set, get) => ({
       logs: [],
@@ -54,7 +54,7 @@ export const useLogStore = create<LogStoreState>()(
       },
     }),
     {
-      name: "klin-log-store",
+      name: "klin-history-store",
     },
   ),
 );

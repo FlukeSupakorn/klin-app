@@ -17,7 +17,7 @@ export interface SaveRuleMappingDto {
   mappings: RuleMapping[];
 }
 
-export interface WriteLogDto {
+export interface WriteHistoryDto {
   log: AutomationLog;
 }
 
@@ -65,8 +65,8 @@ export interface TauriClient {
   watchFolder(input: WatchFolderDto): Promise<void>;
   getDownloadsFolder(): Promise<string>;
   getAppDataDir(): Promise<string>;
-  writeLog(input: WriteLogDto): Promise<void>;
-  listLogs(): Promise<AutomationLog[]>;
+  writeHistory(input: WriteHistoryDto): Promise<void>;
+  listHistory(): Promise<AutomationLog[]>;
   getCategories(): Promise<Category[]>;
   saveRuleMapping(input: SaveRuleMappingDto): Promise<void>;
   startOAuthListener(): Promise<void>;

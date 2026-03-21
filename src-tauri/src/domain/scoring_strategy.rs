@@ -9,3 +9,15 @@ impl ScoringStrategy for FrontendOwnedScoringStrategy {
         "frontend-owned"
     }
 }
+
+pub enum AiProvider {
+    Frontend,
+}
+
+pub struct ScoringProviderFactory;
+
+impl ScoringProviderFactory {
+    pub fn create(_provider: AiProvider) -> Box<dyn ScoringStrategy> {
+        Box::new(FrontendOwnedScoringStrategy)
+    }
+}

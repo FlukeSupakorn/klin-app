@@ -1,6 +1,5 @@
 mod commands;
 mod domain;
-mod dto;
 mod infrastructure;
 mod repositories;
 mod services;
@@ -20,18 +19,18 @@ use domain::repository_traits::AutomationConfigRepository;
 use repositories::{
     json_automation_config_repository::JsonAutomationConfigRepository,
     json_category_repository::JsonCategoryRepository,
-    json_log_repository::JsonLogRepository,
+    json_history_repository::JsonHistoryRepository,
     json_rule_repository::JsonRuleRepository,
 };
 use services::{
-    category_service::CategoryService, log_service::LogService, rule_service::RuleService,
+    category_service::CategoryService, history_service::HistoryService, rule_service::RuleService,
 };
 use sidecars::{LlamaSlotState, ModelSlot};
 
 // ── App State ───────────────────────────────────────────────────────────
 
 pub struct AppState {
-    pub log_service: Arc<Mutex<LogService<JsonLogRepository>>>,
+    pub history_service: Arc<Mutex<HistoryService<JsonHistoryRepository>>>,
     pub rule_service: Arc<Mutex<RuleService<JsonRuleRepository>>>,
     pub category_service: Arc<Mutex<CategoryService<JsonCategoryRepository>>>,
     pub app_data_dir: PathBuf,
@@ -186,7 +185,7 @@ pub fn run() {
             let worker_child = setup_worker(app.handle(), &app_data_dir);
 
             // ── Repositories & services ─────────────────────────────
-            let log_repo = JsonLogRepository::new(app_data_dir.join("logs.json"));
+            let history_repo = JsonHistoryRepository::new(app_data_dir.join("history.json"));
             let rule_repo = JsonRuleRepository::new(app_data_dir.join("rules.json"));
             let category_repo = JsonCategoryRepository::new(app_data_dir.join("categories.json"));
             let config_repo = Arc::new(JsonAutomationConfigRepository::new(
@@ -197,7 +196,7 @@ pub fn run() {
             let slots = setup_llama_slots();
 
             app.manage(AppState {
-                log_service: Arc::new(Mutex::new(LogService::new(log_repo))),
+                history_service: Arc::new(Mutex::new(HistoryService::new(history_repo))),
                 rule_service: Arc::new(Mutex::new(RuleService::new(rule_repo))),
                 category_service: Arc::new(Mutex::new(CategoryService::new(category_repo))),
                 app_data_dir: app_data_dir.clone(),
@@ -233,8 +232,8 @@ pub fn run() {
             commands::get_app_data_dir,
             commands::list_note_files,
             commands::read_note_file,
-            commands::write_log,
-            commands::list_logs,
+            commands::write_history,
+            commands::list_history,
             commands::get_categories,
             commands::save_rule_mapping,
             commands::start_oauth_listener,

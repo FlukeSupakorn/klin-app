@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::dto::NoteFileEntryDto;
+use crate::domain::dto::NoteFileEntryDto;
 
 #[tauri::command]
 pub fn save_note_file(

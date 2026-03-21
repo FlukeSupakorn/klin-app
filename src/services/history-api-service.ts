@@ -1,7 +1,7 @@
 import type { HistoryEntry } from "@/features/history/history-types";
 import type { CategoryScore } from "@/types/domain";
 import { tauriClient } from "@/services/tauri-client";
-import { useLogStore } from "@/stores/use-log-store";
+import { useHistoryStore } from "@/stores/use-history-store";
 
 const HISTORY_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/history",
@@ -51,8 +51,8 @@ function normalizeLogScores(input: unknown): CategoryScore[] {
 }
 
 async function getLocalOrganizeHistoryEntries(): Promise<HistoryEntry[]> {
-  const tauriLogs = await tauriClient.listLogs().catch(() => []);
-  const storeLogs = useLogStore.getState().logs;
+  const tauriLogs = await tauriClient.listHistory().catch(() => []);
+  const storeLogs = useHistoryStore.getState().logs;
   const mergedLogs = [...storeLogs, ...tauriLogs];
   const dedupedById = new Map<string, (typeof mergedLogs)[number]>();
   mergedLogs.forEach((log) => {

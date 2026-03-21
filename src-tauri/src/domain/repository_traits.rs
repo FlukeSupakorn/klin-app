@@ -1,6 +1,6 @@
 use crate::domain::entities::{AutomationLog, Category, RuleMapping};
 
-pub trait LogRepository: Send + Sync {
+pub trait HistoryRepository: Send + Sync {
     fn append(&mut self, log: AutomationLog) -> Result<(), String>;
     fn list(&self) -> Result<Vec<AutomationLog>, String>;
 }
@@ -15,6 +15,6 @@ pub trait CategoryRepository: Send + Sync {
 }
 
 pub trait AutomationConfigRepository: Send + Sync {
-    fn save(&self, config: &crate::dto::AutomationConfigDto) -> Result<(), String>;
-    fn load(&self) -> Result<crate::dto::AutomationConfigDto, String>;
+    fn save(&self, config: &crate::domain::dto::AutomationConfigDto) -> Result<(), String>;
+    fn load(&self) -> Result<crate::domain::dto::AutomationConfigDto, String>;
 }

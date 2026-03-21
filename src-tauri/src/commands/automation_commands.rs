@@ -1,8 +1,8 @@
 use tauri::State;
 
 use crate::{
+    domain::dto::AutomationConfigDto,
     domain::repository_traits::AutomationConfigRepository,
-    dto::AutomationConfigDto,
     AppState,
 };
 

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::domain::file_command::{DeleteFileCommand, FileCommand, MoveFileCommand};
+use crate::domain::file_operations::{DeleteFileCommand, FileCommand, MoveFileCommand};
 use crate::infrastructure::fs_ops;
 
 pub struct FileService;

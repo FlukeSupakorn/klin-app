@@ -2,7 +2,7 @@ import { ScoringStrategyFactory } from "@/lib/ai-scoring-service";
 import { RuleEngine } from "@/services/rule-engine";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryStore } from "@/stores/use-category-store";
-import { useLogStore } from "@/stores/use-log-store";
+import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 import { useRuleStore } from "@/stores/use-rule-store";
 import type { AutomationJob, AutomationLog } from "@/types/domain";
@@ -46,8 +46,8 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
       errorMessage: "No active mapping for selected category",
     };
 
-    useLogStore.getState().appendLog(unmappedLog);
-    await tauriClient.writeLog({ log: unmappedLog });
+    useHistoryStore.getState().appendLog(unmappedLog);
+    await tauriClient.writeHistory({ log: unmappedLog });
     return;
   }
 
@@ -68,6 +68,6 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
     status: "completed",
   };
 
-  useLogStore.getState().appendLog(log);
-  await tauriClient.writeLog({ log });
+  useHistoryStore.getState().appendLog(log);
+  await tauriClient.writeHistory({ log });
 }

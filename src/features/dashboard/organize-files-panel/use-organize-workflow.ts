@@ -3,7 +3,7 @@ import type { DragEvent } from "react";
 import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
-import { useLogStore } from "@/stores/use-log-store";
+import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 import type { AutomationLog, OrganizePreviewItem } from "@/types/domain";
 import {
@@ -495,8 +495,8 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
         status: "completed",
       };
 
-      useLogStore.getState().appendLog(moveLog);
-      await tauriClient.writeLog({ log: moveLog });
+      useHistoryStore.getState().appendLog(moveLog);
+      await tauriClient.writeHistory({ log: moveLog });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Move failed";
       setErrorMessage(`Failed to move ${item.fileName}: ${reason}`);

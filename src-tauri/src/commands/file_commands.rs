@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
-    dto::{MoveFileDto, ReadFolderDto, SubdirEntry, WatchFolderDto},
+    domain::dto::{MoveFileDto, ReadFolderDto, SubdirEntry, WatchFolderDto},
     infrastructure::watcher,
     services::file_service::FileService,
 };
