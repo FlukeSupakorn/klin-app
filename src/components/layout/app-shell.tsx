@@ -330,7 +330,7 @@ export function AppShell() {
           )}
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-black text-foreground ring-2 ring-border">
             {profile?.picture ? (
-              <img src={profile.picture} alt={profile.name ?? "Profile"} className="h-full w-full rounded-full object-cover" />
+              <img src={profile.picture} alt={profile.name ?? "Profile"} referrerPolicy="no-referrer" className="h-full w-full rounded-full object-cover" />
             ) : (
               profileInitial
             )}

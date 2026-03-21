@@ -279,6 +279,7 @@ export function SettingsPage() {
               <img
                 src={profile.picture}
                 alt={profile.name}
+                referrerPolicy="no-referrer"
                 className="h-12 w-12 rounded-full border-2 border-primary/30 object-cover"
               />
             ) : (
