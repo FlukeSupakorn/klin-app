@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
-use crate::domain::file_operations::{DeleteFileCommand, FileCommand, MoveFileCommand};
-use crate::infrastructure::fs_ops;
+use crate::domain::{
+    dto::SubdirEntry,
+    file_operations::{DeleteFileCommand, FileCommand, MoveFileCommand},
+};
+use crate::infrastructure::{fs_ops, watcher};
 
 pub struct FileService;
 
@@ -23,5 +26,17 @@ impl FileService {
             file_path: PathBuf::from(path),
         };
         command.execute()
+    }
+
+    pub fn watch_folder(path: String) -> Result<(), String> {
+        watcher::watch_folder(PathBuf::from(path).as_path())
+    }
+
+    pub fn list_subdirectories(path: String) -> Result<Vec<SubdirEntry>, String> {
+        fs_ops::list_subdirectories(PathBuf::from(path).as_path())
+    }
+
+    pub fn list_all_subdirectories(path: String) -> Result<Vec<String>, String> {
+        fs_ops::list_all_subdirectories(PathBuf::from(path).as_path())
     }
 }

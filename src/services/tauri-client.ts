@@ -22,13 +22,6 @@ class TauriCommandClient implements TauriClient {
     return invoke("read_folder", { input });
   }
 
-  // ── AI server lifecycle ──────────────────────────────────────────────
-  // Every frontend service that triggers an AI-dependent klin-worker
-  // endpoint MUST call `ensureLlamaServer()` before its fetch request.
-  // AI-triggering endpoints: /api/organize, /api/summary
-  // (including stream), /api/settings/default-base-path when it seeds
-  // or embeds categories, and /api/settings/categories (POST/PATCH/batch).
-
   ensureLlamaServer(slot: ModelSlot): Promise<void> {
     return invoke("ensure_llama_server", { slot });
   }
