@@ -1,155 +1,280 @@
 # KLIN App
 
-Automation-first desktop file organizer built with Tauri + React.
+Desktop AI file organizer built with Tauri, React, and a local `klin-worker` backend.
 
-KLIN helps you analyze dropped files, suggest categories and names, and track organization history from a single desktop UI.
+This README is for the `klin-app` repo. It explains the exact setup that currently works in development and what is expected for production packaging.
 
-## Tech Stack
+## What ships in this app
 
-- Frontend: React 19, TypeScript, Vite 7, React Router
-- Desktop runtime: Tauri v2 (Rust)
-- State: Zustand (with persisted slices)
-- UI: Tailwind CSS, Radix UI primitives, lucide-react
-- Tooling: Bun (package manager + scripts)
+- React + Vite frontend
+- Tauri desktop shell
+- `klin-worker` sidecar for local API/database work
+- `llama-server` sidecar for local chat and embedding inference
+- Windows `llama-server` runtime DLLs in [`src-tauri/binaries`](C:\Work\MyProject\Senior-Project\klin-app\src-tauri\binaries)
 
-## Current App Scope
+Users do not need to install `llama.cpp` separately if you package the app correctly. The app still needs model files.
 
-- Drag-and-drop or picker-based file intake for organize analysis
-- Dashboard cards for organize flow, automation status, notes, and calendar
-- History view with search/filter and expandable entry details
-- Settings for category/default-folder/watched-folder management
-- Google account connection for calendar/profile flows (OAuth token flow)
-- Local API integration for organize, history, note summary, and calendar endpoints
+## Supported runtime modes
+
+KLIN supports two development modes:
+
+1. `Sidecar mode`
+   - Tauri spawns `klin-worker`
+   - Tauri spawns `llama-server` for chat/embed when needed
+   - best default for app development
+
+2. `External worker mode`
+   - you run `klin-worker` yourself from the worker repo
+   - Tauri still spawns `llama-server` for chat/embed
+   - useful when developing worker code with reload
 
 ## Prerequisites
 
-Install these before running the app:
+Install these first:
 
-- Bun `>= 1.2`
-- Rust toolchain (stable)
-- Tauri system prerequisites for your OS
+- Bun `1.2+`
+- Rust stable toolchain
+- Tauri v2 system prerequisites for your OS
+- Python and `uv` if you want external worker mode
 
-Windows users can follow the official Tauri prerequisites guide if WebView2/Rust toolchain is missing.
+On Windows, make sure WebView2 is installed.
 
-## Environment Variables
+## Model files
 
-Create a `.env` file in the project root:
+Place model files in [`models`](C:\Work\MyProject\Senior-Project\klin-app\models).
+
+Current working local setup:
+
+- chat model:
+  - `Qwen2.5-VL-3B-Instruct-IQ4_XS.gguf`
+- embedding model:
+  - `Qwen3-Embedding-0.6B-f16.gguf`
+
+Important:
+
+- If you use a VL chat model, you should also provide the matching `mmproj` file for full vision support.
+- Text chat may start without `mmproj`, but production reliability is better with it configured.
+
+## Environment file
+
+Create [`klin-app/.env`](C:\Work\MyProject\Senior-Project\klin-app\.env) from [`klin-app/.env.example`](C:\Work\MyProject\Senior-Project\klin-app\.env.example).
+
+Example:
 
 ```env
-VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
+VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+VITE_SKIP_ONBOARDING=false
+
+KLIN_WORKER_EXTERNAL=false
+
+KLIN_CHAT_MODEL_PATH="C:\Work\MyProject\Senior-Project\klin-app\models\Qwen2.5-VL-3B-Instruct-IQ4_XS.gguf"
+KLIN_MODEL_PATH="C:\Work\MyProject\Senior-Project\klin-app\models\Qwen2.5-VL-3B-Instruct-IQ4_XS.gguf"
+KLIN_EMBED_MODEL_PATH="C:\Work\MyProject\Senior-Project\klin-app\models\Qwen3-Embedding-0.6B-f16.gguf"
+KLIN_MMPROJ_PATH=""
+KLIN_N_GPU_LAYERS=-1
+KLIN_CTX_SIZE=4096
 ```
 
-Without this value, Google connect/auth features will stay in an error state.
+Notes:
 
-For the AI runtime, you can choose between:
+- Keep Windows paths quoted.
+- `KLIN_MODEL_PATH` is kept for compatibility, but chat should use `KLIN_CHAT_MODEL_PATH`.
+- `KLIN_WORKER_EXTERNAL=false` means sidecar mode.
 
-- bundled sidecar binaries for the normal packaged workflow
-- locally run `llama-server` plus a source-run `klin-worker` in development
+## Quick start
 
-Start from [.env.example](.env.example) and enable the external-service flags only for the dev workflow.
-
-## Getting Started
+From [`klin-app`](C:\Work\MyProject\Senior-Project\klin-app):
 
 ```bash
 bun install
 ```
 
-### Run web UI only (Vite)
+Then run:
+
+```bash
+bun tauri dev
+```
+
+If everything is configured correctly:
+
+- Vite starts on `http://localhost:1420`
+- Tauri launches the desktop app
+- `klin-worker` sidecar starts automatically
+- `llama-server` chat/embed are started lazily when onboarding or AI features need them
+
+## Recommended dev flow: sidecar mode
+
+Use this when you want the app to behave like production.
+
+### 1. Set `.env`
+
+```env
+KLIN_WORKER_EXTERNAL=false
+```
+
+### 2. Do not run worker manually
+
+Do not start `uv run ...` in another terminal.
+
+### 3. Run the app
+
+From [`klin-app`](C:\Work\MyProject\Senior-Project\klin-app):
+
+```bash
+bun tauri dev
+```
+
+Expected startup behavior:
+
+- `klin-worker` is spawned by Tauri
+- onboarding saves base path and categories into the worker database
+- `embed` starts on `127.0.0.1:8081` when needed
+- `chat` starts on `127.0.0.1:8080` when needed
+
+## External worker mode
+
+Use this only when you want live-reload while editing the Python worker.
+
+### 1. Set app `.env`
+
+```env
+KLIN_WORKER_EXTERNAL=true
+```
+
+### 2. Start worker manually
+
+From [`klin-worker`](C:\Work\MyProject\Senior-Project\klin-worker):
+
+```powershell
+$env:KLIN_APP_DATA_DIR="C:\Users\<YOUR_USER>\AppData\Roaming\com.klin.app"
+uv sync
+uv run python main.py --reload
+```
+
+Important:
+
+- the external worker must use the same `KLIN_APP_DATA_DIR` as the app
+- otherwise the worker and app will read different databases
+
+### 3. Start the app
+
+From [`klin-app`](C:\Work\MyProject\Senior-Project\klin-app):
+
+```bash
+bun tauri dev
+```
+
+In this mode:
+
+- Tauri does not spawn `klin-worker`
+- Tauri still manages `llama-server` sidecars
+
+## Onboarding flow
+
+Current intended onboarding flow:
+
+1. User walks through tabs.
+2. Each tab stores changes in frontend onboarding state only.
+3. Nothing important is committed until `Launch`.
+4. On `Launch`, the app:
+   - ensures embed server is available
+   - saves default base path
+   - creates or updates categories
+   - saves watcher config
+5. Existing categories should not block onboarding.
+
+Default base path behavior:
+
+- onboarding initializes to `Downloads/KLIN`
+- user can change it before launch
+- that chosen value is what gets written to the worker
+
+## Production packaging
+
+For production builds:
+
+- keep `KLIN_WORKER_EXTERNAL=false`
+- ship `klin-worker` as a sidecar
+- ship `llama-server` as a sidecar
+- ship the required Windows `.dll` files together with `llama-server`
+- either:
+  - bundle model files, or
+  - download/select them during onboarding
+
+Production users should not need to install `llama.cpp` themselves.
+
+They will still need:
+
+- model files
+- `mmproj` file too, if you want VL features to work reliably
+
+## No `llma.sh` setup step
+
+There is currently no `llma.sh` or equivalent setup script in this repo.
+
+That means setup is controlled by:
+
+- [`klin-app/.env`](C:\Work\MyProject\Senior-Project\klin-app\.env)
+- sidecar binaries in [`src-tauri/binaries`](C:\Work\MyProject\Senior-Project\klin-app\src-tauri\binaries)
+- model files in [`models`](C:\Work\MyProject\Senior-Project\klin-app\models)
+
+If you add a future bootstrap script, document it here, but it is not required for the current working flow.
+
+## Useful commands
+
+From [`klin-app`](C:\Work\MyProject\Senior-Project\klin-app):
 
 ```bash
 bun run dev:vite
-```
-
-### Run desktop app (Tauri + Vite)
-
-```bash
 bun tauri dev
-```
-
-### Run desktop app with source worker
-
-1. Copy `.env.example` to `.env`.
-2. In `.env`, enable:
-	- `KLIN_WORKER_EXTERNAL=true`
-3. Ensure `KLIN_MODEL_PATH` is set in `.env` so Tauri launches the `llama-server` sidecar.
-4. Start `klin-worker` from source in the worker repo:
-
-```bash
-uv run fastapi dev app/main.py
-```
-
-5. Start the desktop app:
-
-```bash
-bun tauri dev
-```
-
-### Build frontend bundle
-
-```bash
 bun run build
-```
-
-### Build desktop installer/binaries
-
-```bash
 bun tauri build
+bun.cmd run lint
 ```
-
-For the packaged workflow, keep `KLIN_WORKER_EXTERNAL` unset or false so Tauri uses the bundled sidecar binaries from [src-tauri/binaries](src-tauri/binaries).
-
-## Available Scripts
-
-- `bun run dev:vite` — start Vite dev server on port `1420`
-- `bun run build` — TypeScript project build + Vite production build
-- `bun run preview` — preview production web build
-- `bun run lint` — TypeScript type-check (`tsc --noEmit`)
-- `bun run api:organize` — run local API server on `http://localhost:3000`
-- `bun tauri dev` — run desktop app in development mode
-- `bun tauri build` — create production desktop build
-
-## Project Structure (high level)
-
-```text
-src/
-	app/            # Router + app-level boundaries
-	components/     # Shared UI/layout building blocks
-	features/       # Feature modules (dashboard, history, settings, auth, etc.)
-	services/       # API + Tauri client + orchestration services
-	stores/         # Zustand stores and slices
-	types/          # Domain and IPC types
-
-src-tauri/
-	src/commands/   # Tauri command handlers
-	src/services/   # Rust-side services
-	src/domain/     # Domain models
-	src/repositories/
-```
-
-## API Server Notes
-
-- Frontend organize analysis currently targets:
-	- `http://localhost:3000/organize`
-	- `http://localhost:3000/organize/analyze`
-- Start the local API server with:
-
-```bash
-bun run api:organize
-```
-
-- Bruno request definitions are available under `brunoapi/`.
-
-## Google OAuth / Deep Link Notes
-
-- Desktop deep link scheme is configured as `klin://auth`.
-- Full setup/testing notes are in `GOOGLE_AUTH_DEEP_LINK_SETUP.md`.
-- In practice, deep link callback behavior is reliable on built app binaries (`bun tauri build`) rather than dev runtime.
 
 ## Troubleshooting
 
-- `Could not load suggestions... localhost:3000`
-	- Ensure local API server is running: `bun run api:organize`
-- `Missing VITE_GOOGLE_CLIENT_ID`
-	- Add `VITE_GOOGLE_CLIENT_ID` to `.env` and restart the app
-- Tauri build/dev startup issues
-	- Re-check Rust + Tauri prerequisites and run `bun install` again
+### `KLIN_EMBED_MODEL_PATH not set`
+
+Check:
+
+- `.env` exists at [`klin-app/.env`](C:\Work\MyProject\Senior-Project\klin-app\.env)
+- the path is quoted on Windows
+- the embedding model file actually exists
+
+### `127.0.0.1:8081/health` refused
+
+This means embed did not start. Check:
+
+- model path is valid
+- `llama-server` sidecar binary exists
+- required DLLs exist in [`src-tauri/binaries`](C:\Work\MyProject\Senior-Project\klin-app\src-tauri\binaries)
+- no stale `llama-server.exe` process is blocking startup
+
+### Categories do not appear in settings
+
+If using external worker mode, make sure:
+
+- `KLIN_WORKER_EXTERNAL=true`
+- the worker is running
+- worker uses the same `KLIN_APP_DATA_DIR` as the app
+
+### Tauri build says `Access is denied`
+
+Usually stale processes are locking sidecar files. Stop them and retry:
+
+```powershell
+Get-Process | Where-Object {
+  $_.ProcessName -eq 'klin-worker' -or
+  $_.ProcessName -eq 'klin-app' -or
+  $_.ProcessName -eq 'llama-server' -or
+  $_.ProcessName -eq 'cargo' -or
+  $_.ProcessName -eq 'rustc'
+} | Stop-Process -Force
+```
+
+## Related docs
+
+- Worker backend guide: [`klin-worker/README.md`](C:\Work\MyProject\Senior-Project\klin-worker\README.md)
+- Tauri config: [`src-tauri/tauri.conf.json`](C:\Work\MyProject\Senior-Project\klin-app\src-tauri\tauri.conf.json)
+- App env template: [`.env.example`](C:\Work\MyProject\Senior-Project\klin-app\.env.example)
