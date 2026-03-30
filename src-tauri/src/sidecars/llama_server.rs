@@ -1,4 +1,5 @@
 use std::net::{SocketAddr, TcpStream};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -6,6 +7,8 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+
+use crate::infrastructure::runtime_env;
 
 // ── Model slot ───────────────────────────────────────────────────────
 
@@ -93,13 +96,11 @@ pub enum LaunchPhase {
 
 fn slot_port(slot: &ModelSlot) -> u16 {
     match slot {
-        ModelSlot::Chat => std::env::var("KLIN_CHAT_PORT")
-            .or_else(|_| std::env::var("KLIN_LLAMA_PORT"))
-            .ok()
+        ModelSlot::Chat => runtime_env::get("KLIN_CHAT_PORT")
+            .or_else(|| runtime_env::get("KLIN_LLAMA_PORT"))
             .and_then(|v| v.parse::<u16>().ok())
             .unwrap_or(8080),
-        ModelSlot::Embed => std::env::var("KLIN_EMBED_PORT")
-            .ok()
+        ModelSlot::Embed => runtime_env::get("KLIN_EMBED_PORT")
             .and_then(|v| v.parse::<u16>().ok())
             .unwrap_or(8081),
     }
@@ -109,11 +110,36 @@ fn slot_socket_addr(slot: &ModelSlot) -> SocketAddr {
     SocketAddr::from(([127, 0, 0, 1], slot_port(slot)))
 }
 
+fn validate_model_path(slot: ModelSlot, model_path: &str) -> Result<(), String> {
+    if !Path::new(model_path).exists() {
+        return Err(format!(
+            "llama-server[{}] model path does not exist: {}",
+            slot.label(),
+            model_path
+        ));
+    }
+
+    if matches!(slot, ModelSlot::Embed) {
+        let chat_model_path = runtime_env::get("KLIN_CHAT_MODEL_PATH")
+            .or_else(|| runtime_env::get("KLIN_MODEL_PATH"))
+            .unwrap_or_default();
+
+        if !chat_model_path.is_empty() && chat_model_path == model_path {
+            return Err(
+                "KLIN_EMBED_MODEL_PATH points to the same GGUF as chat; configure a real embedding model."
+                    .to_string(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
 // ── Readiness probe ────────────────────────────────────────────────────
 
 fn tcp_probe_timeout() -> Duration {
-    match std::env::var("KLIN_TCP_PROBE_TIMEOUT_MS") {
-        Ok(val) => match val.parse::<u64>() {
+    match runtime_env::get("KLIN_TCP_PROBE_TIMEOUT_MS") {
+        Some(val) => match val.parse::<u64>() {
             Ok(ms) => Duration::from_millis(ms),
             Err(_) => {
                 eprintln!(
@@ -123,7 +149,7 @@ fn tcp_probe_timeout() -> Duration {
                 Duration::from_millis(250)
             }
         },
-        Err(_) => Duration::from_millis(250),
+        None => Duration::from_millis(250),
     }
 }
 
@@ -181,8 +207,8 @@ fn spawn_slot<R: tauri::Runtime>(
 
     let (model_path, args) = match slot.slot {
         ModelSlot::Chat => {
-            let model_path = std::env::var("KLIN_CHAT_MODEL_PATH")
-                .or_else(|_| std::env::var("KLIN_MODEL_PATH"))
+            let model_path = runtime_env::get("KLIN_CHAT_MODEL_PATH")
+                .or_else(|| runtime_env::get("KLIN_MODEL_PATH"))
                 .unwrap_or_default();
 
             if model_path.is_empty() {
@@ -191,11 +217,10 @@ fn spawn_slot<R: tauri::Runtime>(
                     label
                 ));
             }
+            validate_model_path(slot.slot, &model_path)?;
 
-            let n_gpu_layers =
-                std::env::var("KLIN_N_GPU_LAYERS").unwrap_or_else(|_| "-1".to_string());
-            let ctx_size =
-                std::env::var("KLIN_CTX_SIZE").unwrap_or_else(|_| "4096".to_string());
+            let n_gpu_layers = runtime_env::get_or("KLIN_N_GPU_LAYERS", "-1");
+            let ctx_size = runtime_env::get_or("KLIN_CTX_SIZE", "4096");
 
             let mut args = vec![
                 "-m".to_string(),
@@ -211,7 +236,7 @@ fn spawn_slot<R: tauri::Runtime>(
                 "--no-webui".to_string(),
             ];
 
-            let mmproj_path = std::env::var("KLIN_MMPROJ_PATH").unwrap_or_default();
+            let mmproj_path = runtime_env::get("KLIN_MMPROJ_PATH").unwrap_or_default();
             if !mmproj_path.is_empty() {
                 args.push("--mmproj".to_string());
                 args.push(mmproj_path);
@@ -220,8 +245,7 @@ fn spawn_slot<R: tauri::Runtime>(
             (model_path, args)
         }
         ModelSlot::Embed => {
-            let model_path =
-                std::env::var("KLIN_EMBED_MODEL_PATH").unwrap_or_default();
+            let model_path = runtime_env::get("KLIN_EMBED_MODEL_PATH").unwrap_or_default();
 
             if model_path.is_empty() {
                 return Err(format!(
@@ -229,9 +253,9 @@ fn spawn_slot<R: tauri::Runtime>(
                     label
                 ));
             }
+            validate_model_path(slot.slot, &model_path)?;
 
-            let n_gpu_layers = std::env::var("KLIN_EMBED_N_GPU_LAYERS")
-                .unwrap_or_else(|_| "0".to_string());
+            let n_gpu_layers = runtime_env::get_or("KLIN_EMBED_N_GPU_LAYERS", "0");
 
             let args = vec![
                 "-m".to_string(),
@@ -459,6 +483,7 @@ pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
     let idle_timeout_secs: u64 = std::env::var("KLIN_LLAMA_IDLE_TIMEOUT")
         .ok()
         .and_then(|v| v.parse().ok())
+        .or_else(|| runtime_env::get("KLIN_LLAMA_IDLE_TIMEOUT").and_then(|v| v.parse().ok()))
         .unwrap_or(300);
 
     tauri::async_runtime::spawn_blocking(move || {

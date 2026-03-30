@@ -51,6 +51,48 @@ export function OnboardingPage() {
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [animating, setAnimating] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [launchError, setLaunchError] = useState<string | null>(null);
+
+  const formatError = useCallback((error: unknown, fallback: string) => {
+    if (error instanceof Error && error.message.trim()) {
+      return error.message;
+    }
+
+    if (typeof error === "string" && error.trim()) {
+      return error;
+    }
+
+    if (error && typeof error === "object") {
+      const maybeMessage = Reflect.get(error, "message");
+      if (typeof maybeMessage === "string" && maybeMessage.trim()) {
+        return maybeMessage;
+      }
+
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return fallback;
+      }
+    }
+
+    return fallback;
+  }, []);
+
+  const waitForLlamaHealth = useCallback(async (port: number, timeoutMs: number) => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/health`, {
+          signal: AbortSignal.timeout(1500),
+        });
+        if (res.ok) return true;
+      } catch {
+        // retry until timeout
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    return false;
+  }, []);
 
   const navigate_ = useCallback(
     (target: OnboardingStep, dir: "forward" | "back" = "forward") => {
@@ -77,14 +119,32 @@ export function OnboardingPage() {
 
   const handleLaunch = async () => {
     setIsLaunching(true);
+    setLaunchError(null);
     try {
-      // 1. Save base path to worker API
-      await categoryManagementService.saveDefaultFolder(state.basePath);
+      try {
+        await tauriClient.ensureLlamaServer("embed");
+      } catch (error) {
+        throw new Error(
+          `Failed to start embedding server: ${formatError(error, "unknown error")}`,
+        );
+      }
 
-      // 2. Create each selected category in worker API
+      const embedReady = await waitForLlamaHealth(8081, 15000);
+      if (!embedReady) {
+        throw new Error("Embedding model is not ready. Start llama-server or verify model paths.");
+      }
+
+      try {
+        await categoryManagementService.saveDefaultFolder(state.basePath);
+      } catch (error) {
+        throw new Error(
+          `Failed to save base path: ${formatError(error, "worker API unavailable")}`,
+        );
+      }
+
       for (const cat of state.categories) {
-        await categoryManagementService
-          .addCategoryToWorker({
+        try {
+          await categoryManagementService.addCategoryToWorker({
             name: cat.name,
             description: cat.description,
             folderPath: `${state.basePath}/${cat.name}`,
@@ -93,24 +153,35 @@ export function OnboardingPage() {
             enabled: true,
             aiLearned: false,
             isAutoDescription: false,
-          })
-          .catch(() => undefined); // non-blocking per category
+          });
+        } catch (error) {
+          throw new Error(
+            `Failed to create category "${cat.name}": ${formatError(error, "unknown error")}`,
+          );
+        }
       }
 
-      // 3. Save automation config if watcher folders were added
       if (state.watcherFolders.length > 0) {
-        await tauriClient
-          .saveAutomationConfig({
+        try {
+          await tauriClient.saveAutomationConfig({
             auto_organize_enabled: false,
             watched_folders: state.watcherFolders.map((f) => f.path),
             scan_interval_seconds: 60,
-          })
-          .catch(() => undefined);
+          });
+        } catch (error) {
+          throw new Error(
+            `Failed to save watcher configuration: ${formatError(error, "unknown error")}`,
+          );
+        }
       }
-    } finally {
-      // 4. Always mark onboarding complete and navigate — don't block user on API errors
+
       markOnboardingCompletedInSession();
       navigate("/");
+    } catch (err) {
+      const message = formatError(err, "Failed to finish onboarding.");
+      console.error("[onboarding] launch failed:", err);
+      setLaunchError(message);
+    } finally {
       setIsLaunching(false);
     }
   };
@@ -181,6 +252,7 @@ export function OnboardingPage() {
               state={state}
               onLaunch={handleLaunch}
               isLaunching={isLaunching}
+              errorMessage={launchError}
             />
           )}
         </div>

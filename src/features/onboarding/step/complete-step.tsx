@@ -14,9 +14,15 @@ interface CompleteStepProps {
   state: OnboardingState;
   onLaunch: () => void;
   isLaunching?: boolean;
+  errorMessage?: string | null;
 }
 
-export function CompleteStep({ state, onLaunch, isLaunching = false }: CompleteStepProps) {
+export function CompleteStep({
+  state,
+  onLaunch,
+  isLaunching = false,
+  errorMessage = null,
+}: CompleteStepProps) {
   const summaryItems = [
     {
       icon: FolderOpen,
@@ -118,6 +124,12 @@ export function CompleteStep({ state, onLaunch, isLaunching = false }: CompleteS
           </>
         )}
       </Button>
+
+      {errorMessage && (
+        <p className="text-xs text-destructive text-balance">
+          {errorMessage}
+        </p>
+      )}
 
       <p className="text-[11px] text-muted-foreground">
         You can update any of these settings later from the Settings panel.

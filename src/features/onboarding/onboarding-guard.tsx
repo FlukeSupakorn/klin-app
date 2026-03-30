@@ -41,7 +41,7 @@ export function OnboardingGuard() {
     const check = async () => {
       for (const url of HEALTH_URL_CANDIDATES) {
         try {
-          const res = await fetch(url);
+          const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
           if (!res.ok) continue;
           const data: HealthResponse = await res.json();
           if (!cancelled) {

@@ -6,9 +6,9 @@ mod services;
 mod sidecars;
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use std::path::PathBuf;
 
 use parking_lot::Mutex;
 use tauri::{Emitter, Manager};
@@ -48,14 +48,7 @@ impl AppState {
 }
 
 fn env_flag(name: &str) -> bool {
-    std::env::var(name)
-        .map(|value| {
-            matches!(
-                value.trim().to_ascii_lowercase().as_str(),
-                "1" | "true" | "yes" | "on"
-            )
-        })
-        .unwrap_or(false)
+    infrastructure::runtime_env::get_bool(name)
 }
 
 // ── Setup helpers ────────────────────────────────────────────────────────
@@ -160,8 +153,20 @@ fn setup_background_scanner<R: tauri::Runtime>(
 // ── App Entry Point ─────────────────────────────────────────────────────
 
 pub fn run() {
-    // Load .env file (silently ignore if not found)
-    let _ = dotenvy::dotenv();
+    let loaded = infrastructure::runtime_env::preload_process_env();
+    let resolved_chat = infrastructure::runtime_env::get("KLIN_CHAT_MODEL_PATH")
+        .or_else(|| infrastructure::runtime_env::get("KLIN_MODEL_PATH"));
+    let resolved_embed = infrastructure::runtime_env::get("KLIN_EMBED_MODEL_PATH");
+    eprintln!(
+        "[startup] env: path={}, loaded={}, chat_set={}, embed_set={}, worker_external={}, chat_model={:?}, embed_model={:?}",
+        infrastructure::runtime_env::app_env_path_string(),
+        loaded,
+        resolved_chat.is_some(),
+        resolved_embed.is_some(),
+        env_flag("KLIN_WORKER_EXTERNAL"),
+        resolved_chat,
+        resolved_embed,
+    );
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {

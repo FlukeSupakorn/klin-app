@@ -2,7 +2,6 @@ import { useCategoryManagementStore } from "@/stores/use-category-management-sto
 import { useCategoryStore } from "@/stores/use-category-store";
 import { useRuleStore } from "@/stores/use-rule-store";
 import { tauriClient } from "@/services/tauri-client";
-import { withLlama } from "@/hooks/useLlama";
 import type { ManagedCategory } from "@/types/domain";
 
 const SETTINGS_API_URL_CANDIDATES = [
@@ -16,6 +15,8 @@ const CATEGORIES_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/categories",
   "http://localhost:8000/api/categories",
 ];
+
+const WORKER_FETCH_TIMEOUT_MS = 8000;
 
 interface WorkerCategory {
   id: string;
@@ -61,6 +62,13 @@ function ensureSuccess(response: Response, label: string): Response {
   }
 
   return response;
+}
+
+function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
+  return fetch(input, {
+    ...init,
+    signal: AbortSignal.timeout(WORKER_FETCH_TIMEOUT_MS),
+  });
 }
 
 function joinFolderPath(basePath: string, categoryName: string): string {
@@ -121,20 +129,20 @@ async function fetchFromCandidates<T>(
 }
 
 async function getDefaultBasePathFromWorker(fallback: string): Promise<string> {
-  return withLlama(['embed'], () => fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
+  return fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
     const response = ensureSuccess(
-      await fetch(`${baseUrl}/default-base-path`),
+      await fetchWithTimeout(`${baseUrl}/default-base-path`),
       "Failed to load default base path",
     );
     const payload = (await response.json()) as WorkerDefaultBasePathResponse;
     return (payload.default_base_path?.trim() || fallback.trim()).trim();
-  }));
+  });
 }
 
 async function upsertDefaultBasePath(basePath: string, label: string): Promise<string> {
-  return withLlama(['embed'], () => fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
+  return fetchFromCandidates(SETTINGS_API_URL_CANDIDATES, async (baseUrl) => {
     const response = ensureSuccess(
-      await fetch(`${baseUrl}/default-base-path`, {
+      await fetchWithTimeout(`${baseUrl}/default-base-path`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -145,7 +153,7 @@ async function upsertDefaultBasePath(basePath: string, label: string): Promise<s
     );
     const payload = (await response.json()) as WorkerDefaultBasePathResponse;
     return (payload.default_base_path?.trim() || basePath.trim()).trim();
-  }));
+  });
 }
 
 export class CategoryManagementService {
@@ -190,8 +198,8 @@ export class CategoryManagementService {
     const normalizedFolderPath = category.folderPath.trim();
     const inferredFolderPath = normalizedFolderPath || joinFolderPath(fallbackPath, normalizedName);
 
-    await withLlama(['embed'], () => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
-      const response = await fetch(baseUrl, {
+    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+      const response = await fetchWithTimeout(baseUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -208,7 +216,7 @@ export class CategoryManagementService {
 
       ensureSuccess(response, "Failed to create category");
       return true;
-    }));
+    });
 
     await this.refreshCategoriesFromWorker();
     this.syncToAutomationStores();
@@ -251,8 +259,8 @@ export class CategoryManagementService {
       return;
     }
 
-    await withLlama(['embed'], () => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/${id}`, {
+    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+      const response = await fetchWithTimeout(`${baseUrl}/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -262,7 +270,7 @@ export class CategoryManagementService {
 
       ensureSuccess(response, "Failed to update category");
       return true;
-    }));
+    });
 
     const currentCategories = this.repository.listCategories();
     const nextCategories = currentCategories.map((category) =>
@@ -276,7 +284,7 @@ export class CategoryManagementService {
 
   async deleteCategoryInWorker(id: string): Promise<void> {
     await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/${id}`, {
+      const response = await fetchWithTimeout(`${baseUrl}/${id}`, {
         method: "DELETE",
       });
 
@@ -300,15 +308,15 @@ export class CategoryManagementService {
       is_auto_description: true,
     }));
 
-    await withLlama(['embed'], () => fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/batch`, {
+    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+      const response = await fetchWithTimeout(`${baseUrl}/batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categories }),
       });
       ensureSuccess(response, "Failed to batch create categories");
       return true;
-    }));
+    });
 
     await this.refreshCategoriesFromWorker();
     this.syncToAutomationStores();
@@ -321,7 +329,7 @@ export class CategoryManagementService {
       CATEGORIES_API_URL_CANDIDATES,
       async (baseUrl): Promise<{ defaultFolder: string; categories: ManagedCategory[] }> => {
         const response = ensureSuccess(
-          await fetch(`${baseUrl}?active_only=false`),
+          await fetchWithTimeout(`${baseUrl}?active_only=false`),
           "Failed to load categories",
         );
         const payload = (await response.json()) as WorkerCategory[];
