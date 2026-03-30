@@ -51,14 +51,16 @@ export function FolderTreeNode({
           type="checkbox"
           checked={checked}
           disabled={disabled}
-          onClick={(e) => {
-            e.stopPropagation();
+          onChange={(e) => {
             const nextChecked = !checked;
-            if (e.shiftKey && onToggleSubtree) {
+            if (e.nativeEvent instanceof MouseEvent && e.nativeEvent.shiftKey && onToggleSubtree) {
               onToggleSubtree(path, nextChecked);
               return;
             }
             onToggle(path, nextChecked);
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
           }}
           className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
           title={hasChildren ? "Click: this folder only | Shift+Click: this folder and all subfolders" : undefined}

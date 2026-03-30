@@ -1,3 +1,4 @@
+use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -157,7 +158,33 @@ fn is_slot_ready(slot: &ModelSlot) -> bool {
     TcpStream::connect_timeout(&slot_socket_addr(slot), tcp_probe_timeout()).is_ok()
 }
 
-/// Poll TCP until the port is open, timed out, or the process crashes.
+fn is_slot_http_healthy(slot: &ModelSlot) -> bool {
+    let addr = slot_socket_addr(slot);
+    let mut stream = match TcpStream::connect_timeout(&addr, tcp_probe_timeout()) {
+        Ok(stream) => stream,
+        Err(_) => return false,
+    };
+
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(1)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(1)));
+
+    let request = format!(
+        "GET /health HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+        addr
+    );
+    if stream.write_all(request.as_bytes()).is_err() {
+        return false;
+    }
+
+    let mut response = String::new();
+    if stream.read_to_string(&mut response).is_err() {
+        return false;
+    }
+
+    response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200")
+}
+
+/// Poll HTTP health until the slot reports 200 OK, timed out, or the process crashes.
 ///
 /// Checks `phase` each interval so a `Crashed` transition (set by the
 /// async termination handler) causes an early exit rather than waiting
@@ -182,7 +209,7 @@ fn wait_for_slot_ready(
             }
         }
 
-        if is_slot_ready(slot) {
+        if is_slot_http_healthy(slot) {
             return Ok(());
         }
 

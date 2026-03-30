@@ -7,8 +7,6 @@ import {
   Info,
 } from "lucide-react";
 import { Input } from "@/components/not-use-ui/input";
-import { useCategoryManagementStore } from "@/stores/use-category-management-store";
-import { categoryManagementService } from "@/services/category-management-service";
 
 interface DefaultFolderStepProps {
   value: string;
@@ -30,50 +28,26 @@ export function DefaultFolderStep({
   onNext,
   onBack,
 }: DefaultFolderStepProps) {
-  const defaultFolder = useCategoryManagementStore(
-    (state) => state.defaultFolder,
-  );
-  const categories = useCategoryManagementStore((state) => state.categories);
-
-  const [draftDefaultFolder, setDraftDefaultFolder] = useState(defaultFolder);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [draftDefaultFolder, setDraftDefaultFolder] = useState(value);
 
   useEffect(() => {
-    setDraftDefaultFolder(defaultFolder);
-  }, [defaultFolder]);
-
-  const persist = async (path: string) => {
-    const normalized = path.trim();
-    if (!normalized) return;
-    setIsSaving(true);
-    setError(null);
-    try {
-      await categoryManagementService.saveDefaultFolder(normalized);
-      categoryManagementService.syncToAutomationStores();
-      setDraftDefaultFolder(normalized);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to save default folder",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    setDraftDefaultFolder(value);
+  }, [value]);
 
   const handleNext = () => {
-    // if (!draftDefaultFolder.trim()) return;
-    // void persist(draftDefaultFolder.trim());
+    onChange(draftDefaultFolder);
     onNext();
   };
 
   const handleSuggestion = (path: string) => {
+    setDraftDefaultFolder(path);
     onChange(path);
   };
 
   const handleBrowse = async () => {
     const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
     if (folder) {
+      setDraftDefaultFolder(folder);
       onChange(folder);
     }
   };
@@ -101,19 +75,20 @@ export function DefaultFolderStep({
         <div className="flex gap-2">
           <Input
             value={draftDefaultFolder}
-            onChange={(e) => setDraftDefaultFolder(e.target.value)}
+            onChange={(e) => {
+              setDraftDefaultFolder(e.target.value);
+              onChange(e.target.value);
+            }}
             placeholder="Base path for categories"
             className="border-border bg-muted/30"
           />
           <Button
             variant="outline"
             onClick={() => void handleBrowse()}
-            disabled={isSaving}
           >
             Browse Folder
           </Button>
         </div>
-        {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
 
       {/* Suggested paths */}
@@ -163,9 +138,8 @@ export function DefaultFolderStep({
         <Button
           onClick={handleNext}
           className="flex-2 font-semibold"
-          disabled={isSaving}
         >
-          {isSaving ? "Initializing..." : "Continue"}
+          Continue
         </Button>
       </div>
     </div>

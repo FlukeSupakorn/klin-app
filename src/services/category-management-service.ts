@@ -12,8 +12,6 @@ const SETTINGS_API_URL_CANDIDATES = [
 const CATEGORIES_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/settings/categories",
   "http://localhost:8000/api/settings/categories",
-  "http://127.0.0.1:8000/api/categories",
-  "http://localhost:8000/api/categories",
 ];
 
 const WORKER_FETCH_TIMEOUT_MS = 8000;
@@ -34,6 +32,16 @@ interface WorkerCategory {
 
 interface WorkerDefaultBasePathResponse {
   default_base_path: string | null;
+}
+
+class WorkerHttpError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "WorkerHttpError";
+  }
 }
 
 export interface CategoryManagementRepository {
@@ -58,7 +66,7 @@ class ZustandCategoryManagementRepository implements CategoryManagementRepositor
 
 function ensureSuccess(response: Response, label: string): Response {
   if (!response.ok) {
-    throw new Error(`${label}: ${response.status}`);
+    throw new WorkerHttpError(`${label}: ${response.status}`, response.status);
   }
 
   return response;
@@ -122,6 +130,9 @@ async function fetchFromCandidates<T>(
       return await request(baseUrl);
     } catch (error) {
       lastError = error;
+      if (error instanceof WorkerHttpError) {
+        throw error;
+      }
     }
   }
 
@@ -137,6 +148,28 @@ async function getDefaultBasePathFromWorker(fallback: string): Promise<string> {
     const payload = (await response.json()) as WorkerDefaultBasePathResponse;
     return (payload.default_base_path?.trim() || fallback.trim()).trim();
   });
+}
+
+function buildCategoryPayload(input: {
+  name: string;
+  description: string;
+  enabled: boolean;
+  folderPath: string;
+  color?: string | null;
+  icon?: string | null;
+  isAutoDescription?: boolean;
+}): Record<string, unknown> {
+  return {
+    name: input.name,
+    description: input.description,
+    enabled: input.enabled,
+    is_active: input.enabled,
+    folder_path: input.folderPath,
+    destination_path: input.folderPath,
+    color: input.color,
+    icon: input.icon,
+    is_auto_description: input.isAutoDescription ?? false,
+  };
 }
 
 async function upsertDefaultBasePath(basePath: string, label: string): Promise<string> {
@@ -204,14 +237,15 @@ export class CategoryManagementService {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
+        body: JSON.stringify(buildCategoryPayload({
           name: normalizedName,
           description: normalizedDescription,
           enabled: category.enabled,
-          folder_path: inferredFolderPath,
+          folderPath: inferredFolderPath,
           color: category.color,
           icon: category.icon,
-        }),
+          isAutoDescription: category.isAutoDescription,
+        })),
       });
 
       ensureSuccess(response, "Failed to create category");
@@ -220,6 +254,33 @@ export class CategoryManagementService {
 
     await this.refreshCategoriesFromWorker();
     this.syncToAutomationStores();
+  }
+
+  async upsertCategoryToWorker(category: Omit<ManagedCategory, "id">): Promise<void> {
+    const normalizedName = category.name.trim();
+    const normalizedDescription = category.description.trim();
+    if (!normalizedName || !normalizedDescription) {
+      return;
+    }
+
+    await this.refreshCategoriesFromWorker().catch(() => undefined);
+    const existing = this.repository
+      .listCategories()
+      .find((item) => item.name.trim().toLowerCase() === normalizedName.toLowerCase());
+
+    if (existing) {
+      await this.updateCategoryInWorker(existing.id, {
+        name: normalizedName,
+        description: normalizedDescription,
+        folderPath: category.folderPath,
+        enabled: category.enabled,
+        color: category.color,
+        icon: category.icon,
+      });
+      return;
+    }
+
+    await this.addCategoryToWorker(category);
   }
 
   async updateCategoryInWorker(id: string, updates: Partial<ManagedCategory>): Promise<void> {
@@ -238,10 +299,12 @@ export class CategoryManagementService {
     if (typeof updates.folderPath === "string") {
       const value = updates.folderPath.trim();
       payload.folder_path = value;
+      payload.destination_path = value;
       normalizedUpdates.folderPath = value;
     }
     if (typeof updates.enabled === "boolean") {
       payload.enabled = updates.enabled;
+      payload.is_active = updates.enabled;
       normalizedUpdates.enabled = updates.enabled;
     }
     if (typeof updates.color === "string") {
@@ -299,24 +362,25 @@ export class CategoryManagementService {
   async batchCreateFromFolders(items: Array<{ name: string; path: string }>): Promise<void> {
     if (!items.length) return;
 
-    const categories = items.map((item) => ({
-      name: item.name,
-      description: buildFolderDescription(item.path),
-      enabled: true,
-      folder_path: item.path,
-      color: null,
-      is_auto_description: true,
-    }));
-
-    await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
-      const response = await fetchWithTimeout(`${baseUrl}/batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categories }),
+    for (const item of items) {
+      await fetchFromCandidates(CATEGORIES_API_URL_CANDIDATES, async (baseUrl) => {
+        const response = await fetchWithTimeout(baseUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildCategoryPayload({
+            name: item.name,
+            description: buildFolderDescription(item.path),
+            enabled: true,
+            folderPath: item.path,
+            color: null,
+            icon: null,
+            isAutoDescription: true,
+          })),
+        });
+        ensureSuccess(response, `Failed to create category "${item.name}"`);
+        return true;
       });
-      ensureSuccess(response, "Failed to batch create categories");
-      return true;
-    });
+    }
 
     await this.refreshCategoriesFromWorker();
     this.syncToAutomationStores();

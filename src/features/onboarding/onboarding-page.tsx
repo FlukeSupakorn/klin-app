@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { StepProgress } from "./step-progress";
@@ -52,6 +52,33 @@ export function OnboardingPage() {
   const [animating, setAnimating] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const downloadsFolder = await tauriClient.getDownloadsFolder();
+        if (cancelled) return;
+
+        const normalized = downloadsFolder.trim().replace(/[\\/]+$/, "");
+        if (!normalized) return;
+
+        setState((prev) => {
+          if (prev.basePath.trim()) {
+            return prev;
+          }
+          return { ...prev, basePath: `${normalized}/KLIN` };
+        });
+      } catch {
+        // Keep onboarding usable even if downloads folder lookup fails.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const formatError = useCallback((error: unknown, fallback: string) => {
     if (error instanceof Error && error.message.trim()) {
@@ -144,10 +171,10 @@ export function OnboardingPage() {
 
       for (const cat of state.categories) {
         try {
-          await categoryManagementService.addCategoryToWorker({
+          await categoryManagementService.upsertCategoryToWorker({
             name: cat.name,
             description: cat.description,
-            folderPath: `${state.basePath}/${cat.name}`,
+            folderPath: `${state.basePath.trim().replace(/[\\/]+$/, "")}/${cat.name}`,
             color: cat.color,
             icon: cat.icon,
             enabled: true,
