@@ -1,6 +1,6 @@
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 fn copy_runtime_dlls() {
     let manifest_dir =
@@ -15,11 +15,14 @@ fn copy_runtime_dlls() {
         return;
     }
 
-    for entry in fs::read_dir(&binaries_dir).into_iter().flatten().flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("dll")).unwrap_or(false) {
+    // Copy DLLs and binaries from binaries/ to target/ (silently skip if locked)
+    if let Ok(entries) = fs::read_dir(&binaries_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
             if let Some(name) = path.file_name() {
-                let _ = fs::copy(&path, target_dir.join(name));
+                let target_path = target_dir.join(name);
+                // Silently skip if file is locked (in use by running process)
+                let _ = fs::copy(&path, target_path);
             }
         }
     }
