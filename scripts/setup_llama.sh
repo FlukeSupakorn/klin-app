@@ -49,7 +49,9 @@ fi
 echo "Latest version: ${VERSION}"
 
 # ── Platform-specific settings ───────────────────────────────────────
-CMAKE_EXTRA_FLAGS=""
+CMAKE_EXTRA_FLAGS=()
+CMAKE_GENERATOR_ARGS=()
+BUILD_CONFIG=""
 case "$OS" in
     Darwin)
         if [ "$ARCH" = "arm64" ]; then
@@ -57,7 +59,7 @@ case "$OS" in
         else
             TARGET_BIN="${BIN_DIR}/llama-server-x86_64-apple-darwin"
         fi
-        CMAKE_EXTRA_FLAGS="-DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON"
+        CMAKE_EXTRA_FLAGS=("-DGGML_METAL=ON" "-DGGML_METAL_EMBED_LIBRARY=ON")
         SERVER_BIN="llama-server"
         NPROC=$(sysctl -n hw.ncpu)
         ;;
@@ -68,13 +70,17 @@ case "$OS" in
             echo "Unsupported Linux architecture: $ARCH"
             exit 1
         fi
-        CMAKE_EXTRA_FLAGS="-DGGML_METAL=OFF"
+        CMAKE_EXTRA_FLAGS=("-DGGML_METAL=OFF")
         SERVER_BIN="llama-server"
         NPROC=$(nproc)
         ;;
     MINGW*|MSYS*|CYGWIN*)
         TARGET_BIN="${BIN_DIR}/llama-server-x86_64-pc-windows-msvc.exe"
-        CMAKE_EXTRA_FLAGS="-DGGML_VULKAN=ON"
+        # Force MSVC toolchain on Windows to avoid MinGW compatibility issues
+        # (for example, CreateFile2-related failures in cpp-httplib).
+        CMAKE_GENERATOR_ARGS=("-G" "Visual Studio 17 2022" "-A" "x64")
+        BUILD_CONFIG="Release"
+        CMAKE_EXTRA_FLAGS=("-DGGML_VULKAN=ON")
         SERVER_BIN="llama-server.exe"
         NPROC=$(nproc 2>/dev/null || echo 4)
         ;;
@@ -90,13 +96,18 @@ echo "Cloning llama.cpp ${VERSION}..."
 git clone --depth 1 --branch "$VERSION" "$REPO_URL" "$TMP_DIR"
 
 echo "Building llama-server (static, release)..."
-cmake -B "${TMP_DIR}/build" -S "$TMP_DIR" \
+cmake "${CMAKE_GENERATOR_ARGS[@]}" -B "${TMP_DIR}/build" -S "$TMP_DIR" \
     -DBUILD_SHARED_LIBS=OFF \
     -DLLAMA_BUILD_SERVER=ON \
     -DCMAKE_BUILD_TYPE=Release \
-    $CMAKE_EXTRA_FLAGS
+    "${CMAKE_EXTRA_FLAGS[@]}"
 
-cmake --build "${TMP_DIR}/build" --target llama-server -j"$NPROC"
+BUILD_ARGS=(--target llama-server --parallel "$NPROC")
+if [ -n "$BUILD_CONFIG" ]; then
+    BUILD_ARGS=(--config "$BUILD_CONFIG" "${BUILD_ARGS[@]}")
+fi
+
+cmake --build "${TMP_DIR}/build" "${BUILD_ARGS[@]}"
 
 # ── Install ──────────────────────────────────────────────────────────
 FOUND_BIN=$(find "${TMP_DIR}/build" -name "$SERVER_BIN" -type f | head -1)

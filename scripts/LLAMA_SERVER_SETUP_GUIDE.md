@@ -170,7 +170,14 @@ Only Apple Silicon (M1+) and Intel Macs with compatible GPUs support Metal. The 
 
 ### Build fails on Windows
 
-Ensure Visual Studio's C++ workload is installed and you are running from a terminal that has the build tools in PATH (e.g. "x64 Native Tools Command Prompt" or Git Bash).
+Current `llama.cpp` server builds on Windows are most reliable with MSVC (Visual Studio toolchain), not MinGW GCC.
+
+This project build script now forces the Visual Studio CMake generator on Windows (`Visual Studio 17 2022`, x64), so it works from Git Bash as long as Visual Studio C++ tools are installed.
+
+If the build still fails:
+- Verify Visual Studio includes `Desktop development with C++`.
+- Verify CMake can find Visual Studio: `cmake -G "Visual Studio 17 2022" -A x64 -S . -B build-test`.
+- Avoid custom `CC`/`CXX` env vars pointing to MinGW (`gcc`/`g++`) for this build.
 
 ### Server crashes immediately
 
