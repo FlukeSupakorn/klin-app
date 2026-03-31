@@ -199,7 +199,7 @@ pub fn run() {
             // ── Llama-server slots ──────────────────────────────────
             let slots = setup_llama_slots();
 
-            app.manage(AppState {
+            let app_state = AppState {
                 history_service: Arc::new(Mutex::new(HistoryService::new(history_repo))),
                 rule_service: Arc::new(Mutex::new(RuleService::new(rule_repo))),
                 category_service: Arc::new(Mutex::new(CategoryService::new(category_repo))),
@@ -207,7 +207,9 @@ pub fn run() {
                 slots,
                 worker_child: Arc::new(Mutex::new(worker_child)),
                 automation_config_repository: config_repo.clone(),
-            });
+            };
+
+            app.manage(app_state);
 
             // ── Deep links ──────────────────────────────────────────
             setup_deep_links(app)?;
@@ -227,6 +229,7 @@ pub fn run() {
             commands::ensure_llama_server,
             commands::stop_llama_server,
             commands::touch_llama_server,
+            commands::warmup_chat_model,
             commands::pick_files_for_organize,
             commands::pick_folder_for_organize,
             commands::save_note_file,

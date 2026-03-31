@@ -20,6 +20,7 @@ import { StartupDialogs, runStartupChecks } from "@/features/startup/startup-dia
 import type { FailedService } from "@/features/startup/startup-dialogs";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import type { FileSearchResultItem } from "@/types/domain";
+import { tauriClient } from "@/services/tauri-client";
 import klinLogo from "@/assets/klin-logo.svg";
 
 const navItems = [
@@ -54,6 +55,14 @@ export function AppShell() {
       setHealthIssues(checks.healthIssues);
       setDefaultPathSet(checks.defaultPathSet);
       void bootstrapAppData().catch(() => undefined);
+
+      // Eagerly warm up Chat model so it's ready when user clicks Organize
+      // This will take 30-60 seconds on first app startup, but subsequent organizes will be fast
+      console.log("[startup] warming up Chat model for faster organize...");
+      tauriClient
+        .warmupChatModel()
+        .then(() => console.log("[startup] Chat model ready!"))
+        .catch((e) => console.warn("[startup] Chat warmup failed:", e));
     })();
   }, [initializeAuth]);
 

@@ -34,6 +34,10 @@ class TauriCommandClient implements TauriClient {
     return invoke("stop_llama_server", { slot });
   }
 
+  warmupChatModel(): Promise<void> {
+    return invoke("warmup_chat_model");
+  }
+
   pickFilesForOrganize(): Promise<string[]> {
     return invoke("pick_files_for_organize");
   }
