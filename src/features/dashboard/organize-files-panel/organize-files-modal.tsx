@@ -353,10 +353,6 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
 }
 
 export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
-  if (!workflow.modalOpen) {
-    return null;
-  }
-
   const isLockWarning = Boolean(workflow.errorMessage?.startsWith("Skipped "));
   const [showWarningDetails, setShowWarningDetails] = useState(false);
   const parsedWarning = workflow.errorMessage ? splitLockNotice(workflow.errorMessage) : null;
@@ -364,6 +360,10 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
   useEffect(() => {
     setShowWarningDetails(false);
   }, [workflow.errorMessage]);
+
+  if (!workflow.modalOpen) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">

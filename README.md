@@ -66,6 +66,22 @@ bun run dev:vite
 bun tauri dev
 ```
 
+### Rebuild klin-worker sidecar binary
+
+Only needed when you change Python source code in `klin-worker/`. The compiled binary lives in `src-tauri/binaries/` — Tauri spawns it automatically on `bun tauri dev`.
+
+```bash
+# 1. In the klin-worker repo — install deps including PyInstaller
+cd ../klin-worker
+uv sync --extra build
+
+# 2. Build and copy binary to src-tauri/binaries/
+.\build-sidecar.ps1          # Windows
+pwsh ./build-sidecar.ps1     # macOS / Linux
+```
+
+After this, run `bun tauri dev` normally — no separate terminal needed.
+
 ### Run desktop app with source worker
 
 1. Copy `.env.example` to `.env`.
@@ -75,7 +91,7 @@ bun tauri dev
 4. Start `klin-worker` from source in the worker repo:
 
 ```bash
-uv run fastapi dev app/main.py
+uv run python main.py --reload
 ```
 
 5. Start the desktop app:

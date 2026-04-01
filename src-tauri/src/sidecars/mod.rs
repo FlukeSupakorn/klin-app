@@ -33,24 +33,24 @@ pub(crate) fn kill_sidecar(name: &str, child_slot: &Arc<Mutex<Option<CommandChil
     if let Some(child) = child_slot.lock().take() {
         let pid = child.pid();
 
-        // Try normal kill first
-        match child.kill() {
-            Ok(_) => {
-                eprintln!("[shutdown] {} terminated", name);
-                return;
-            }
-            Err(e) => eprintln!("[shutdown] {} initial kill: {}", name, e),
-        }
-
-        // On Windows, try taskkill as fallback
         #[cfg(target_os = "windows")]
         {
+            // On Windows always use taskkill /T to kill the entire process tree.
+            // child.kill() only kills the top-level process; spawned sub-processes
+            // (e.g. uvicorn workers) survive and keep holding their ports.
             use std::process::Command;
-
-            eprintln!("[shutdown] {} attempting force kill with taskkill (PID: {})", name, pid);
+            eprintln!("[shutdown] {} force-killing process tree (PID: {})", name, pid);
             let _ = Command::new("taskkill")
                 .args(&["/PID", &pid.to_string(), "/F", "/T"])
                 .output();
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            match child.kill() {
+                Ok(_) => eprintln!("[shutdown] {} terminated", name),
+                Err(e) => eprintln!("[shutdown] {} kill failed: {}", name, e),
+            }
         }
     }
 }
