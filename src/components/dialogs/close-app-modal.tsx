@@ -22,7 +22,7 @@ export function CloseAppModal({ open, onMinimize, onQuit }: CloseAppModalProps) 
 
   return (
     <Dialog open={open}>
-      <DialogContent showCloseButton={false} onOpenChange={() => {}}>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <h2 className="text-lg font-semibold">Close Application</h2>
           <p className="text-sm text-muted-foreground">
