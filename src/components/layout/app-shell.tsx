@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { listen } from "@tauri-apps/api/event";
 import {
   CalendarDays,
   FileText,
@@ -21,6 +22,8 @@ import type { FailedService } from "@/features/startup/startup-dialogs";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import type { FileSearchResultItem } from "@/types/domain";
 import { tauriClient } from "@/services/tauri-client";
+import { appClient } from "@/services/app-client";
+import { CloseAppModal } from "@/components/dialogs/close-app-modal";
 import klinLogo from "@/assets/klin-logo.svg";
 
 const navItems = [
@@ -47,6 +50,7 @@ export function AppShell() {
   const [healthIssues, setHealthIssues] = useState<FailedService[]>([]);
   const [defaultPathSet, setDefaultPathSet] = useState<{ path: string } | null>(null);
   const [showDefaultFolderSettings, setShowDefaultFolderSettings] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -124,6 +128,20 @@ export function AppShell() {
     document.addEventListener("mousedown", onClickAway);
     return () => {
       document.removeEventListener("mousedown", onClickAway);
+    };
+  }, []);
+
+  useEffect(() => {
+    let unlistener: (() => void) | null = null;
+
+    void (async () => {
+      unlistener = await listen("window://close-requested", () => {
+        setShowCloseModal(true);
+      });
+    })();
+
+    return () => {
+      unlistener?.();
     };
   }, []);
 
@@ -365,6 +383,14 @@ export function AppShell() {
         open={showDefaultFolderSettings}
         sections={["default-folder"]}
         onClose={() => setShowDefaultFolderSettings(false)}
+      />
+
+      <CloseAppModal
+        open={showCloseModal}
+        onMinimize={() => setShowCloseModal(false)}
+        onQuit={async () => {
+          await appClient.exitApp();
+        }}
       />
     </div>
   );

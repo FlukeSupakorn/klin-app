@@ -109,9 +109,33 @@ fn setup_window_behavior<R: tauri::Runtime>(app: &tauri::App<R>) {
         main_window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                let _ = close_window.hide();
+                let _ = close_window.emit("window://close-requested", ());
             }
         });
+    }
+}
+
+fn cleanup_orphaned_llama_servers() {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+
+        eprintln!("[startup] checking for orphaned llama-server processes...");
+        let output = Command::new("tasklist")
+            .args(&["/FI", "IMAGENAME eq llama-server.exe"])
+            .output();
+
+        if let Ok(output) = output {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // If llama-server appears in tasklist, kill it
+            if stdout.contains("llama-server.exe") {
+                eprintln!("[startup] found orphaned llama-server, cleaning up...");
+                let _ = Command::new("taskkill")
+                    .args(&["/IM", "llama-server.exe", "/F", "/T"])
+                    .output();
+                eprintln!("[startup] orphaned llama-server cleaned up");
+            }
+        }
     }
 }
 
@@ -184,6 +208,9 @@ pub fn run() {
             let app_data_dir = infrastructure::app_paths::resolve_app_data_dir(app.handle())?;
             std::fs::create_dir_all(&app_data_dir)?;
 
+            // ── Clean up orphaned processes ──────────────────────────
+            cleanup_orphaned_llama_servers();
+
             // ── Spawn sidecars ──────────────────────────────────────
             eprintln!("[startup] llama-server: lazy startup enabled (multi-slot)");
             let worker_child = setup_worker(app.handle(), &app_data_dir);
@@ -223,6 +250,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::exit_app,
             commands::watch_folder,
             commands::move_file,
             commands::read_folder,

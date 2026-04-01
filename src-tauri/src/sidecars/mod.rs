@@ -28,11 +28,29 @@ pub use llama_server::{
 
 /// Kill a sidecar whose `CommandChild` is stored in `child_slot`.
 /// Logs the result and leaves the slot empty.
+/// On Windows, uses taskkill as fallback if normal kill fails.
 pub(crate) fn kill_sidecar(name: &str, child_slot: &Arc<Mutex<Option<CommandChild>>>) {
     if let Some(child) = child_slot.lock().take() {
+        let pid = child.pid();
+
+        // Try normal kill first
         match child.kill() {
-            Ok(_) => eprintln!("[shutdown] {} stopped", name),
-            Err(e) => eprintln!("[shutdown] {} kill failed: {}", name, e),
+            Ok(_) => {
+                eprintln!("[shutdown] {} terminated", name);
+                return;
+            }
+            Err(e) => eprintln!("[shutdown] {} initial kill: {}", name, e),
+        }
+
+        // On Windows, try taskkill as fallback
+        #[cfg(target_os = "windows")]
+        {
+            use std::process::Command;
+
+            eprintln!("[shutdown] {} attempting force kill with taskkill (PID: {})", name, pid);
+            let _ = Command::new("taskkill")
+                .args(&["/PID", &pid.to_string(), "/F", "/T"])
+                .output();
         }
     }
 }
