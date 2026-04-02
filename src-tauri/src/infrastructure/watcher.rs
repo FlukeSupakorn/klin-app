@@ -133,7 +133,7 @@ fn schedule_stability_check<R: tauri::Runtime>(
 
             if is_file_stable(&path) {
                 if should_emit_now(&path_str) {
-                    eprintln!("[watcher] file stable; emitting ready event: {}", path_str);
+                    tracing::info!("[watcher] file stable; emitting ready event: {}", path_str);
 
                     let payload = WatchedFileEvent {
                         file_path: path_str.clone(),
@@ -172,13 +172,14 @@ fn emit_file_events<R: tauri::Runtime>(
 
         let path_str = path.to_string_lossy().to_string();
         if is_temporary_download_path(&path_str) {
-            eprintln!("[watcher] skip temporary download file: {}", path_str);
+            tracing::info!("[watcher] skip temporary download file: {}", path_str);
             continue;
         }
 
-        eprintln!(
+        tracing::info!(
             "[watcher] detected file event: kind={:?}, file={} (queued for stability check)",
-            event.kind, path_str
+            event.kind,
+            path_str
         );
 
         PENDING_PATHS
@@ -202,22 +203,23 @@ pub fn watch_folder<R: tauri::Runtime>(
     {
         let mut watched = WATCHED_PATHS.lock();
         if watched.contains(&folder_path) {
-            eprintln!("[watcher] already watching {}", folder_path);
+            tracing::info!("[watcher] already watching {}", folder_path);
             return Ok(());
         }
         watched.insert(folder_path.clone());
     }
 
-    eprintln!("[watcher] starting watch on {}", folder_path);
+    tracing::info!("[watcher] starting watch on {}", folder_path);
 
     let watched_folder = folder_path.clone();
     let app_handle = app.clone();
     let mut watcher = RecommendedWatcher::new(
         move |result| match result {
             Ok(event) => emit_file_events(&app_handle, &watched_folder, event),
-            Err(err) => eprintln!(
+            Err(err) => tracing::info!(
                 "[watcher] file event error for '{}': {}",
-                watched_folder, err
+                watched_folder,
+                err
             ),
         },
         Config::default(),

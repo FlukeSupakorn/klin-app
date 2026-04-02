@@ -11,7 +11,7 @@ pub fn save_automation_config<R: tauri::Runtime>(
     state: State<AppState>,
     config: AutomationConfigDto,
 ) -> Result<(), String> {
-    eprintln!(
+    tracing::info!(
         "[automation] save config: enabled={}, watched_folders={}",
         config.auto_organize_enabled,
         config.watched_folders.len()
@@ -20,7 +20,7 @@ pub fn save_automation_config<R: tauri::Runtime>(
 
     if config.auto_organize_enabled {
         for folder in config.watched_folders {
-            eprintln!("[automation] register watcher for {}", folder);
+            tracing::info!("[automation] register watcher for {}", folder);
             FileService::watch_folder(app.clone(), folder)?;
         }
     }

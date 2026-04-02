@@ -96,6 +96,11 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
             controller,
           };
 
+          console.info("[organize] analysis queued -> processing", {
+            itemId: nextQueuedItem.id,
+            currentPath: nextQueuedItem.currentPath,
+          });
+
           // Keep sequential analysis so queue progress is deterministic in the modal.
           // eslint-disable-next-line no-await-in-loop
           const analyzedItem = await organizeApiService.analyzeOne(
@@ -103,6 +108,14 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
             categories,
             controller.signal,
           );
+
+          console.info("[organize] analysis completed", {
+            itemId: nextQueuedItem.id,
+            currentPath: nextQueuedItem.currentPath,
+            status: analyzedItem.analysisStatus,
+            selectedCategory: analyzedItem.selectedCategory,
+            destinationPath: analyzedItem.destinationPath,
+          });
 
           setItems((state) => state.map((item) => (
             item.id === nextQueuedItem.id
@@ -127,12 +140,21 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
         } catch (error) {
           const aborted = isAbortError(error);
           if (aborted) {
+            console.info("[organize] analysis aborted", {
+              itemId: nextQueuedItem.id,
+              currentPath: nextQueuedItem.currentPath,
+            });
             activeAnalyzeRef.current = null;
             continue;
           }
 
           hasFailures = true;
           const reason = error instanceof Error ? error.message : "Unknown analysis error";
+          console.error("[organize] analysis failed", {
+            itemId: nextQueuedItem.id,
+            currentPath: nextQueuedItem.currentPath,
+            reason,
+          });
 
           setItems((state) => state.map((item) => (
             item.id === nextQueuedItem.id

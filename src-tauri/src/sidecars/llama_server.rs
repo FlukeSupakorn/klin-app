@@ -150,7 +150,7 @@ fn tcp_probe_timeout() -> Duration {
         Some(val) => match val.parse::<u64>() {
             Ok(ms) => Duration::from_millis(ms),
             Err(_) => {
-                eprintln!(
+                tracing::info!(
                     "[llama-server] KLIN_TCP_PROBE_TIMEOUT_MS={:?} is not a valid u64, using 250ms",
                     val
                 );
@@ -326,23 +326,25 @@ fn spawn_slot<R: tauri::Runtime>(
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(line) => {
-                    eprintln!(
+                    tracing::info!(
                         "[llama-server][{}] {}",
                         log_label,
                         String::from_utf8_lossy(&line)
                     );
                 }
                 CommandEvent::Stderr(line) => {
-                    eprintln!(
+                    tracing::info!(
                         "[llama-server][{}][stderr] {}",
                         log_label,
                         String::from_utf8_lossy(&line)
                     );
                 }
                 CommandEvent::Terminated(payload) => {
-                    eprintln!(
+                    tracing::info!(
                         "[llama-server][{}] terminated (code: {:?}, signal: {:?})",
-                        log_label, payload.code, payload.signal
+                        log_label,
+                        payload.code,
+                        payload.signal
                     );
                     let mut p = phase.lock();
                     // Don't overwrite an intentional Idle (clean stop/idle-kill).
@@ -360,9 +362,11 @@ fn spawn_slot<R: tauri::Runtime>(
         }
     });
 
-    eprintln!(
+    tracing::info!(
         "[llama-server][{}] Spawned — model: {}, port: {}",
-        label, model_path, port
+        label,
+        model_path,
+        port
     );
 
     Ok(child)
@@ -380,7 +384,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
 ) -> Result<(), String> {
     let label = slot.slot.label();
 
-    eprintln!("[llama-server][{}] ensure requested", label);
+    tracing::info!("[llama-server][{}] ensure requested", label);
 
     // A new caller wants the server — clear any previous explicit stop request.
     slot.stop_requested.store(false, Ordering::SeqCst);
@@ -393,7 +397,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
             LaunchPhase::Running => {
                 if is_slot_ready(&slot.slot) {
                     *slot.last_used.lock() = Some(Instant::now());
-                    eprintln!(
+                    tracing::info!(
                         "[llama-server][{}] already running, idle timer refreshed",
                         label
                     );
@@ -423,7 +427,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
                     *phase = LaunchPhase::Running;
                     slot.phase_condvar.notify_all();
                     *slot.last_used.lock() = Some(Instant::now());
-                    eprintln!(
+                    tracing::info!(
                         "[llama-server][{}] Reusing already-running process on {}",
                         label,
                         slot_socket_addr(&slot.slot)
@@ -442,7 +446,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
                     return Err(msg);
                 }
 
-                eprintln!("[llama-server][{}] spawning new process", label);
+                tracing::info!("[llama-server][{}] spawning new process", label);
                 *phase = LaunchPhase::Starting;
                 slot.phase_condvar.notify_all();
                 drop(phase);
@@ -452,9 +456,10 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
                     let mut child_slot = slot.child.lock();
                     if let Some(existing) = child_slot.take() {
                         if let Err(e) = existing.kill() {
-                            eprintln!(
+                            tracing::info!(
                                 "[llama-server][{}] stale child cleanup failed: {}",
-                                label, e
+                                label,
+                                e
                             );
                         }
                     }
@@ -480,7 +485,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
                         *p = LaunchPhase::Running;
                         slot.phase_condvar.notify_all();
                         *slot.last_used.lock() = Some(Instant::now());
-                        eprintln!("[llama-server][{}] ready and timer started", label);
+                        tracing::info!("[llama-server][{}] ready and timer started", label);
                         return Ok(());
                     }
                     Err(e) => {
@@ -513,7 +518,7 @@ pub fn touch_slot_last_used(slot: &LlamaSlotState) {
 /// Stop the running llama-server for a slot and clear the idle timer.
 pub fn stop_slot(slot: &LlamaSlotState) {
     let label = slot.slot.label();
-    eprintln!("[llama-server][{}] stop requested", label);
+    tracing::info!("[llama-server][{}] stop requested", label);
     // Prevent concurrent ensure_slot_running callers from respawning.
     slot.stop_requested.store(true, Ordering::SeqCst);
     super::kill_sidecar(&format!("llama-server[{}]", label), &slot.child);
@@ -549,7 +554,7 @@ pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
         let poll_interval = Duration::from_secs(IDLE_POLL_INTERVAL_SECS);
         let idle_limit = Duration::from_secs(idle_timeout_secs);
 
-        eprintln!(
+        tracing::info!(
             "[idle-timer][{}] idle timeout: {}s (poll every {}s)",
             label,
             idle_timeout_secs,
@@ -574,9 +579,10 @@ pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
             };
 
             if should_stop {
-                eprintln!(
+                tracing::info!(
                     "[idle-timer][{}] idle for >{}s — stopping",
-                    label, idle_timeout_secs
+                    label,
+                    idle_timeout_secs
                 );
                 *phase.lock() = LaunchPhase::Idle;
                 condvar.notify_all();
@@ -584,16 +590,16 @@ pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
                 let child = child_slot.lock().take();
                 if let Some(child) = child {
                     if let Err(e) = child.kill() {
-                        eprintln!("[idle-timer][{}] kill failed: {}", label, e);
+                        tracing::info!("[idle-timer][{}] kill failed: {}", label, e);
                     } else {
-                        eprintln!("[idle-timer][{}] llama-server stopped", label);
+                        tracing::info!("[idle-timer][{}] llama-server stopped", label);
                     }
                 }
                 *last_used.lock() = None;
             }
         }
 
-        eprintln!("[idle-timer][{}] shutdown — exiting", label);
+        tracing::info!("[idle-timer][{}] shutdown — exiting", label);
     });
 }
 

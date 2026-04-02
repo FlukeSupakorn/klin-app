@@ -38,11 +38,11 @@ pub fn warmup_chat_model<R: tauri::Runtime>(
     state: State<AppState>,
 ) -> Result<(), String> {
     let chat_slot = state.slot(crate::sidecars::ModelSlot::Chat);
-    eprintln!("[startup] warming up Chat model (this may take 30-60 seconds)...");
+    tracing::info!("[startup] warming up Chat model (this may take 30-60 seconds)...");
 
     // Simply ensure Chat is running — blocks until warmup complete or fails
     crate::sidecars::ensure_slot_running(&app, chat_slot)?;
-    eprintln!("[startup] Chat model ready!");
+    tracing::info!("[startup] Chat model ready!");
 
     Ok(())
 }

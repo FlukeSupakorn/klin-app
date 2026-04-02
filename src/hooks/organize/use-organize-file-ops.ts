@@ -11,7 +11,6 @@
 import { useCallback, useRef } from "react";
 import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
-import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { splitDestinationPath, normalizePath } from "@/lib/path-utils";
 import type { OrganizePreviewItem } from "@/types/domain";
 
@@ -20,26 +19,21 @@ export interface UseOrganizeFileOpsReturn {
   undoSingleItem: (item: OrganizePreviewItem) => Promise<void>;
   moveAllPending: () => Promise<void>;
   undoAllMoved: () => Promise<void>;
-  handleDrop: (event: React.DragEvent<HTMLDivElement>) => void;
 }
 
 interface FileOpsDependencies {
   items: OrganizePreviewItem[];
-  lastNativeDropAt: number;
   categories: any[];
   setItems: (fn: (state: OrganizePreviewItem[]) => OrganizePreviewItem[]) => void;
   setErrorMessage: (message: string | null) => void;
-  setLastNativeDropAt: (time: number) => void;
 }
 
 export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOpsReturn {
   const {
     items,
-    lastNativeDropAt,
     categories,
     setItems,
     setErrorMessage,
-    setLastNativeDropAt,
   } = deps;
 
   const itemsRef = useRef<OrganizePreviewItem[]>(items);
@@ -66,6 +60,13 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
     setErrorMessage(null);
 
     try {
+      console.info("[organize] move started", {
+        itemId: item.id,
+        currentPath: item.currentPath,
+        destinationPath: item.destinationPath,
+        selectedCategory: item.selectedCategory,
+      });
+
       const selectedScore = item.topScores.find((score) => score.name === item.selectedCategory) ?? item.topScores[0];
       const categoryByName = categories.find((category) => category.name === item.selectedCategory);
       const currentName = splitDestinationPath(item.currentPath).fileName;
@@ -96,6 +97,12 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
 
       await tauriClient.moveFile({ sourcePath: item.currentPath, destinationPath: item.destinationPath });
 
+      console.info("[organize] move completed", {
+        itemId: item.id,
+        sourcePath: item.currentPath,
+        destinationPath: item.destinationPath,
+      });
+
       setItems((state) => state.map((entry) => (
         entry.id === item.id
           ? {
@@ -110,6 +117,12 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
       window.dispatchEvent(new Event("klin:history-updated"));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Move failed";
+      console.error("[organize] move failed", {
+        itemId: item.id,
+        sourcePath: item.currentPath,
+        destinationPath: item.destinationPath,
+        reason,
+      });
       setErrorMessage(`Failed to move ${item.fileName}: ${reason}`);
       setItems((state) => state.map((entry) => (
         entry.id === item.id ? { ...entry, moveStatus: "failed" } : entry
@@ -132,7 +145,19 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
     setErrorMessage(null);
 
     try {
+      console.info("[organize] undo started", {
+        itemId: item.id,
+        sourcePath,
+        destinationPath,
+      });
+
       await tauriClient.moveFile({ sourcePath, destinationPath });
+
+      console.info("[organize] undo completed", {
+        itemId: item.id,
+        sourcePath,
+        destinationPath,
+      });
 
       setItems((state) => state.map((entry) => (
         entry.id === item.id
@@ -146,6 +171,12 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
       )));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Undo failed";
+      console.error("[organize] undo failed", {
+        itemId: item.id,
+        sourcePath,
+        destinationPath,
+        reason,
+      });
       setErrorMessage(`Failed to undo ${item.fileName}: ${reason}`);
       setItems((state) => state.map((entry) => (
         entry.id === item.id ? { ...entry, moveStatus: "failed" } : entry
@@ -171,34 +202,10 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
     }
   }, [undoSingleItem]);
 
-  const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    if (Date.now() - lastNativeDropAt < 300) {
-      return;
-    }
-
-    const dropped = Array.from(event.dataTransfer.files)
-      .map((file) => {
-        const fileWithPath = file as File & { path?: string };
-        return fileWithPath.path;
-      })
-      .filter((value): value is string => Boolean(value));
-
-    if (dropped.length === 0) {
-      setErrorMessage("Could not read dropped file paths. Try dropping directly into the app window or use Add Files.");
-      return;
-    }
-
-    // Note: This would need to be handled by calling openWithPaths from queue
-    // For now, just trigger the error
-    setLastNativeDropAt(Date.now());
-  }, [lastNativeDropAt, setErrorMessage, setLastNativeDropAt]);
-
   return {
     moveSingleItem,
     undoSingleItem,
     moveAllPending,
     undoAllMoved,
-    handleDrop,
   };
 }

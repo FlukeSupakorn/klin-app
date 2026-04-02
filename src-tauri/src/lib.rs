@@ -62,14 +62,14 @@ fn setup_worker<R: tauri::Runtime>(
     app_data_dir: &PathBuf,
 ) -> Option<CommandChild> {
     if env_flag("KLIN_WORKER_EXTERNAL") {
-        eprintln!("[startup] klin-worker: external mode enabled, skipping sidecar spawn");
+        tracing::info!("[startup] klin-worker: external mode enabled, skipping sidecar spawn");
         return None;
     }
     let app_data_dir_str = app_data_dir.to_string_lossy().to_string();
     match sidecars::spawn_klin_worker(app, &app_data_dir_str) {
         Ok(child) => Some(child),
         Err(e) => {
-            eprintln!("[startup] klin-worker: {}", e);
+            tracing::info!("[startup] klin-worker: {}", e);
             None
         }
     }
@@ -113,7 +113,7 @@ fn setup_window_behavior<R: tauri::Runtime>(app: &tauri::App<R>) {
         main_window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                eprintln!("[tray] close requested intercepted; opening close-to-tray prompt");
+                tracing::info!("[tray] close requested intercepted; opening close-to-tray prompt");
                 let _ = close_window.emit("window://close-requested", ());
             }
         });
@@ -127,30 +127,30 @@ fn setup_configured_watchers<R: tauri::Runtime>(
     let config = match config_repo.load() {
         Ok(config) => config,
         Err(err) => {
-            eprintln!(
+            tracing::info!(
                 "[startup] failed to load automation config; using defaults: {}",
                 err
             );
             Default::default()
         }
     };
-    eprintln!(
+    tracing::info!(
         "[startup] automation config: enabled={}, watched_folders={} ",
         config.auto_organize_enabled,
         config.watched_folders.len()
     );
 
     if !config.auto_organize_enabled {
-        eprintln!("[startup] watcher registration skipped: auto organize disabled");
+        tracing::info!("[startup] watcher registration skipped: auto organize disabled");
         return;
     }
 
     for folder in config.watched_folders {
-        eprintln!("[startup] registering watcher for {}", folder);
+        tracing::info!("[startup] registering watcher for {}", folder);
         if let Err(err) =
             services::file_service::FileService::watch_folder(app_handle.clone(), folder)
         {
-            eprintln!("[startup] watcher setup failed: {}", err);
+            tracing::info!("[startup] watcher setup failed: {}", err);
         }
     }
 }
@@ -160,7 +160,7 @@ fn cleanup_orphaned_llama_servers() {
     {
         use std::process::Command;
 
-        eprintln!("[startup] checking for orphaned llama-server processes...");
+        tracing::info!("[startup] checking for orphaned llama-server processes...");
         let output = Command::new("tasklist")
             .args(&["/FI", "IMAGENAME eq llama-server.exe"])
             .output();
@@ -169,11 +169,11 @@ fn cleanup_orphaned_llama_servers() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             // If llama-server appears in tasklist, kill it
             if stdout.contains("llama-server.exe") {
-                eprintln!("[startup] found orphaned llama-server, cleaning up...");
+                tracing::info!("[startup] found orphaned llama-server, cleaning up...");
                 let _ = Command::new("taskkill")
                     .args(&["/IM", "llama-server.exe", "/F", "/T"])
                     .output();
-                eprintln!("[startup] orphaned llama-server cleaned up");
+                tracing::info!("[startup] orphaned llama-server cleaned up");
             }
         }
     }
@@ -182,12 +182,14 @@ fn cleanup_orphaned_llama_servers() {
 // ── App Entry Point ─────────────────────────────────────────────────────
 
 pub fn run() {
+    infrastructure::logging::init_logging();
+
     // Load .env file (silently ignore if not found)
     let loaded = infrastructure::runtime_env::preload_process_env();
     let resolved_chat = infrastructure::runtime_env::get("KLIN_CHAT_MODEL_PATH")
         .or_else(|| infrastructure::runtime_env::get("KLIN_MODEL_PATH"));
     let resolved_embed = infrastructure::runtime_env::get("KLIN_EMBED_MODEL_PATH");
-    eprintln!(
+    tracing::info!(
         "[startup] env: path={}, loaded={}, chat_model={:?}, embed_model={:?}, worker_external={}",
         infrastructure::runtime_env::app_env_path_string(),
         loaded,
@@ -199,10 +201,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(main_window) = app.get_webview_window("main") {
-                eprintln!("[tray] restore requested (single-instance activation)");
+                tracing::info!("[tray] restore requested (single-instance activation)");
                 let _ = main_window.show();
                 let _ = main_window.set_focus();
-                eprintln!("[tray] tray mode closed (main window visible)");
+                tracing::info!("[tray] tray mode closed (main window visible)");
             }
 
             if let Some(url) = argv.iter().find(|arg| arg.starts_with("klin://auth")) {
@@ -219,7 +221,7 @@ pub fn run() {
             cleanup_orphaned_llama_servers();
 
             // ── Spawn sidecars ──────────────────────────────────────
-            eprintln!("[startup] llama-server: lazy startup enabled (multi-slot)");
+            tracing::info!("[startup] llama-server: lazy startup enabled (multi-slot)");
             let worker_child = setup_worker(app.handle(), &app_data_dir);
 
             // ── Repositories & services ─────────────────────────────

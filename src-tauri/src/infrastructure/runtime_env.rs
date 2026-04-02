@@ -32,7 +32,7 @@ fn parse_env_value(raw: &str) -> String {
 fn load_env_map() -> HashMap<String, String> {
     let path = app_env_path();
     let Ok(contents) = fs::read_to_string(&path) else {
-        eprintln!("[startup] env file not found: {}", path.display());
+        tracing::info!("[startup] env file not found: {}", path.display());
         return HashMap::new();
     };
 
@@ -43,7 +43,7 @@ fn load_env_map() -> HashMap<String, String> {
             continue;
         }
         let Some((key, value)) = trimmed.split_once('=') else {
-            eprintln!(
+            tracing::info!(
                 "[startup] skipping malformed env line {} in {}: {}",
                 index + 1,
                 path.display(),

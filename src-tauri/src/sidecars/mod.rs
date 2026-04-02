@@ -38,9 +38,10 @@ pub(crate) fn kill_sidecar(name: &str, child_slot: &Arc<Mutex<Option<CommandChil
             // child.kill() only kills the top-level process; spawned sub-processes
             // (e.g. uvicorn workers) survive and keep holding their ports.
             use std::process::Command;
-            eprintln!(
+            tracing::info!(
                 "[shutdown] {} force-killing process tree (PID: {})",
-                name, pid
+                name,
+                pid
             );
             let _ = Command::new("taskkill")
                 .args(&["/PID", &pid.to_string(), "/F", "/T"])
@@ -50,8 +51,8 @@ pub(crate) fn kill_sidecar(name: &str, child_slot: &Arc<Mutex<Option<CommandChil
         #[cfg(not(target_os = "windows"))]
         {
             match child.kill() {
-                Ok(_) => eprintln!("[shutdown] {} terminated", name),
-                Err(e) => eprintln!("[shutdown] {} kill failed: {}", name, e),
+                Ok(_) => tracing::info!("[shutdown] {} terminated", name),
+                Err(e) => tracing::info!("[shutdown] {} kill failed: {}", name, e),
             }
         }
     }

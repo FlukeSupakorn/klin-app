@@ -63,7 +63,6 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
     openSuggestionFor,
     openSettingsWindow,
     isDraggingOver,
-    lastNativeDropAt,
     resumeDismissed,
     setItems,
     setModalOpen,
@@ -109,11 +108,9 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
   // File operations hook (handles move, undo, bulk operations)
   const fileOps = useOrganizeFileOps({
     items,
-    lastNativeDropAt,
     categories,
     setItems,
     setErrorMessage,
-    setLastNativeDropAt,
   });
 
   // Drag-drop hook
