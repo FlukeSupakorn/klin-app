@@ -10,9 +10,11 @@ use tauri::Emitter;
 
 static WATCHERS: Lazy<Mutex<Vec<RecommendedWatcher>>> = Lazy::new(|| Mutex::new(Vec::new()));
 static WATCHED_PATHS: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
-static PENDING_PATHS: Lazy<Mutex<HashMap<String, Instant>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static PENDING_PATHS: Lazy<Mutex<HashMap<String, Instant>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 static ACTIVE_CHECKS: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
-static LAST_EMITTED_AT: Lazy<Mutex<HashMap<String, Instant>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static LAST_EMITTED_AT: Lazy<Mutex<HashMap<String, Instant>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 const STABLE_QUIET_WINDOW: Duration = Duration::from_millis(500);
 const STABLE_PROBE_GAP: Duration = Duration::from_millis(500);
@@ -191,7 +193,10 @@ fn emit_file_events<R: tauri::Runtime>(
     }
 }
 
-pub fn watch_folder<R: tauri::Runtime>(app: tauri::AppHandle<R>, path: &Path) -> Result<(), String> {
+pub fn watch_folder<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    path: &Path,
+) -> Result<(), String> {
     let folder_path = path.to_string_lossy().to_string();
 
     {
@@ -210,11 +215,14 @@ pub fn watch_folder<R: tauri::Runtime>(app: tauri::AppHandle<R>, path: &Path) ->
     let mut watcher = RecommendedWatcher::new(
         move |result| match result {
             Ok(event) => emit_file_events(&app_handle, &watched_folder, event),
-            Err(err) => eprintln!("[watcher] file event error for '{}': {}", watched_folder, err),
+            Err(err) => eprintln!(
+                "[watcher] file event error for '{}': {}",
+                watched_folder, err
+            ),
         },
         Config::default(),
     )
-        .map_err(|err| format!("watcher init failed: {err}"))?;
+    .map_err(|err| format!("watcher init failed: {err}"))?;
 
     if let Err(err) = watcher.watch(path, RecursiveMode::NonRecursive) {
         WATCHED_PATHS.lock().remove(&folder_path);

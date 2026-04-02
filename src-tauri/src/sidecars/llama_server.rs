@@ -393,7 +393,10 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
             LaunchPhase::Running => {
                 if is_slot_ready(&slot.slot) {
                     *slot.last_used.lock() = Some(Instant::now());
-                    eprintln!("[llama-server][{}] already running, idle timer refreshed", label);
+                    eprintln!(
+                        "[llama-server][{}] already running, idle timer refreshed",
+                        label
+                    );
                     return Ok(());
                 }
                 *phase = LaunchPhase::Crashed(
@@ -411,10 +414,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
             // ── Need to spawn ─────────────────────────────────────────
             LaunchPhase::Idle | LaunchPhase::Crashed(_) => {
                 if slot.stop_requested.load(Ordering::SeqCst) {
-                    return Err(format!(
-                        "llama-server[{}] stopped by user",
-                        label
-                    ));
+                    return Err(format!("llama-server[{}] stopped by user", label));
                 }
 
                 // App can restart without owning child handles while a previous healthy
@@ -474,11 +474,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
 
                 *slot.child.lock() = Some(child);
 
-                match wait_for_slot_ready(
-                    Duration::from_secs(60),
-                    &slot.phase,
-                    &slot.slot,
-                ) {
+                match wait_for_slot_ready(Duration::from_secs(60), &slot.phase, &slot.slot) {
                     Ok(()) => {
                         let mut p = slot.phase.lock();
                         *p = LaunchPhase::Running;
@@ -520,10 +516,7 @@ pub fn stop_slot(slot: &LlamaSlotState) {
     eprintln!("[llama-server][{}] stop requested", label);
     // Prevent concurrent ensure_slot_running callers from respawning.
     slot.stop_requested.store(true, Ordering::SeqCst);
-    super::kill_sidecar(
-        &format!("llama-server[{}]", label),
-        &slot.child,
-    );
+    super::kill_sidecar(&format!("llama-server[{}]", label), &slot.child);
     // Mark Idle *before* notify so the async termination handler
     // sees Idle and skips setting Crashed.
     *slot.phase.lock() = LaunchPhase::Idle;
@@ -617,12 +610,18 @@ mod tests {
     #[test]
     fn idle_stop_triggers_after_limit() {
         let last_used = Instant::now() - Duration::from_secs(301);
-        assert!(slot_should_idle_stop(Some(last_used), Duration::from_secs(300)));
+        assert!(slot_should_idle_stop(
+            Some(last_used),
+            Duration::from_secs(300)
+        ));
     }
 
     #[test]
     fn idle_stop_does_not_trigger_before_limit() {
         let last_used = Instant::now() - Duration::from_secs(120);
-        assert!(!slot_should_idle_stop(Some(last_used), Duration::from_secs(300)));
+        assert!(!slot_should_idle_stop(
+            Some(last_used),
+            Duration::from_secs(300)
+        ));
     }
 }

@@ -1,10 +1,8 @@
 use tauri::State;
 
 use crate::{
-    domain::dto::AutomationConfigDto,
-    domain::repository_traits::AutomationConfigRepository,
-    services::file_service::FileService,
-    AppState,
+    domain::dto::AutomationConfigDto, domain::repository_traits::AutomationConfigRepository,
+    services::file_service::FileService, AppState,
 };
 
 #[tauri::command]
@@ -31,8 +29,6 @@ pub fn save_automation_config<R: tauri::Runtime>(
 }
 
 #[tauri::command]
-pub fn load_automation_config(
-    state: State<AppState>,
-) -> Result<AutomationConfigDto, String> {
+pub fn load_automation_config(state: State<AppState>) -> Result<AutomationConfigDto, String> {
     state.automation_config_repository.load()
 }

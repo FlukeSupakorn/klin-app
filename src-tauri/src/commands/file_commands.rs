@@ -27,7 +27,7 @@ pub async fn pick_files_for_organize() -> Result<Vec<String>, String> {
     Ok(selected
         .unwrap_or_default()
         .into_iter()
-    .map(|handle| handle.path().to_string_lossy().to_string())
+        .map(|handle| handle.path().to_string_lossy().to_string())
         .collect())
 }
 
@@ -43,7 +43,7 @@ pub async fn pick_folders_for_batch() -> Result<Vec<String>, String> {
     Ok(selected
         .unwrap_or_default()
         .into_iter()
-    .map(|handle| handle.path().to_string_lossy().to_string())
+        .map(|handle| handle.path().to_string_lossy().to_string())
         .collect())
 }
 

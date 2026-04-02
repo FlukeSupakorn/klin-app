@@ -30,7 +30,8 @@ impl JsonHistoryRepository {
     fn write_all(&self, logs: &[AutomationLog]) -> Result<(), String> {
         let content = serde_json::to_string_pretty(logs)
             .map_err(|err| format!("serialize history failed: {err}"))?;
-        std::fs::write(&self.file_path, content).map_err(|err| format!("write history failed: {err}"))
+        std::fs::write(&self.file_path, content)
+            .map_err(|err| format!("write history failed: {err}"))
     }
 }
 

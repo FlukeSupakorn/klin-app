@@ -31,10 +31,7 @@ pub fn spawn_klin_worker<R: tauri::Runtime>(
                     eprintln!("[klin-worker] {}", String::from_utf8_lossy(&line));
                 }
                 CommandEvent::Stderr(line) => {
-                    eprintln!(
-                        "[klin-worker][stderr] {}",
-                        String::from_utf8_lossy(&line)
-                    );
+                    eprintln!("[klin-worker][stderr] {}", String::from_utf8_lossy(&line));
                 }
                 CommandEvent::Terminated(payload) => {
                     eprintln!(

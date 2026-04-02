@@ -11,27 +11,32 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tauri::{Emitter, Manager};
+#[cfg(windows)]
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_shell::process::CommandChild;
 
 use domain::repository_traits::AutomationConfigRepository;
+use domain::repository_traits::{CategoryRepository, HistoryRepository, RuleRepository};
 use repositories::{
     json_automation_config_repository::JsonAutomationConfigRepository,
     json_category_repository::JsonCategoryRepository,
-    json_history_repository::JsonHistoryRepository,
-    json_rule_repository::JsonRuleRepository,
+    json_history_repository::JsonHistoryRepository, json_rule_repository::JsonRuleRepository,
 };
 use services::{
     category_service::CategoryService, history_service::HistoryService, rule_service::RuleService,
 };
 use sidecars::{LlamaSlotState, ModelSlot};
 
+type DynHistoryRepository = Box<dyn HistoryRepository>;
+type DynRuleRepository = Box<dyn RuleRepository>;
+type DynCategoryRepository = Box<dyn CategoryRepository>;
+
 // ── App State ───────────────────────────────────────────────────────────
 
 pub struct AppState {
-    pub history_service: Arc<Mutex<HistoryService<JsonHistoryRepository>>>,
-    pub rule_service: Arc<Mutex<RuleService<JsonRuleRepository>>>,
-    pub category_service: Arc<Mutex<CategoryService<JsonCategoryRepository>>>,
+    pub history_service: Arc<Mutex<HistoryService<DynHistoryRepository>>>,
+    pub rule_service: Arc<Mutex<RuleService<DynRuleRepository>>>,
+    pub category_service: Arc<Mutex<CategoryService<DynCategoryRepository>>>,
     pub app_data_dir: PathBuf,
     /// Per-slot llama-server lifecycle state.
     pub slots: HashMap<ModelSlot, LlamaSlotState>,
@@ -119,7 +124,16 @@ fn setup_configured_watchers<R: tauri::Runtime>(
     app_handle: tauri::AppHandle<R>,
     config_repo: Arc<JsonAutomationConfigRepository>,
 ) {
-    let config = config_repo.load().unwrap_or_default();
+    let config = match config_repo.load() {
+        Ok(config) => config,
+        Err(err) => {
+            eprintln!(
+                "[startup] failed to load automation config; using defaults: {}",
+                err
+            );
+            Default::default()
+        }
+    };
     eprintln!(
         "[startup] automation config: enabled={}, watched_folders={} ",
         config.auto_organize_enabled,
@@ -133,7 +147,9 @@ fn setup_configured_watchers<R: tauri::Runtime>(
 
     for folder in config.watched_folders {
         eprintln!("[startup] registering watcher for {}", folder);
-        if let Err(err) = services::file_service::FileService::watch_folder(app_handle.clone(), folder) {
+        if let Err(err) =
+            services::file_service::FileService::watch_folder(app_handle.clone(), folder)
+        {
             eprintln!("[startup] watcher setup failed: {}", err);
         }
     }
@@ -218,9 +234,11 @@ pub fn run() {
             let slots = setup_llama_slots();
 
             let app_state = AppState {
-                history_service: Arc::new(Mutex::new(HistoryService::new(history_repo))),
-                rule_service: Arc::new(Mutex::new(RuleService::new(rule_repo))),
-                category_service: Arc::new(Mutex::new(CategoryService::new(category_repo))),
+                history_service: Arc::new(Mutex::new(HistoryService::new(Box::new(history_repo)))),
+                rule_service: Arc::new(Mutex::new(RuleService::new(Box::new(rule_repo)))),
+                category_service: Arc::new(Mutex::new(CategoryService::new(Box::new(
+                    category_repo,
+                )))),
                 app_data_dir: app_data_dir.clone(),
                 slots,
                 worker_child: Arc::new(Mutex::new(worker_child)),
@@ -273,7 +291,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
-            if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
+            if matches!(
+                event,
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+            ) {
                 // Signal all idle-timeout threads to exit cleanly.
                 let state = app.state::<AppState>();
                 for slot_state in state.slots.values() {

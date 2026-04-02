@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import type { DragEvent as ReactDragEvent } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
@@ -140,4 +141,27 @@ export function useOrganizeDragDrop({
       window.removeEventListener("drop", onWindowDrop);
     };
   }, [setIsDraggingOver, setLastNativeDropAt]);
+
+  const handleDrop = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingOver(false);
+
+    const droppedPaths = Array.from(event.dataTransfer.files)
+      .map((file) => {
+        const fileWithPath = file as File & { path?: string };
+        return fileWithPath.path;
+      })
+      .filter((value): value is string => Boolean(value));
+
+    if (droppedPaths.length === 0) {
+      return;
+    }
+
+    setLastNativeDropAt(Date.now());
+    void openWithPathsRef.current(droppedPaths);
+  }, [setIsDraggingOver, setLastNativeDropAt]);
+
+  return {
+    handleDrop,
+  };
 }

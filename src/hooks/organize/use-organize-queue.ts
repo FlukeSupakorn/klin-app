@@ -8,7 +8,7 @@
  * - Queue execution and cancellation
  */
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
@@ -155,6 +155,13 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
     }
   }, [categories, setItems, setIsAnalyzing, setErrorMessage]);
 
+  useEffect(() => {
+    const hasQueued = items.some((item) => item.analysisStatus === "queued");
+    if (hasQueued && !isAnalyzing) {
+      void runAnalyzeQueue();
+    }
+  }, [items, isAnalyzing, runAnalyzeQueue]);
+
   const openWithPaths = useCallback(async (paths: string[]) => {
     const selectedPaths = normalizeSelectedPaths(paths);
     if (selectedPaths.length === 0) {
@@ -209,7 +216,9 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
       const queuedItems = allowed
         .filter((path) => !existingPaths.has(path))
         .map((path) => buildQueuedItem(path, categories, defaultFolder));
-      return queuedItems.length > 0 ? [...state, ...queuedItems] : state;
+      const nextState = queuedItems.length > 0 ? [...state, ...queuedItems] : state;
+      itemsRef.current = nextState;
+      return nextState;
     });
 
     await runAnalyzeQueue();

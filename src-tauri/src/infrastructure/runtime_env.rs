@@ -115,7 +115,12 @@ pub fn get(name: &str) -> Option<String> {
     std::env::var(name)
         .ok()
         .filter(|v| !v.trim().is_empty())
-        .or_else(|| env_map().get(name).cloned().filter(|v| !v.trim().is_empty()))
+        .or_else(|| {
+            env_map()
+                .get(name)
+                .cloned()
+                .filter(|v| !v.trim().is_empty())
+        })
         .or_else(|| fallback_model_path(name))
 }
 
@@ -125,6 +130,11 @@ pub fn get_or(name: &str, fallback: &str) -> String {
 
 pub fn get_bool(name: &str) -> bool {
     get(name)
-        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .map(|v| {
+            matches!(
+                v.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
         .unwrap_or(false)
 }
