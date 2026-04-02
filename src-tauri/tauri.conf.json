@@ -18,8 +18,7 @@
         "minWidth": 1000,
         "minHeight": 700,
         "resizable": true,
-        "dragDropEnabled": true,
-        "additionalBrowserArgs": "--disable-features=msTrackingPrevention"
+        "dragDropEnabled": true
       }
     ],
     "security": {

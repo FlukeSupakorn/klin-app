@@ -403,6 +403,31 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
                     ));
                 }
 
+                // App can restart without owning child handles while a previous healthy
+                // llama-server process is still alive on the slot port.
+                if is_slot_http_healthy(&slot.slot) {
+                    *phase = LaunchPhase::Running;
+                    slot.phase_condvar.notify_all();
+                    *slot.last_used.lock() = Some(Instant::now());
+                    eprintln!(
+                        "[llama-server][{}] Reusing already-running process on {}",
+                        label,
+                        slot_socket_addr(&slot.slot)
+                    );
+                    return Ok(());
+                }
+
+                if is_slot_ready(&slot.slot) {
+                    let msg = format!(
+                        "Port {} is already in use but /health is not ready for llama-server[{}]",
+                        slot_port(&slot.slot),
+                        label
+                    );
+                    *phase = LaunchPhase::Crashed(msg.clone());
+                    slot.phase_condvar.notify_all();
+                    return Err(msg);
+                }
+
                 *phase = LaunchPhase::Starting;
                 slot.phase_condvar.notify_all();
                 drop(phase);

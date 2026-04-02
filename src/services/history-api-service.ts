@@ -401,8 +401,22 @@ export const historyApiService = {
         const merged = [...localEntries, ...filteredRemoteEntries];
         const deduped = new Map<string, HistoryEntry>();
         merged.forEach((entry) => {
-          if (!deduped.has(entry.id)) {
-            deduped.set(entry.id, entry);
+          // Local and remote sources may represent the same organize action with different IDs.
+          const dedupeKey = (() => {
+            if (entry.type !== "organize") {
+              return entry.id;
+            }
+
+            const from = entry.fromPath.trim().toLowerCase();
+            const to = entry.toPath.trim().toLowerCase();
+            const ts = Date.parse(entry.timestamp);
+            const minuteBucket = Number.isNaN(ts) ? entry.timestamp : String(Math.floor(ts / 60_000));
+
+            return `organize:${from}->${to}:${minuteBucket}`;
+          })();
+
+          if (!deduped.has(dedupeKey)) {
+            deduped.set(dedupeKey, entry);
           }
         });
 

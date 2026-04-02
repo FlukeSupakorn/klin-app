@@ -22,28 +22,28 @@ pub fn read_folder(input: ReadFolderDto) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub fn pick_files_for_organize() -> Result<Vec<String>, String> {
-    let selected = rfd::FileDialog::new().pick_files();
+pub async fn pick_files_for_organize() -> Result<Vec<String>, String> {
+    let selected = rfd::AsyncFileDialog::new().pick_files().await;
     Ok(selected
         .unwrap_or_default()
         .into_iter()
-        .map(|path| path.to_string_lossy().to_string())
+    .map(|handle| handle.path().to_string_lossy().to_string())
         .collect())
 }
 
 #[tauri::command]
-pub fn pick_folder_for_organize() -> Result<Option<String>, String> {
-    let selected = rfd::FileDialog::new().pick_folder();
-    Ok(selected.map(|path| path.to_string_lossy().to_string()))
+pub async fn pick_folder_for_organize() -> Result<Option<String>, String> {
+    let selected = rfd::AsyncFileDialog::new().pick_folder().await;
+    Ok(selected.map(|handle| handle.path().to_string_lossy().to_string()))
 }
 
 #[tauri::command]
-pub fn pick_folders_for_batch() -> Result<Vec<String>, String> {
-    let selected = rfd::FileDialog::new().pick_folders();
+pub async fn pick_folders_for_batch() -> Result<Vec<String>, String> {
+    let selected = rfd::AsyncFileDialog::new().pick_folders().await;
     Ok(selected
         .unwrap_or_default()
         .into_iter()
-        .map(|path| path.to_string_lossy().to_string())
+    .map(|handle| handle.path().to_string_lossy().to_string())
         .collect())
 }
 

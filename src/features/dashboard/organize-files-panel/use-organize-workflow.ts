@@ -110,6 +110,7 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
   itemsRef.current = items;
   const isQueueRunningRef = useRef(false);
   const activeAnalyzeRef = useRef<{ itemId: string; controller: AbortController } | null>(null);
+  const isPickingFilesRef = useRef(false);
 
   const splitDestinationPath = (destinationPath: string) => {
     const slashIndex = Math.max(destinationPath.lastIndexOf("/"), destinationPath.lastIndexOf("\\"));
@@ -299,8 +300,17 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
   useOrganizeDragDrop({ openWithPaths, setIsDraggingOver, setLastNativeDropAt });
 
   const handleAddFiles = async () => {
+    if (isPickingFilesRef.current) {
+      return;
+    }
+
+    isPickingFilesRef.current = true;
     const selected = await tauriClient.pickFilesForOrganize();
-    await openWithPaths(selected);
+    try {
+      await openWithPaths(selected);
+    } finally {
+      isPickingFilesRef.current = false;
+    }
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
