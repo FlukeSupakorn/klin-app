@@ -7,6 +7,31 @@ import {
 import { tauriClient } from "@/services/tauri-client";
 import { listen } from "@tauri-apps/api/event";
 
+let deepLinkListenerReady = false;
+let deepLinkListenerPromise: Promise<void> | null = null;
+let initializeInFlight: Promise<void> | null = null;
+
+async function ensureDeepLinkListener(handler: (url: string) => Promise<void>): Promise<void> {
+  if (deepLinkListenerReady) {
+    return;
+  }
+
+  if (!deepLinkListenerPromise) {
+    deepLinkListenerPromise = (async () => {
+      await listen<string>("deep-link://oauth-callback", (event) => {
+        console.log("Deep link OAuth callback received:", event.payload);
+        void handler(event.payload);
+      });
+      deepLinkListenerReady = true;
+    })().catch((error) => {
+      deepLinkListenerPromise = null;
+      throw error;
+    });
+  }
+
+  await deepLinkListenerPromise;
+}
+
 interface AuthState {
   initialized: boolean;
   status: "idle" | "loading" | "authenticated" | "error";
@@ -37,93 +62,103 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
       return;
     }
 
-    try {
-      await listen<string>("deep-link://oauth-callback", (event) => {
-        console.log("Deep link OAuth callback received:", event.payload);
-        get().handleDeepLinkCallback(event.payload);
-      });
-    } catch (error) {
-      console.error("Failed to set up deep link listener:", error);
-    }
-
-    const restoredToken = get().accessToken;
-    const restoredExpiry = get().expiresAt;
-    const restoredProfile = get().profile;
-
-    if (restoredToken && restoredExpiry) {
-      if (!googleAuthService.isExpired(restoredExpiry)) {
-        try {
-          const profile = await googleAuthService.fetchProfile(restoredToken);
-          set({
-            initialized: true,
-            status: "authenticated",
-            profile,
-            error: null,
-          });
-        } catch {
-          set({
-            initialized: true,
-            status: "authenticated",
-            profile: restoredProfile,
-            error: null,
-          });
-        }
-        return;
-      } else {
-        set({
-          accessToken: null,
-          expiresAt: null,
-          profile: null,
-          status: "idle",
-        });
-      }
-    }
-
-    if (!googleClientId) {
-      set({
-        initialized: true,
-        status: "error",
-        error: "Missing VITE_GOOGLE_CLIENT_ID",
-      });
+    if (initializeInFlight) {
+      await initializeInFlight;
       return;
     }
 
-    const callbackData = googleAuthService.parseTokenFromUrl();
-    if (callbackData) {
-      set({ status: "loading", error: null });
+    initializeInFlight = (async () => {
       try {
-        const profile = await googleAuthService.fetchProfile(callbackData.accessToken);
+        await ensureDeepLinkListener((url) => get().handleDeepLinkCallback(url));
+      } catch (error) {
+        console.error("Failed to set up deep link listener:", error);
+      }
+
+      const restoredToken = get().accessToken;
+      const restoredExpiry = get().expiresAt;
+      const restoredProfile = get().profile;
+
+      if (restoredToken && restoredExpiry) {
+        if (!googleAuthService.isExpired(restoredExpiry)) {
+          try {
+            const profile = await googleAuthService.fetchProfile(restoredToken);
+            set({
+              initialized: true,
+              status: "authenticated",
+              profile,
+              error: null,
+            });
+          } catch {
+            set({
+              initialized: true,
+              status: "authenticated",
+              profile: restoredProfile,
+              error: null,
+            });
+          }
+          return;
+        } else {
+          set({
+            accessToken: null,
+            expiresAt: null,
+            profile: null,
+            status: "idle",
+          });
+        }
+      }
+
+      if (!googleClientId) {
         set({
           initialized: true,
-          status: "authenticated",
-          accessToken: callbackData.accessToken,
-          expiresAt: callbackData.expiresAt,
-          profile,
-          error: null,
+          status: "error",
+          error: "Missing VITE_GOOGLE_CLIENT_ID",
         });
-        window.history.replaceState(null, "", window.location.pathname);
         return;
+      }
+
+      const callbackData = googleAuthService.parseTokenFromUrl();
+      if (callbackData) {
+        set({ status: "loading", error: null });
+        try {
+          const profile = await googleAuthService.fetchProfile(callbackData.accessToken);
+          set({
+            initialized: true,
+            status: "authenticated",
+            accessToken: callbackData.accessToken,
+            expiresAt: callbackData.expiresAt,
+            profile,
+            error: null,
+          });
+          window.history.replaceState(null, "", window.location.pathname);
+          return;
+        } catch (error) {
+          set({
+            initialized: true,
+            status: "error",
+            error: error instanceof Error ? error.message : "Failed to fetch profile",
+          });
+          return;
+        }
+      }
+
+      try {
+        if (!("__TAURI_INTERNALS__" in window)) {
+          await googleAuthService.initialize(googleClientId);
+        }
+        set({ initialized: true, error: null });
       } catch (error) {
         set({
           initialized: true,
           status: "error",
-          error: error instanceof Error ? error.message : "Failed to fetch profile",
+          error: error instanceof Error ? error.message : "Failed to initialize Google auth",
         });
-        return;
       }
-    }
+    })();
 
     try {
-      if (!("__TAURI_INTERNALS__" in window)) {
-        await googleAuthService.initialize(googleClientId);
-      }
-      set({ initialized: true, error: null });
-    } catch (error) {
-      set({
-        initialized: true,
-        status: "error",
-        error: error instanceof Error ? error.message : "Failed to initialize Google auth",
-      });
+      await initializeInFlight;
+    } finally {
+      initializeInFlight = null;
     }
   },
 

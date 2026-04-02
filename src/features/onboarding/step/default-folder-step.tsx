@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/components/not-use-ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { tauriClient } from "@/services/tauri-client";
 import {
   FolderOpen,
   Info,
 } from "lucide-react";
-import { Input } from "@/components/not-use-ui/input";
+import { Input } from "@/components/ui/input";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { categoryManagementService } from "@/services/category-management-service";
 

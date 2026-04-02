@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Button } from "@/components/not-use-ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Category } from "../types";
+import type { Category } from "@/types/onboarding";
 import {
   CATEGORY_COLOR_OPTIONS,
   CATEGORY_ICON_OPTIONS,

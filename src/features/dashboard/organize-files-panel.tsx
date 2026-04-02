@@ -1,10 +1,10 @@
 import { FolderOpen, Upload } from "lucide-react";
 import { FileDropOverlay } from "@/features/dashboard/file-drop-overlay";
-import { Button } from "@/components/not-use-ui/button";
-import { Card, CardContent } from "@/components/not-use-ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { OrganizeFilesModal } from "@/features/dashboard/organize-files-panel/organize-files-modal";
-import { useOrganizeWorkflow } from "@/features/dashboard/organize-files-panel/use-organize-workflow";
+import { useOrganizeWorkflow } from "@/hooks/organize/use-organize-workflow";
 
 export function OrganizeFilesPanel() {
   const workflow = useOrganizeWorkflow();

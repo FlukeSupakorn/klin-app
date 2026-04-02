@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
 import { WatcherOverviewCard } from "@/features/dashboard/watcher-overview-card";
 import { RecentMovementsSection } from "@/features/dashboard/recent-movements-section";
-import type { HistoryEntry } from "@/features/history/history-types";
+import type { HistoryEntry } from "@/types/history";
 import { historyApiService } from "@/services/history-api-service";
 import { FileText, ArrowRight } from "lucide-react";
 

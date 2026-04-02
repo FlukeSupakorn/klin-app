@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronDown, ChevronRight, Clock, Trash2 } from "lucide-react";
-import { Button } from "@/components/not-use-ui/button";
+import { Button } from "@/components/ui/button";
 import { useApiLogStore, type ApiLogEntry } from "@/stores/use-api-log-store";
 import { cn } from "@/lib/utils";
 

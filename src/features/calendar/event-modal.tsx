@@ -1,11 +1,11 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { ExternalLink, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/not-use-ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { googleAuthService } from "@/features/auth/google-auth-service";
-import { useAuthStore } from "@/features/auth/use-auth-store";
-import { useCalendarStore } from "@/features/calendar/use-calendar-store";
+import { useAuthStore } from "@/hooks/auth/use-auth-store";
+import { useCalendarStore } from "@/hooks/calendar/use-calendar-store";
 import { tauriClient } from "@/services/tauri-client";
 
 function formatEventTime(start: Date, end: Date, isAllDay: boolean): string {

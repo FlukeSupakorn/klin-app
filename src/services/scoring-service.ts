@@ -1,4 +1,5 @@
 import type { CategoryScore, ScoringResponse } from "@/types/domain";
+import { normalizeScoreDistribution } from "@/lib/scoring-utils";
 
 export interface ScoringInput {
   fileName: string;
@@ -8,18 +9,6 @@ export interface ScoringInput {
 
 export interface ScoringStrategy {
   score(input: ScoringInput): Promise<ScoringResponse>;
-}
-
-function normalizeScores(scores: CategoryScore[]): CategoryScore[] {
-  const total = scores.reduce((sum, item) => sum + item.score, 0);
-  if (total === 0) {
-    const even = 1 / Math.max(scores.length, 1);
-    return scores.map((item) => ({ ...item, score: Number(even.toFixed(4)) }));
-  }
-  return scores.map((item) => ({
-    ...item,
-    score: Number((item.score / total).toFixed(4)),
-  }));
 }
 
 function seededRandom(seed: string): number {
@@ -43,7 +32,7 @@ export class MockScoringStrategy implements ScoringStrategy {
       return { name, score: base * variability + 0.05 };
     });
 
-    const normalized = normalizeScores(raw).sort((a, b) => b.score - a.score);
+    const normalized = normalizeScoreDistribution(raw).sort((a, b) => b.score - a.score);
     return { categories: normalized };
   }
 }

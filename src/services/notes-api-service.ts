@@ -8,8 +8,7 @@ const NOTE_HISTORY_API_URL_CANDIDATES = [
   "http://localhost:8000/api/history/note",
 ];
 
-import { withLlama, createLlamaStreamGuard } from "@/hooks/useLlama";
-
+import { withLlama, createLlamaStreamGuard } from "@/services/llama-service";
 export interface NotesSummarizeResult {
   summary: string;
   suggestedTitle: string;

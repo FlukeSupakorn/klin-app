@@ -13,11 +13,11 @@ import {
   UserCircle2,
   X,
 } from "lucide-react";
-import { Button } from "@/components/not-use-ui/button";
+import { Button } from "@/components/ui/button";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { cn } from "@/lib/utils";
 import { googleAuthService } from "@/features/auth/google-auth-service";
-import { useAuthStore } from "@/features/auth/use-auth-store";
+import { useAuthStore } from "@/hooks/auth/use-auth-store";
 import { AsyncProcessingQueue } from "@/services/automation-queue";
 import { processAutomationJob } from "@/services/automation-service";
 import { tauriClient } from "@/services/tauri-client";

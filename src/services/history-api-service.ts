@@ -1,5 +1,6 @@
-import type { HistoryEntry } from "@/features/history/history-types";
-import type { CategoryScore } from "@/types/domain";
+import type { HistoryEntry } from "@/types/history";
+import { getPathTail } from "@/lib/path-utils";
+import { parseNormalizedScores, normalizeScore } from "@/lib/scoring-utils";
 
 const HISTORY_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/history",
@@ -17,46 +18,6 @@ export interface HistoryListPage {
   limit: number;
   offset: number;
   hasMore: boolean;
-}
-
-function getPathTail(path: string): string {
-  const value = path.split(/[\\/]/).pop();
-  return value && value.trim().length > 0 ? value : "Unknown";
-}
-
-function normalizeScore(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) {
-    return 0;
-  }
-
-  if (value > 1) {
-    return Number((value / 100).toFixed(4));
-  }
-
-  return Number(value.toFixed(4));
-}
-
-function normalizeScores(input: unknown): CategoryScore[] {
-  if (!Array.isArray(input)) {
-    return [];
-  }
-
-  return input
-    .map((item) => {
-      if (!item || typeof item !== "object") {
-        return null;
-      }
-
-      const name = "name" in item ? String(item.name ?? "") : "";
-      const score = "score" in item ? Number(item.score) : Number.NaN;
-      if (!name) {
-        return null;
-      }
-
-      return { name, score: normalizeScore(score) };
-    })
-    .filter((item): item is CategoryScore => item !== null)
-    .sort((a, b) => b.score - a.score);
 }
 
 function normalizeEntries(payload: unknown): HistoryEntry[] {
@@ -152,7 +113,7 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
           : defaultToPath;
         const oldName = "oldName" in entry ? String(entry.oldName ?? getPathTail(fromPath)) : getPathTail(fromPath);
         const newName = "newName" in entry ? String(entry.newName ?? getPathTail(toPath)) : getPathTail(toPath);
-        let scores = normalizeScores("scores" in entry ? entry.scores : "categories" in entry ? entry.categories : []);
+        let scores = parseNormalizedScores("scores" in entry ? entry.scores : "categories" in entry ? entry.categories : []);
         if (scores.length === 0 && "category" in entry && entry.category && typeof entry.category === "object") {
           const rawCategory = entry.category as { id?: unknown; name?: unknown; score?: unknown };
           const name = typeof rawCategory.name === "string" ? rawCategory.name : "";

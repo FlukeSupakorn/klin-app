@@ -11,11 +11,11 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/not-use-ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { bootstrapAppData } from "@/services/bootstrap-service";
 import { categoryManagementService } from "@/services/category-management-service";
 import { fileSearchApiService } from "@/services/file-search-api-service";
-import { useAuthStore } from "@/features/auth/use-auth-store";
+import { useAuthStore } from "@/hooks/auth/use-auth-store";
 import { GlobalOrganizeResumeBubble } from "@/features/dashboard/organize-files-panel/global-organize-resume-bubble";
 import { StartupDialogs, runStartupChecks } from "@/features/startup/startup-dialogs";
 import type { FailedService } from "@/features/startup/startup-dialogs";

@@ -2,7 +2,7 @@ import { useCategoryManagementStore } from "@/stores/use-category-management-sto
 import { useCategoryStore } from "@/stores/use-category-store";
 import { useRuleStore } from "@/stores/use-rule-store";
 import { tauriClient } from "@/services/tauri-client";
-import { withLlama } from "@/hooks/useLlama";
+import { withLlama } from "@/services/llama-service";
 import type { ManagedCategory } from "@/types/domain";
 
 const SETTINGS_API_URL_CANDIDATES = [

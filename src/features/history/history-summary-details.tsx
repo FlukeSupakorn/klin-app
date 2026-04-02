@@ -1,5 +1,5 @@
-import { Button } from "@/components/not-use-ui/button";
-import type { HistoryEntry } from "@/features/history/history-types";
+import { Button } from "@/components/ui/button";
+import type { HistoryEntry } from "@/types/history";
 
 interface HistorySummaryDetailsProps {
   entry: Extract<HistoryEntry, { type: "summary" }>;

@@ -7,7 +7,7 @@ import {
   googleCalendarService,
   type NormalizedCalendarEvent,
 } from "@/features/calendar/google-calendar-service";
-import { useAuthStore } from "@/features/auth/use-auth-store";
+import { useAuthStore } from "@/hooks/auth/use-auth-store";
 
 function mapCalendarApiError(error: CalendarApiError): string {
   if (error.status === 403) {

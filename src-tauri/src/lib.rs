@@ -83,21 +83,21 @@ fn setup_llama_slots() -> HashMap<ModelSlot, LlamaSlotState> {
 fn setup_deep_links<R: tauri::Runtime>(
     app: &tauri::App<R>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(windows)]
     {
         app.deep_link().register("klin")?;
-    }
 
-    let handle = app.handle().clone();
-    app.deep_link().on_open_url(move |event| {
-        if let Some(url) = event
-            .urls()
-            .iter()
-            .find(|url| url.as_str().starts_with("klin://auth"))
-        {
-            let _ = handle.emit("deep-link://oauth-callback", url.to_string());
-        }
-    });
+        let handle = app.handle().clone();
+        app.deep_link().on_open_url(move |event| {
+            if let Some(url) = event
+                .urls()
+                .iter()
+                .find(|url| url.as_str().starts_with("klin://auth"))
+            {
+                let _ = handle.emit("deep-link://oauth-callback", url.to_string());
+            }
+        });
+    }
 
     Ok(())
 }

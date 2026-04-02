@@ -5,32 +5,14 @@ import type {
   OrganizeAnalyzeRequest,
   OrganizePreviewItem,
 } from "@/types/domain";
-import { withLlama } from "@/hooks/useLlama";
+import { withLlama } from "@/services/llama-service";
+import { isAbortError } from "@/lib/error-utils";
+import { normalizeCategoryLabel } from "@/lib/text-utils";
 
 const ORGANIZE_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/organize",
   "http://localhost:8000/api/organize",
 ];
-
-function isAbortError(error: unknown): boolean {
-  if (error instanceof DOMException && error.name === "AbortError") {
-    return true;
-  }
-
-  if (error && typeof error === "object" && "name" in error) {
-    return (error as { name?: string }).name === "AbortError";
-  }
-
-  if (error instanceof Error) {
-    return /abort/i.test(error.message);
-  }
-
-  return false;
-}
-
-function normalizeCategoryLabel(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
 
 function findMatchingManagedCategoryName(rawName: string, categoryCatalog: ManagedCategory[]): string | null {
   const normalizedRaw = normalizeCategoryLabel(rawName);

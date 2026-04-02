@@ -4,11 +4,8 @@ import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
+import { normalizePath } from "@/lib/path-utils";
 import type { AutomationJob, AutomationLog } from "@/types/domain";
-
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, "/").replace(/\/+$/g, "").toLowerCase();
-}
 
 export async function processAutomationJob(job: AutomationJob): Promise<void> {
   const start = performance.now();

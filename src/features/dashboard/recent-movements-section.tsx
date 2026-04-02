@@ -2,8 +2,8 @@ import { Link } from "react-router-dom";
 import { ChevronRight, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { theme } from "@/theme/theme";
-import { Card, CardContent } from "@/components/not-use-ui/card";
-import type { HistoryEntry } from "@/features/history/history-types";
+import { Card, CardContent } from "@/components/ui/card";
+import type { HistoryEntry } from "@/types/history";
 import { formatTime, getFolderTail, getPathTail } from "@/features/history/history-utils";
 
 interface RecentMovementsSectionProps {
