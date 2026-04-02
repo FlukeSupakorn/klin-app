@@ -3,9 +3,8 @@ import type { DragEvent } from "react";
 import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
-import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
-import type { AutomationLog, OrganizePreviewItem } from "@/types/domain";
+import type { OrganizePreviewItem } from "@/types/domain";
 import {
   applyCategoryToItem,
   applySuggestedNameToItem,
@@ -487,26 +486,7 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
           : entry
       )));
 
-      const chosenCategory = item.selectedCategory === "No category"
-        ? "No category"
-        : item.selectedCategory;
-      const selectedScoreForLog = item.topScores.find((score) => score.name === chosenCategory) ?? item.topScores[0];
-      const moveLog: AutomationLog = {
-        id: crypto.randomUUID(),
-        itemType: "file",
-        fileName: item.fileName,
-        originalPath: item.currentPath,
-        movedTo: item.destinationPath,
-        chosenCategory,
-        score: selectedScoreForLog?.score ?? 0,
-        allScores: item.topScores,
-        timestamp: new Date().toISOString(),
-        processingTimeMs: 0,
-        status: "completed",
-      };
-
-      useHistoryStore.getState().appendLog(moveLog);
-      await tauriClient.writeHistory({ log: moveLog });
+      window.dispatchEvent(new Event("klin:history-updated"));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Move failed";
       setErrorMessage(`Failed to move ${item.fileName}: ${reason}`);
