@@ -108,6 +108,7 @@ fn setup_window_behavior<R: tauri::Runtime>(app: &tauri::App<R>) {
         main_window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
+                eprintln!("[tray] close requested intercepted; opening close-to-tray prompt");
                 let _ = close_window.emit("window://close-requested", ());
             }
         });
@@ -182,8 +183,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(main_window) = app.get_webview_window("main") {
+                eprintln!("[tray] restore requested (single-instance activation)");
                 let _ = main_window.show();
                 let _ = main_window.set_focus();
+                eprintln!("[tray] tray mode closed (main window visible)");
             }
 
             if let Some(url) = argv.iter().find(|arg| arg.starts_with("klin://auth")) {

@@ -11,6 +11,9 @@ use tauri_plugin_shell::ShellExt;
 
 use crate::infrastructure::runtime_env;
 
+const DEFAULT_IDLE_TIMEOUT_SECS: u64 = 60;
+const IDLE_POLL_INTERVAL_SECS: u64 = 30;
+
 // ── Model slot ───────────────────────────────────────────────────────
 
 /// Identifies which llama-server instance to manage.
@@ -130,6 +133,14 @@ fn validate_model_path(slot: ModelSlot, model_path: &str) -> Result<(), String> 
         }
     }
     Ok(())
+}
+
+fn idle_timeout_secs() -> u64 {
+    std::env::var("KLIN_LLAMA_IDLE_TIMEOUT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .or_else(|| runtime_env::get("KLIN_LLAMA_IDLE_TIMEOUT").and_then(|v| v.parse().ok()))
+        .unwrap_or(DEFAULT_IDLE_TIMEOUT_SECS)
 }
 
 // ── Readiness probe ────────────────────────────────────────────────────
@@ -369,6 +380,8 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
 ) -> Result<(), String> {
     let label = slot.slot.label();
 
+    eprintln!("[llama-server][{}] ensure requested", label);
+
     // A new caller wants the server — clear any previous explicit stop request.
     slot.stop_requested.store(false, Ordering::SeqCst);
 
@@ -380,6 +393,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
             LaunchPhase::Running => {
                 if is_slot_ready(&slot.slot) {
                     *slot.last_used.lock() = Some(Instant::now());
+                    eprintln!("[llama-server][{}] already running, idle timer refreshed", label);
                     return Ok(());
                 }
                 *phase = LaunchPhase::Crashed(
@@ -428,6 +442,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
                     return Err(msg);
                 }
 
+                eprintln!("[llama-server][{}] spawning new process", label);
                 *phase = LaunchPhase::Starting;
                 slot.phase_condvar.notify_all();
                 drop(phase);
@@ -469,6 +484,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
                         *p = LaunchPhase::Running;
                         slot.phase_condvar.notify_all();
                         *slot.last_used.lock() = Some(Instant::now());
+                        eprintln!("[llama-server][{}] ready and timer started", label);
                         return Ok(());
                     }
                     Err(e) => {
@@ -501,6 +517,7 @@ pub fn touch_slot_last_used(slot: &LlamaSlotState) {
 /// Stop the running llama-server for a slot and clear the idle timer.
 pub fn stop_slot(slot: &LlamaSlotState) {
     let label = slot.slot.label();
+    eprintln!("[llama-server][{}] stop requested", label);
     // Prevent concurrent ensure_slot_running callers from respawning.
     slot.stop_requested.store(true, Ordering::SeqCst);
     super::kill_sidecar(
@@ -512,6 +529,13 @@ pub fn stop_slot(slot: &LlamaSlotState) {
     *slot.phase.lock() = LaunchPhase::Idle;
     slot.phase_condvar.notify_all();
     *slot.last_used.lock() = None;
+}
+
+fn slot_should_idle_stop(last_used: Option<Instant>, idle_limit: Duration) -> bool {
+    match last_used {
+        Some(last) => last.elapsed() > idle_limit,
+        None => false,
+    }
 }
 
 // ── Idle-timeout background task ───────────────────────────────────────
@@ -526,14 +550,10 @@ pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
     let shutdown = Arc::clone(&slot.idle_shutdown);
     let shutdown_condvar = Arc::clone(&slot.shutdown_condvar);
 
-    let idle_timeout_secs: u64 = std::env::var("KLIN_LLAMA_IDLE_TIMEOUT")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .or_else(|| runtime_env::get("KLIN_LLAMA_IDLE_TIMEOUT").and_then(|v| v.parse().ok()))
-        .unwrap_or(300);
+    let idle_timeout_secs = idle_timeout_secs();
 
     tauri::async_runtime::spawn_blocking(move || {
-        let poll_interval = Duration::from_secs(30);
+        let poll_interval = Duration::from_secs(IDLE_POLL_INTERVAL_SECS);
         let idle_limit = Duration::from_secs(idle_timeout_secs);
 
         eprintln!(
@@ -557,10 +577,7 @@ pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
 
             let should_stop = {
                 let guard = last_used.lock();
-                match *guard {
-                    Some(last) => last.elapsed() > idle_limit,
-                    None => false,
-                }
+                slot_should_idle_stop(*guard, idle_limit)
             };
 
             if should_stop {
@@ -585,4 +602,27 @@ pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
 
         eprintln!("[idle-timer][{}] shutdown — exiting", label);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::slot_should_idle_stop;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn idle_stop_is_disabled_without_last_use() {
+        assert!(!slot_should_idle_stop(None, Duration::from_secs(300)));
+    }
+
+    #[test]
+    fn idle_stop_triggers_after_limit() {
+        let last_used = Instant::now() - Duration::from_secs(301);
+        assert!(slot_should_idle_stop(Some(last_used), Duration::from_secs(300)));
+    }
+
+    #[test]
+    fn idle_stop_does_not_trigger_before_limit() {
+        let last_used = Instant::now() - Duration::from_secs(120);
+        assert!(!slot_should_idle_stop(Some(last_used), Duration::from_secs(300)));
+    }
 }
