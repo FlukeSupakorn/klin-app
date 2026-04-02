@@ -207,7 +207,7 @@ export function AppShell() {
   }, [isAutomationRunning, watchedFolders, addWatchedFolder]);
 
   useEffect(() => {
-    if (effectiveWatchedFolders.length === 0) {
+    if (!isAutomationRunning || effectiveWatchedFolders.length === 0) {
       console.info("[watcher-ui] registration skipped", {
         isAutomationRunning,
         watchedFolders: effectiveWatchedFolders.length,
@@ -249,7 +249,7 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
-    if (effectiveWatchedFolders.length === 0) {
+    if (!isAutomationRunning || effectiveWatchedFolders.length === 0) {
       knownFilesByFolderRef.current.clear();
       return;
     }
@@ -291,7 +291,7 @@ export function AppShell() {
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [effectiveWatchedFolders]);
+  }, [isAutomationRunning, effectiveWatchedFolders]);
 
   useEffect(() => {
     let unlistener: (() => void) | null = null;

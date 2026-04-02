@@ -1,6 +1,5 @@
 import type { Category, OnboardingStep } from "@/types/onboarding";
 
-// Remove this later, just for testing
 export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: "photos-media",
