@@ -384,7 +384,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
 ) -> Result<(), String> {
     let label = slot.slot.label();
 
-    tracing::info!("[llama-server][{}] ensure requested", label);
+    tracing::debug!("[llama-server][{}] ensure requested", label);
 
     // A new caller wants the server — clear any previous explicit stop request.
     slot.stop_requested.store(false, Ordering::SeqCst);
@@ -397,7 +397,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
             LaunchPhase::Running => {
                 if is_slot_ready(&slot.slot) {
                     *slot.last_used.lock() = Some(Instant::now());
-                    tracing::info!(
+                    tracing::debug!(
                         "[llama-server][{}] already running, idle timer refreshed",
                         label
                     );
