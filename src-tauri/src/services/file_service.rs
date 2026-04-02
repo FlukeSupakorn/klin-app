@@ -28,8 +28,11 @@ impl FileService {
         command.execute()
     }
 
-    pub fn watch_folder(path: String) -> Result<(), String> {
-        watcher::watch_folder(PathBuf::from(path).as_path())
+    pub fn watch_folder<R: tauri::Runtime>(
+        app: tauri::AppHandle<R>,
+        path: String,
+    ) -> Result<(), String> {
+        watcher::watch_folder(app, PathBuf::from(path).as_path())
     }
 
     pub fn list_subdirectories(path: String) -> Result<Vec<SubdirEntry>, String> {

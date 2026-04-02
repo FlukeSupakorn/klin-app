@@ -4,8 +4,11 @@ use crate::{
 };
 
 #[tauri::command]
-pub fn watch_folder(input: WatchFolderDto) -> Result<(), String> {
-    FileService::watch_folder(input.folder_path)
+pub fn watch_folder<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    input: WatchFolderDto,
+) -> Result<(), String> {
+    FileService::watch_folder(app, input.folder_path)
 }
 
 #[tauri::command]

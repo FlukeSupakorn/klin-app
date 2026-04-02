@@ -176,7 +176,7 @@ async function postAnalyze(requestPayload: OrganizeAnalyzeRequest, signal?: Abor
     throw new DOMException("Request aborted", "AbortError");
   }
 
-  return withLlama(['chat'], async () => {
+  return withLlama(['chat', 'embed'], async () => {
     let lastError: unknown = null;
 
     for (const url of ORGANIZE_API_URL_CANDIDATES) {

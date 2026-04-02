@@ -8,7 +8,6 @@ mod sidecars;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
 use parking_lot::Mutex;
 use tauri::{Emitter, Manager};
@@ -115,6 +114,30 @@ fn setup_window_behavior<R: tauri::Runtime>(app: &tauri::App<R>) {
     }
 }
 
+fn setup_configured_watchers<R: tauri::Runtime>(
+    app_handle: tauri::AppHandle<R>,
+    config_repo: Arc<JsonAutomationConfigRepository>,
+) {
+    let config = config_repo.load().unwrap_or_default();
+    eprintln!(
+        "[startup] automation config: enabled={}, watched_folders={} ",
+        config.auto_organize_enabled,
+        config.watched_folders.len()
+    );
+
+    if !config.auto_organize_enabled {
+        eprintln!("[startup] watcher registration skipped: auto organize disabled");
+        return;
+    }
+
+    for folder in config.watched_folders {
+        eprintln!("[startup] registering watcher for {}", folder);
+        if let Err(err) = services::file_service::FileService::watch_folder(app_handle.clone(), folder) {
+            eprintln!("[startup] watcher setup failed: {}", err);
+        }
+    }
+}
+
 fn cleanup_orphaned_llama_servers() {
     #[cfg(target_os = "windows")]
     {
@@ -137,41 +160,6 @@ fn cleanup_orphaned_llama_servers() {
             }
         }
     }
-}
-
-fn setup_background_scanner<R: tauri::Runtime>(
-    app_handle: tauri::AppHandle<R>,
-    config_repo: Arc<JsonAutomationConfigRepository>,
-) {
-    std::thread::spawn(move || {
-        let mut previous_has_files = false;
-
-        loop {
-            std::thread::sleep(Duration::from_secs(60));
-
-            let config = config_repo.load().unwrap_or_default();
-
-            if !config.auto_organize_enabled || config.watched_folders.is_empty() {
-                previous_has_files = false;
-                continue;
-            }
-
-            let has_files = config.watched_folders.iter().any(|folder: &String| {
-                services::file_service::FileService::read_folder(folder.clone())
-                    .map(|files| !files.is_empty())
-                    .unwrap_or(false)
-            });
-
-            if has_files && !previous_has_files {
-                if let Some(main_window) = app_handle.get_webview_window("main") {
-                    let _ = main_window.show();
-                    let _ = main_window.set_focus();
-                }
-            }
-
-            previous_has_files = has_files;
-        }
-    });
 }
 
 // ── App Entry Point ─────────────────────────────────────────────────────
@@ -244,13 +232,14 @@ pub fn run() {
             // ── Window close → hide ─────────────────────────────────
             setup_window_behavior(app);
 
-            // ── Background folder scanner ───────────────────────────
-            setup_background_scanner(app.handle().clone(), config_repo);
+            // ── Event-driven watcher startup ───────────────────────
+            setup_configured_watchers(app.handle().clone(), config_repo);
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::exit_app,
+            commands::minimize_to_tray,
             commands::watch_folder,
             commands::move_file,
             commands::read_folder,

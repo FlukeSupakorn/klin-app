@@ -20,10 +20,13 @@ import { GlobalOrganizeResumeBubble } from "@/features/dashboard/organize-files-
 import { StartupDialogs, runStartupChecks } from "@/features/startup/startup-dialogs";
 import type { FailedService } from "@/features/startup/startup-dialogs";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
+import { AsyncProcessingQueue } from "@/services/automation-queue";
+import { processAutomationJob } from "@/services/automation-service";
 import type { FileSearchResultItem } from "@/types/domain";
 import { tauriClient } from "@/services/tauri-client";
 import { appClient } from "@/services/app-client";
 import { CloseAppModal } from "@/components/dialogs/close-app-modal";
+import { useAutomationStore } from "@/stores/use-automation-store";
 import klinLogo from "@/assets/klin-logo.svg";
 
 const navItems = [
@@ -37,6 +40,10 @@ const navItems = [
 export function AppShell() {
   const initializeAuth = useAuthStore((state) => state.initialize);
   const profile = useAuthStore((state) => state.profile);
+  const watchedFolders = useAutomationStore((state) => state.watchedFolders);
+  const isAutomationRunning = useAutomationStore((state) => state.isRunning);
+  const concurrencyLimit = useAutomationStore((state) => state.concurrencyLimit);
+  const addWatchedFolder = useAutomationStore((state) => state.addWatchedFolder);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<FileSearchResultItem[]>([]);
@@ -51,6 +58,49 @@ export function AppShell() {
   const [defaultPathSet, setDefaultPathSet] = useState<{ path: string } | null>(null);
   const [showDefaultFolderSettings, setShowDefaultFolderSettings] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [recentDetectedFiles, setRecentDetectedFiles] = useState<Array<{ path: string; at: number }>>([]);
+  const [fallbackDownloadsFolder, setFallbackDownloadsFolder] = useState<string | null>(null);
+  const queueRef = useRef(new AsyncProcessingQueue(concurrencyLimit));
+  const recentEventByPathRef = useRef<Map<string, number>>(new Map());
+  const knownFilesByFolderRef = useRef<Map<string, Set<string>>>(new Map());
+
+  const effectiveWatchedFolders = watchedFolders.length > 0
+    ? watchedFolders
+    : fallbackDownloadsFolder
+      ? [fallbackDownloadsFolder]
+      : [];
+
+  const handleDetectedFile = (pathFromEvent: string) => {
+    if (!pathFromEvent) {
+      return;
+    }
+
+    const now = Date.now();
+    const lastSeen = recentEventByPathRef.current.get(pathFromEvent) ?? 0;
+    if (now - lastSeen < 3000) {
+      return;
+    }
+
+    recentEventByPathRef.current.set(pathFromEvent, now);
+    const fileName = pathFromEvent.split(/[\\/]/).pop() ?? pathFromEvent;
+
+    setRecentDetectedFiles((state) => {
+      const next = [{ path: pathFromEvent, at: now }, ...state.filter((item) => item.path !== pathFromEvent)];
+      return next.slice(0, 6);
+    });
+
+    if (!useAutomationStore.getState().isRunning) {
+      return;
+    }
+
+    queueRef.current.enqueue(async () => {
+      await processAutomationJob({
+        filePath: pathFromEvent,
+        fileName,
+        contentPreview: "",
+      });
+    });
+  };
 
   useEffect(() => {
     void (async () => {
@@ -130,6 +180,126 @@ export function AppShell() {
       document.removeEventListener("mousedown", onClickAway);
     };
   }, []);
+
+  useEffect(() => {
+    queueRef.current.setConcurrency(concurrencyLimit);
+  }, [concurrencyLimit]);
+
+  useEffect(() => {
+    if (!isAutomationRunning) {
+      setFallbackDownloadsFolder(null);
+      return;
+    }
+
+    void tauriClient
+      .getDownloadsFolder()
+      .then((downloadsPath) => {
+        if (!downloadsPath) {
+          return;
+        }
+
+        setFallbackDownloadsFolder(downloadsPath);
+
+        if (watchedFolders.length > 0) {
+          return;
+        }
+
+        console.info("[watcher-ui] no watched folders configured; auto-adding Downloads", {
+          downloadsPath,
+        });
+        addWatchedFolder(downloadsPath);
+      })
+      .catch((error) => {
+        console.warn("[watcher-ui] failed to auto-add Downloads folder", error);
+      });
+  }, [isAutomationRunning, watchedFolders, addWatchedFolder]);
+
+  useEffect(() => {
+    if (effectiveWatchedFolders.length === 0) {
+      console.info("[watcher-ui] registration skipped", {
+        isAutomationRunning,
+        watchedFolders: effectiveWatchedFolders.length,
+      });
+      return;
+    }
+
+    void Promise.all(
+      effectiveWatchedFolders.map((folderPath) => tauriClient.watchFolder({ folderPath })),
+    )
+      .then(() => {
+        console.info("[watcher-ui] watcher registration requested", {
+          watchedFolders: effectiveWatchedFolders,
+        });
+      })
+      .catch((error) => {
+        console.warn("[watcher-ui] watcher registration failed", error);
+      });
+  }, [isAutomationRunning, effectiveWatchedFolders]);
+
+  useEffect(() => {
+    let unlistener: (() => void) | null = null;
+
+    void (async () => {
+      unlistener = await listen<{ filePath?: string; file_path?: string }>("watcher://file-created", (event) => {
+        const pathFromEvent = event.payload?.filePath ?? event.payload?.file_path;
+        console.info("[watcher-ui] event received", event.payload);
+        if (!pathFromEvent) {
+          return;
+        }
+
+        handleDetectedFile(pathFromEvent);
+      });
+    })();
+
+    return () => {
+      unlistener?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (effectiveWatchedFolders.length === 0) {
+      knownFilesByFolderRef.current.clear();
+      return;
+    }
+
+    let disposed = false;
+
+    const syncFolderState = async () => {
+      await Promise.all(
+        effectiveWatchedFolders.map(async (folderPath) => {
+          const files = await tauriClient.readFolder({ folderPath }).catch(() => [] as string[]);
+          if (disposed) {
+            return;
+          }
+
+          const previous = knownFilesByFolderRef.current.get(folderPath);
+          const currentSet = new Set(files);
+          knownFilesByFolderRef.current.set(folderPath, currentSet);
+
+          if (!previous) {
+            return;
+          }
+
+          files.forEach((filePath) => {
+            if (!previous.has(filePath)) {
+              console.info("[watcher-ui] polling detected new file", { folderPath, filePath });
+              handleDetectedFile(filePath);
+            }
+          });
+        }),
+      );
+    };
+
+    void syncFolderState();
+    const timer = window.setInterval(() => {
+      void syncFolderState();
+    }, 5000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [effectiveWatchedFolders]);
 
   useEffect(() => {
     let unlistener: (() => void) | null = null;
@@ -371,6 +541,32 @@ export function AppShell() {
 
       <GlobalOrganizeResumeBubble />
 
+      {recentDetectedFiles.length > 0 && (
+        <div className="pointer-events-none fixed bottom-6 right-6 z-50 w-[360px] max-w-[90vw] rounded-xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur-sm">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="text-xs font-black uppercase tracking-widest text-foreground">New File Detected</p>
+            <button
+              type="button"
+              className="pointer-events-auto rounded px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => setRecentDetectedFiles([])}
+            >
+              Clear
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            {recentDetectedFiles.map((item) => {
+              const name = item.path.split(/[\\/]/).pop() ?? item.path;
+              return (
+                <div key={item.path} className="rounded-lg bg-muted/60 px-2.5 py-2">
+                  <p className="truncate text-xs font-semibold text-foreground" title={item.path}>{name}</p>
+                  <p className="truncate text-[11px] text-muted-foreground" title={item.path}>{item.path}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <StartupDialogs
         healthIssues={healthIssues}
         defaultPathSet={defaultPathSet}
@@ -387,7 +583,10 @@ export function AppShell() {
 
       <CloseAppModal
         open={showCloseModal}
-        onMinimize={() => setShowCloseModal(false)}
+        onMinimize={async () => {
+          await appClient.minimizeToTray();
+          setShowCloseModal(false);
+        }}
         onQuit={async () => {
           await appClient.exitApp();
         }}
