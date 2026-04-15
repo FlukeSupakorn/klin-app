@@ -6,9 +6,10 @@ interface CloseAppModalProps {
   open: boolean;
   onMinimize: () => void;
   onQuit: () => void;
+  onCancel: () => void;
 }
 
-export function CloseAppModal({ open, onMinimize, onQuit }: CloseAppModalProps) {
+export function CloseAppModal({ open, onMinimize, onQuit, onCancel }: CloseAppModalProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleMinimize = async () => {
@@ -20,8 +21,15 @@ export function CloseAppModal({ open, onMinimize, onQuit }: CloseAppModalProps) 
     onQuit();
   };
 
+  const handleOpenChange = (newOpen: boolean) => {
+    // When dialog closes (user clicks outside or presses Escape), call onCancel
+    if (!newOpen) {
+      onCancel();
+    }
+  };
+
   return (
-    <Dialog open={open}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent showCloseButton={false}>
         <DialogHeader>
           <h2 className="text-lg font-semibold">Close Application</h2>

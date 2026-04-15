@@ -582,6 +582,9 @@ export function AppShell() {
         onQuit={async () => {
           await appClient.exitApp();
         }}
+        onCancel={() => {
+          setShowCloseModal(false);
+        }}
       />
     </div>
   );
