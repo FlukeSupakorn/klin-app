@@ -1,5 +1,5 @@
 import { CalendarDays, FileText, FolderSync } from "lucide-react";
-import type { HistoryEntryType } from "@/features/history/history-types";
+import type { HistoryEntryType } from "@/types/history";
 
 type ActionTheme = {
   icon: React.ComponentType<{ className?: string }>;

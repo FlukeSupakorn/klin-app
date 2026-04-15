@@ -1,16 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { privacySettingsService } from "@/services/privacy-settings-service";
+import { normalizePath } from "@/lib/path-utils";
 
 type LockSource = "file" | "folder";
 
 export interface LockMatch {
   source: LockSource;
   lockedPath: string;
-}
-
-function normalizePath(value: string): string {
-  return value.trim().replace(/\\/g, "/").replace(/\/+$/g, "").toLowerCase();
 }
 
 function dedupePaths(paths: string[]): string[] {

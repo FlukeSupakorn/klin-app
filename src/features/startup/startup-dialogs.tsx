@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, FolderOpen, X } from "lucide-react";
-import { Button } from "@/components/not-use-ui/button";
+import { Button } from "@/components/ui/button";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 
@@ -7,6 +7,22 @@ const HEALTH_URL_CANDIDATES = [
   "http://127.0.0.1:8000/health",
   "http://localhost:8000/health",
 ];
+
+const CHAT_SLOT_HEALTH_URL_CANDIDATES = [
+  "http://127.0.0.1:8080/health",
+  "http://localhost:8080/health",
+];
+
+const EMBED_SLOT_HEALTH_URL_CANDIDATES = [
+  "http://127.0.0.1:8081/health",
+  "http://localhost:8081/health",
+];
+
+const STARTUP_POLL_INTERVAL_MS = 1200;
+const WORKER_READY_TIMEOUT_MS = 20_000;
+const CHAT_READY_TIMEOUT_MS = 75_000;
+const EMBED_READY_TIMEOUT_MS = 45_000;
+const HTTP_REQUEST_TIMEOUT_MS = 2500;
 
 const DEFAULT_PATH_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/settings/default-base-path",
@@ -21,6 +37,115 @@ export interface FailedService {
 export interface StartupCheckResult {
   healthIssues: FailedService[];
   defaultPathSet: { path: string } | null;
+}
+
+interface WorkerHealthResponse {
+  status: string;
+  services: Record<string, { ok: boolean; detail: string }>;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function fetchJsonWithTimeout<T>(url: string, timeoutMs = HTTP_REQUEST_TIMEOUT_MS): Promise<T> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+      throw new Error(`Request failed: ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+async function fetchWorkerHealthOnce(): Promise<WorkerHealthResponse> {
+  return fetchFirstSuccess(HEALTH_URL_CANDIDATES, async (url) => fetchJsonWithTimeout<WorkerHealthResponse>(url));
+}
+
+async function probeSlotHealth(candidates: string[]): Promise<boolean> {
+  try {
+    await fetchFirstSuccess(candidates, async (url) => {
+      await fetchJsonWithTimeout<Record<string, unknown>>(url);
+      return true;
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForWorkerHealth(timeoutMs: number): Promise<WorkerHealthResponse | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      return await fetchWorkerHealthOnce();
+    } catch {
+      await sleep(STARTUP_POLL_INTERVAL_MS);
+    }
+  }
+
+  return null;
+}
+
+async function waitForSlotHealth(candidates: string[], timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const ok = await probeSlotHealth(candidates);
+    if (ok) {
+      return true;
+    }
+    await sleep(STARTUP_POLL_INTERVAL_MS);
+  }
+
+  return false;
+}
+
+async function ensureDefaultPathIfMissing(): Promise<{ path: string } | null> {
+  try {
+    const defaultPath = await fetchFirstSuccess(DEFAULT_PATH_URL_CANDIDATES, async (url) => {
+      const res = await fetchJsonWithTimeout<{ default_base_path: string | null }>(url);
+      return res;
+    });
+
+    if (defaultPath.default_base_path !== null) {
+      return null;
+    }
+
+    const suggestedPath = await getDefaultKlinPath();
+    await fetchFirstSuccess(DEFAULT_PATH_URL_CANDIDATES, async (url) => {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), HTTP_REQUEST_TIMEOUT_MS);
+      try {
+        const res = await fetch(url, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ default_base_path: suggestedPath }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to set default path: ${res.status}`);
+        }
+        return res.json();
+      } finally {
+        window.clearTimeout(timer);
+      }
+    });
+
+    useCategoryManagementStore.getState().setManagementState(
+      suggestedPath,
+      useCategoryManagementStore.getState().categories,
+    );
+    return { path: suggestedPath };
+  } catch {
+    // Silently skip — bootstrap will handle the default path later
+    return null;
+  }
 }
 
 async function fetchFirstSuccess<T>(candidates: string[], request: (url: string) => Promise<T>): Promise<T> {
@@ -45,60 +170,82 @@ async function getDefaultKlinPath(): Promise<string> {
 }
 
 export async function runStartupChecks(): Promise<StartupCheckResult> {
-  const [healthResult, defaultPathResult] = await Promise.allSettled([
-    fetchFirstSuccess(HEALTH_URL_CANDIDATES, async (url) => {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Health check failed: ${res.status}`);
-      return res.json() as Promise<{
-        status: string;
-        services: Record<string, { ok: boolean; detail: string }>;
-      }>;
-    }),
-    fetchFirstSuccess(DEFAULT_PATH_URL_CANDIDATES, async (url) => {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Failed to get default path: ${res.status}`);
-      return res.json() as Promise<{ default_base_path: string | null }>;
-    }),
-  ]);
-
   const healthIssues: FailedService[] = [];
-  if (healthResult.status === "fulfilled") {
-    const { services } = healthResult.value;
-    for (const [name, status] of Object.entries(services)) {
-      if (!status.ok) {
-        healthIssues.push({ name, detail: status.detail });
-      }
-    }
-  } else {
+  const defaultPathPromise = ensureDefaultPathIfMissing();
+  const warmupChatPromise = tauriClient.warmupChatModel();
+
+  const workerHealth = await waitForWorkerHealth(WORKER_READY_TIMEOUT_MS);
+  if (!workerHealth) {
     healthIssues.push({
       name: "Worker API",
-      detail: "Could not reach the worker service. Make sure it is running.",
+      detail: "Worker did not become ready in time. Check klin-worker startup logs.",
+    });
+
+    const defaultPathSet = await defaultPathPromise;
+    return { healthIssues, defaultPathSet };
+  }
+
+  for (const [name, status] of Object.entries(workerHealth.services)) {
+    if (name === "LLM Server") {
+      continue;
+    }
+
+    if (!status.ok) {
+      healthIssues.push({ name, detail: status.detail });
+    }
+  }
+
+  let chatWarmupError: unknown = null;
+  let chatWarmupDone = false;
+  void warmupChatPromise
+    .then(() => {
+      chatWarmupDone = true;
+    })
+    .catch((err: unknown) => {
+      chatWarmupError = err;
+    });
+
+  const chatDeadline = Date.now() + CHAT_READY_TIMEOUT_MS;
+  let chatHealthy = false;
+  while (Date.now() < chatDeadline) {
+    if (chatWarmupDone) {
+      chatHealthy = true;
+      break;
+    }
+
+    if (await probeSlotHealth(CHAT_SLOT_HEALTH_URL_CANDIDATES)) {
+      chatHealthy = true;
+      break;
+    }
+
+    await sleep(STARTUP_POLL_INTERVAL_MS);
+  }
+
+  if (!chatHealthy) {
+    const reason = chatWarmupError instanceof Error ? chatWarmupError.message : "chat slot is not healthy";
+    healthIssues.push({
+      name: "LLM Chat",
+      detail: `Chat model did not become ready in time (${reason}).`,
     });
   }
 
-  let defaultPathSet: { path: string } | null = null;
-  if (defaultPathResult.status === "fulfilled" && defaultPathResult.value.default_base_path === null) {
-    try {
-      const suggestedPath = await getDefaultKlinPath();
-      await fetchFirstSuccess(DEFAULT_PATH_URL_CANDIDATES, async (url) => {
-        const res = await fetch(url, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ default_base_path: suggestedPath }),
-        });
-        if (!res.ok) throw new Error(`Failed to set default path: ${res.status}`);
-        return res.json();
-      });
-      useCategoryManagementStore.getState().setManagementState(
-        suggestedPath,
-        useCategoryManagementStore.getState().categories,
-      );
-      defaultPathSet = { path: suggestedPath };
-    } catch {
-      // Silently skip — bootstrap will handle the default path later
-    }
+  let embedEnsureError: unknown = null;
+  try {
+    await tauriClient.ensureLlamaServer("embed");
+  } catch (err) {
+    embedEnsureError = err;
   }
 
+  const embedHealthy = await waitForSlotHealth(EMBED_SLOT_HEALTH_URL_CANDIDATES, EMBED_READY_TIMEOUT_MS);
+  if (!embedHealthy) {
+    const reason = embedEnsureError instanceof Error ? embedEnsureError.message : "embed slot is not healthy";
+    healthIssues.push({
+      name: "LLM Embedding",
+      detail: `Embedding model did not become ready in time (${reason}).`,
+    });
+  }
+
+  const defaultPathSet = await defaultPathPromise;
   return { healthIssues, defaultPathSet };
 }
 

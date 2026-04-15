@@ -48,6 +48,7 @@ export interface TauriClient {
   ensureLlamaServer(slot: ModelSlot): Promise<void>;
   touchLlamaServer(slot: ModelSlot): Promise<void>;
   stopLlamaServer(slot: ModelSlot): Promise<void>;
+  warmupChatModel(): Promise<void>;
   pickFilesForOrganize(): Promise<string[]>;
   pickFolderForOrganize(): Promise<string | null>;
   saveNoteFile(input: { folderPath: string; fileName: string; content: string }): Promise<string>;

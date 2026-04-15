@@ -28,11 +28,32 @@ pub use llama_server::{
 
 /// Kill a sidecar whose `CommandChild` is stored in `child_slot`.
 /// Logs the result and leaves the slot empty.
+/// On Windows, uses taskkill as fallback if normal kill fails.
 pub(crate) fn kill_sidecar(name: &str, child_slot: &Arc<Mutex<Option<CommandChild>>>) {
     if let Some(child) = child_slot.lock().take() {
-        match child.kill() {
-            Ok(_) => eprintln!("[shutdown] {} stopped", name),
-            Err(e) => eprintln!("[shutdown] {} kill failed: {}", name, e),
+        #[cfg(target_os = "windows")]
+        {
+            let pid = child.pid();
+            // On Windows always use taskkill /T to kill the entire process tree.
+            // child.kill() only kills the top-level process; spawned sub-processes
+            // (e.g. uvicorn workers) survive and keep holding their ports.
+            use std::process::Command;
+            tracing::info!(
+                "[shutdown] {} force-killing process tree (PID: {})",
+                name,
+                pid
+            );
+            let _ = Command::new("taskkill")
+                .args(&["/PID", &pid.to_string(), "/F", "/T"])
+                .output();
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            match child.kill() {
+                Ok(_) => tracing::info!("[shutdown] {} terminated", name),
+                Err(e) => tracing::info!("[shutdown] {} kill failed: {}", name, e),
+            }
         }
     }
 }

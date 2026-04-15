@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Button } from "@/components/not-use-ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { tauriClient } from "@/services/tauri-client";
-import type { WatcherFolder } from "../types";
+import type { WatcherFolder } from "@/types/onboarding";
 import {
   AlertCircle,
   Eye,

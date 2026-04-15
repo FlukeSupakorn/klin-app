@@ -1,4 +1,6 @@
+use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -6,6 +8,11 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+
+use crate::infrastructure::runtime_env;
+
+const DEFAULT_IDLE_TIMEOUT_SECS: u64 = 60;
+const IDLE_POLL_INTERVAL_SECS: u64 = 30;
 
 // ── Model slot ───────────────────────────────────────────────────────
 
@@ -93,13 +100,11 @@ pub enum LaunchPhase {
 
 fn slot_port(slot: &ModelSlot) -> u16 {
     match slot {
-        ModelSlot::Chat => std::env::var("KLIN_CHAT_PORT")
-            .or_else(|_| std::env::var("KLIN_LLAMA_PORT"))
-            .ok()
+        ModelSlot::Chat => runtime_env::get("KLIN_CHAT_PORT")
+            .or_else(|| runtime_env::get("KLIN_LLAMA_PORT"))
             .and_then(|v| v.parse::<u16>().ok())
             .unwrap_or(8080),
-        ModelSlot::Embed => std::env::var("KLIN_EMBED_PORT")
-            .ok()
+        ModelSlot::Embed => runtime_env::get("KLIN_EMBED_PORT")
             .and_then(|v| v.parse::<u16>().ok())
             .unwrap_or(8081),
     }
@@ -109,26 +114,77 @@ fn slot_socket_addr(slot: &ModelSlot) -> SocketAddr {
     SocketAddr::from(([127, 0, 0, 1], slot_port(slot)))
 }
 
+fn validate_model_path(slot: ModelSlot, model_path: &str) -> Result<(), String> {
+    if !Path::new(model_path).exists() {
+        return Err(format!(
+            "llama-server[{}] model path does not exist: {}",
+            slot.label(),
+            model_path
+        ));
+    }
+    if matches!(slot, ModelSlot::Embed) {
+        let chat_path = runtime_env::get("KLIN_CHAT_MODEL_PATH")
+            .or_else(|| runtime_env::get("KLIN_MODEL_PATH"))
+            .unwrap_or_default();
+        if !chat_path.is_empty() && chat_path == model_path {
+            return Err(
+                "KLIN_EMBED_MODEL_PATH points to the same GGUF as chat — set a real embedding model.".to_string(),
+            );
+        }
+    }
+    Ok(())
+}
+
+fn idle_timeout_secs() -> u64 {
+    std::env::var("KLIN_LLAMA_IDLE_TIMEOUT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .or_else(|| runtime_env::get("KLIN_LLAMA_IDLE_TIMEOUT").and_then(|v| v.parse().ok()))
+        .unwrap_or(DEFAULT_IDLE_TIMEOUT_SECS)
+}
+
 // ── Readiness probe ────────────────────────────────────────────────────
 
 fn tcp_probe_timeout() -> Duration {
-    match std::env::var("KLIN_TCP_PROBE_TIMEOUT_MS") {
-        Ok(val) => match val.parse::<u64>() {
+    match runtime_env::get("KLIN_TCP_PROBE_TIMEOUT_MS") {
+        Some(val) => match val.parse::<u64>() {
             Ok(ms) => Duration::from_millis(ms),
             Err(_) => {
-                eprintln!(
+                tracing::info!(
                     "[llama-server] KLIN_TCP_PROBE_TIMEOUT_MS={:?} is not a valid u64, using 250ms",
                     val
                 );
                 Duration::from_millis(250)
             }
         },
-        Err(_) => Duration::from_millis(250),
+        None => Duration::from_millis(250),
     }
 }
 
 fn is_slot_ready(slot: &ModelSlot) -> bool {
     TcpStream::connect_timeout(&slot_socket_addr(slot), tcp_probe_timeout()).is_ok()
+}
+
+fn is_slot_http_healthy(slot: &ModelSlot) -> bool {
+    let addr = slot_socket_addr(slot);
+    let mut stream = match TcpStream::connect_timeout(&addr, tcp_probe_timeout()) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(1)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(1)));
+    let request = format!(
+        "GET /health HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+        addr
+    );
+    if stream.write_all(request.as_bytes()).is_err() {
+        return false;
+    }
+    let mut response = String::new();
+    if stream.read_to_string(&mut response).is_err() {
+        return false;
+    }
+    response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200")
 }
 
 /// Poll TCP until the port is open, timed out, or the process crashes.
@@ -156,7 +212,7 @@ fn wait_for_slot_ready(
             }
         }
 
-        if is_slot_ready(slot) {
+        if is_slot_http_healthy(slot) {
             return Ok(());
         }
 
@@ -181,8 +237,8 @@ fn spawn_slot<R: tauri::Runtime>(
 
     let (model_path, args) = match slot.slot {
         ModelSlot::Chat => {
-            let model_path = std::env::var("KLIN_CHAT_MODEL_PATH")
-                .or_else(|_| std::env::var("KLIN_MODEL_PATH"))
+            let model_path = runtime_env::get("KLIN_CHAT_MODEL_PATH")
+                .or_else(|| runtime_env::get("KLIN_MODEL_PATH"))
                 .unwrap_or_default();
 
             if model_path.is_empty() {
@@ -192,10 +248,10 @@ fn spawn_slot<R: tauri::Runtime>(
                 ));
             }
 
-            let n_gpu_layers =
-                std::env::var("KLIN_N_GPU_LAYERS").unwrap_or_else(|_| "-1".to_string());
-            let ctx_size =
-                std::env::var("KLIN_CTX_SIZE").unwrap_or_else(|_| "4096".to_string());
+            validate_model_path(slot.slot, &model_path)?;
+
+            let n_gpu_layers = runtime_env::get_or("KLIN_N_GPU_LAYERS", "-1");
+            let ctx_size = runtime_env::get_or("KLIN_CTX_SIZE", "4096");
 
             let mut args = vec![
                 "-m".to_string(),
@@ -211,7 +267,7 @@ fn spawn_slot<R: tauri::Runtime>(
                 "--no-webui".to_string(),
             ];
 
-            let mmproj_path = std::env::var("KLIN_MMPROJ_PATH").unwrap_or_default();
+            let mmproj_path = runtime_env::get("KLIN_MMPROJ_PATH").unwrap_or_default();
             if !mmproj_path.is_empty() {
                 args.push("--mmproj".to_string());
                 args.push(mmproj_path);
@@ -220,8 +276,7 @@ fn spawn_slot<R: tauri::Runtime>(
             (model_path, args)
         }
         ModelSlot::Embed => {
-            let model_path =
-                std::env::var("KLIN_EMBED_MODEL_PATH").unwrap_or_default();
+            let model_path = runtime_env::get("KLIN_EMBED_MODEL_PATH").unwrap_or_default();
 
             if model_path.is_empty() {
                 return Err(format!(
@@ -230,8 +285,9 @@ fn spawn_slot<R: tauri::Runtime>(
                 ));
             }
 
-            let n_gpu_layers = std::env::var("KLIN_EMBED_N_GPU_LAYERS")
-                .unwrap_or_else(|_| "0".to_string());
+            validate_model_path(slot.slot, &model_path)?;
+
+            let n_gpu_layers = runtime_env::get_or("KLIN_EMBED_N_GPU_LAYERS", "0");
 
             let args = vec![
                 "-m".to_string(),
@@ -270,23 +326,25 @@ fn spawn_slot<R: tauri::Runtime>(
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(line) => {
-                    eprintln!(
+                    tracing::info!(
                         "[llama-server][{}] {}",
                         log_label,
                         String::from_utf8_lossy(&line)
                     );
                 }
                 CommandEvent::Stderr(line) => {
-                    eprintln!(
+                    tracing::info!(
                         "[llama-server][{}][stderr] {}",
                         log_label,
                         String::from_utf8_lossy(&line)
                     );
                 }
                 CommandEvent::Terminated(payload) => {
-                    eprintln!(
+                    tracing::info!(
                         "[llama-server][{}] terminated (code: {:?}, signal: {:?})",
-                        log_label, payload.code, payload.signal
+                        log_label,
+                        payload.code,
+                        payload.signal
                     );
                     let mut p = phase.lock();
                     // Don't overwrite an intentional Idle (clean stop/idle-kill).
@@ -304,9 +362,11 @@ fn spawn_slot<R: tauri::Runtime>(
         }
     });
 
-    eprintln!(
+    tracing::info!(
         "[llama-server][{}] Spawned — model: {}, port: {}",
-        label, model_path, port
+        label,
+        model_path,
+        port
     );
 
     Ok(child)
@@ -324,6 +384,8 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
 ) -> Result<(), String> {
     let label = slot.slot.label();
 
+    tracing::debug!("[llama-server][{}] ensure requested", label);
+
     // A new caller wants the server — clear any previous explicit stop request.
     slot.stop_requested.store(false, Ordering::SeqCst);
 
@@ -335,6 +397,10 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
             LaunchPhase::Running => {
                 if is_slot_ready(&slot.slot) {
                     *slot.last_used.lock() = Some(Instant::now());
+                    tracing::debug!(
+                        "[llama-server][{}] already running, idle timer refreshed",
+                        label
+                    );
                     return Ok(());
                 }
                 *phase = LaunchPhase::Crashed(
@@ -352,12 +418,35 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
             // ── Need to spawn ─────────────────────────────────────────
             LaunchPhase::Idle | LaunchPhase::Crashed(_) => {
                 if slot.stop_requested.load(Ordering::SeqCst) {
-                    return Err(format!(
-                        "llama-server[{}] stopped by user",
-                        label
-                    ));
+                    return Err(format!("llama-server[{}] stopped by user", label));
                 }
 
+                // App can restart without owning child handles while a previous healthy
+                // llama-server process is still alive on the slot port.
+                if is_slot_http_healthy(&slot.slot) {
+                    *phase = LaunchPhase::Running;
+                    slot.phase_condvar.notify_all();
+                    *slot.last_used.lock() = Some(Instant::now());
+                    tracing::info!(
+                        "[llama-server][{}] Reusing already-running process on {}",
+                        label,
+                        slot_socket_addr(&slot.slot)
+                    );
+                    return Ok(());
+                }
+
+                if is_slot_ready(&slot.slot) {
+                    let msg = format!(
+                        "Port {} is already in use but /health is not ready for llama-server[{}]",
+                        slot_port(&slot.slot),
+                        label
+                    );
+                    *phase = LaunchPhase::Crashed(msg.clone());
+                    slot.phase_condvar.notify_all();
+                    return Err(msg);
+                }
+
+                tracing::info!("[llama-server][{}] spawning new process", label);
                 *phase = LaunchPhase::Starting;
                 slot.phase_condvar.notify_all();
                 drop(phase);
@@ -367,9 +456,10 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
                     let mut child_slot = slot.child.lock();
                     if let Some(existing) = child_slot.take() {
                         if let Err(e) = existing.kill() {
-                            eprintln!(
+                            tracing::info!(
                                 "[llama-server][{}] stale child cleanup failed: {}",
-                                label, e
+                                label,
+                                e
                             );
                         }
                     }
@@ -389,16 +479,13 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
 
                 *slot.child.lock() = Some(child);
 
-                match wait_for_slot_ready(
-                    Duration::from_secs(60),
-                    &slot.phase,
-                    &slot.slot,
-                ) {
+                match wait_for_slot_ready(Duration::from_secs(60), &slot.phase, &slot.slot) {
                     Ok(()) => {
                         let mut p = slot.phase.lock();
                         *p = LaunchPhase::Running;
                         slot.phase_condvar.notify_all();
                         *slot.last_used.lock() = Some(Instant::now());
+                        tracing::info!("[llama-server][{}] ready and timer started", label);
                         return Ok(());
                     }
                     Err(e) => {
@@ -431,17 +518,22 @@ pub fn touch_slot_last_used(slot: &LlamaSlotState) {
 /// Stop the running llama-server for a slot and clear the idle timer.
 pub fn stop_slot(slot: &LlamaSlotState) {
     let label = slot.slot.label();
+    tracing::info!("[llama-server][{}] stop requested", label);
     // Prevent concurrent ensure_slot_running callers from respawning.
     slot.stop_requested.store(true, Ordering::SeqCst);
-    super::kill_sidecar(
-        &format!("llama-server[{}]", label),
-        &slot.child,
-    );
+    super::kill_sidecar(&format!("llama-server[{}]", label), &slot.child);
     // Mark Idle *before* notify so the async termination handler
     // sees Idle and skips setting Crashed.
     *slot.phase.lock() = LaunchPhase::Idle;
     slot.phase_condvar.notify_all();
     *slot.last_used.lock() = None;
+}
+
+fn slot_should_idle_stop(last_used: Option<Instant>, idle_limit: Duration) -> bool {
+    match last_used {
+        Some(last) => last.elapsed() > idle_limit,
+        None => false,
+    }
 }
 
 // ── Idle-timeout background task ───────────────────────────────────────
@@ -456,16 +548,13 @@ pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
     let shutdown = Arc::clone(&slot.idle_shutdown);
     let shutdown_condvar = Arc::clone(&slot.shutdown_condvar);
 
-    let idle_timeout_secs: u64 = std::env::var("KLIN_LLAMA_IDLE_TIMEOUT")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(300);
+    let idle_timeout_secs = idle_timeout_secs();
 
     tauri::async_runtime::spawn_blocking(move || {
-        let poll_interval = Duration::from_secs(30);
+        let poll_interval = Duration::from_secs(IDLE_POLL_INTERVAL_SECS);
         let idle_limit = Duration::from_secs(idle_timeout_secs);
 
-        eprintln!(
+        tracing::info!(
             "[idle-timer][{}] idle timeout: {}s (poll every {}s)",
             label,
             idle_timeout_secs,
@@ -486,16 +575,14 @@ pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
 
             let should_stop = {
                 let guard = last_used.lock();
-                match *guard {
-                    Some(last) => last.elapsed() > idle_limit,
-                    None => false,
-                }
+                slot_should_idle_stop(*guard, idle_limit)
             };
 
             if should_stop {
-                eprintln!(
+                tracing::info!(
                     "[idle-timer][{}] idle for >{}s — stopping",
-                    label, idle_timeout_secs
+                    label,
+                    idle_timeout_secs
                 );
                 *phase.lock() = LaunchPhase::Idle;
                 condvar.notify_all();
@@ -503,15 +590,44 @@ pub fn spawn_idle_timeout_task_for_slot(slot: &LlamaSlotState) {
                 let child = child_slot.lock().take();
                 if let Some(child) = child {
                     if let Err(e) = child.kill() {
-                        eprintln!("[idle-timer][{}] kill failed: {}", label, e);
+                        tracing::info!("[idle-timer][{}] kill failed: {}", label, e);
                     } else {
-                        eprintln!("[idle-timer][{}] llama-server stopped", label);
+                        tracing::info!("[idle-timer][{}] llama-server stopped", label);
                     }
                 }
                 *last_used.lock() = None;
             }
         }
 
-        eprintln!("[idle-timer][{}] shutdown — exiting", label);
+        tracing::info!("[idle-timer][{}] shutdown — exiting", label);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::slot_should_idle_stop;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn idle_stop_is_disabled_without_last_use() {
+        assert!(!slot_should_idle_stop(None, Duration::from_secs(300)));
+    }
+
+    #[test]
+    fn idle_stop_triggers_after_limit() {
+        let last_used = Instant::now() - Duration::from_secs(301);
+        assert!(slot_should_idle_stop(
+            Some(last_used),
+            Duration::from_secs(300)
+        ));
+    }
+
+    #[test]
+    fn idle_stop_does_not_trigger_before_limit() {
+        let last_used = Instant::now() - Duration::from_secs(120);
+        assert!(!slot_should_idle_stop(
+            Some(last_used),
+            Duration::from_secs(300)
+        ));
+    }
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { StepProgress } from "./step-progress";
@@ -7,11 +7,13 @@ import { DefaultFolderStep } from "./step/default-folder-step";
 import { CategoriesStep } from "./step/categories-step";
 import { WatcherStep } from "./step/watcher-step";
 import { CompleteStep } from "./step/complete-step";
-import type { OnboardingState, OnboardingStep } from "./types";
-import { DEFAULT_CATEGORIES } from "./types";
+import type { OnboardingState, OnboardingStep } from "@/types/onboarding";
+import { DEFAULT_CATEGORIES } from "@/constants/onboarding";
 import { categoryManagementService } from "@/services/category-management-service";
 import { tauriClient } from "@/services/tauri-client";
 import { markOnboardingCompletedInSession } from "./onboarding-guard";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
+import type { ManagedCategory } from "@/types/domain";
 
 const STEP_ORDER: OnboardingStep[] = [
   "welcome",
@@ -44,13 +46,46 @@ export function OnboardingPage() {
   const [state, setState] = useState<OnboardingState>({
     step: "welcome",
     basePath: "",
-    categories: DEFAULT_CATEGORIES,
+    categories: [],
     watcherFolders: [],
   });
 
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [animating, setAnimating] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateOnboardingDefaults = async () => {
+      const downloadsFolder = await tauriClient.getDownloadsFolder().catch(() => "");
+
+      if (cancelled) {
+        return;
+      }
+
+      setState((prev) => {
+        const nextBasePath = prev.basePath || downloadsFolder;
+        const hasDownloadsWatcher = prev.watcherFolders.some((folder) => folder.path === downloadsFolder);
+        const nextWatchers = downloadsFolder && !hasDownloadsWatcher
+          ? [{ id: `watcher-${Date.now()}`, path: downloadsFolder, recursive: true }, ...prev.watcherFolders]
+          : prev.watcherFolders;
+
+        return {
+          ...prev,
+          basePath: nextBasePath,
+          categories: DEFAULT_CATEGORIES,
+          watcherFolders: nextWatchers,
+        };
+      });
+    };
+
+    void hydrateOnboardingDefaults();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const navigate_ = useCallback(
     (target: OnboardingStep, dir: "forward" | "back" = "forward") => {
@@ -81,20 +116,56 @@ export function OnboardingPage() {
       // 1. Save base path to worker API
       await categoryManagementService.saveDefaultFolder(state.basePath);
 
-      // 2. Create each selected category in worker API
-      for (const cat of state.categories) {
-        await categoryManagementService
-          .addCategoryToWorker({
-            name: cat.name,
-            description: cat.description,
-            folderPath: `${state.basePath}/${cat.name}`,
-            color: cat.color,
-            icon: cat.icon,
+      // 2. Apply category delta using category name as the stable key.
+      await categoryManagementService.refreshCategoriesFromWorker();
+      const backendCategories = useCategoryManagementStore.getState().categories;
+      const backendByName = new Map(
+        backendCategories.map((category: ManagedCategory) => [category.name.trim().toLowerCase(), category]),
+      );
+      const localByName = new Map(
+        state.categories.map((category) => [category.name.trim().toLowerCase(), category]),
+      );
+
+      for (const backendCategory of backendCategories) {
+        if (!localByName.has(backendCategory.name.trim().toLowerCase())) {
+          await categoryManagementService.deleteCategoryInWorker(backendCategory.id).catch(() => undefined);
+        }
+      }
+
+      for (const localCategory of state.categories) {
+        const normalizedName = localCategory.name.trim();
+        const normalizedDescription = localCategory.description.trim();
+        if (!normalizedName || !normalizedDescription) {
+          continue;
+        }
+
+        const folderPath = `${state.basePath.replace(/[\/]+$/, "")}/${normalizedName}`;
+        const existing = backendByName.get(normalizedName.toLowerCase());
+
+        if (!existing) {
+          await categoryManagementService.addCategoryToWorker({
+            name: normalizedName,
+            description: normalizedDescription,
+            folderPath,
+            color: localCategory.color,
+            icon: localCategory.icon,
             enabled: true,
             aiLearned: false,
             isAutoDescription: false,
-          })
-          .catch(() => undefined); // non-blocking per category
+          }).catch(() => undefined);
+          continue;
+        }
+
+        const updates: Partial<ManagedCategory> = {};
+        if (existing.name !== normalizedName) updates.name = normalizedName;
+        if (existing.description !== normalizedDescription) updates.description = normalizedDescription;
+        if (existing.color !== localCategory.color) updates.color = localCategory.color;
+        if (existing.icon !== localCategory.icon) updates.icon = localCategory.icon;
+        if (existing.folderPath !== folderPath) updates.folderPath = folderPath;
+
+        if (Object.keys(updates).length > 0) {
+          await categoryManagementService.updateCategoryInWorker(existing.id, updates).catch(() => undefined);
+        }
       }
 
       // 3. Save automation config if watcher folders were added

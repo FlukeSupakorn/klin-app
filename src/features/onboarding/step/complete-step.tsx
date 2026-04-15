@@ -1,5 +1,5 @@
-import { Button } from "@/components/not-use-ui/button";
-import type { OnboardingState } from "../types";
+import { Button } from "@/components/ui/button";
+import type { OnboardingState } from "@/types/onboarding";
 import { getCategoryIcon } from "@/features/categories/category-appearance";
 import {
   CheckCircle2,

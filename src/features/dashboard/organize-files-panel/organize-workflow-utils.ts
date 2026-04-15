@@ -1,4 +1,5 @@
 import type { ManagedCategory, OrganizePreviewItem } from "@/types/domain";
+import { normalizeCategoryLabel } from "@/lib/text-utils";
 
 export interface OrganizeWorkflowMetrics {
   queuedCount: number;
@@ -44,10 +45,6 @@ export function buildQueuedItem(path: string, categories: ManagedCategory[], def
     lastMovedFromPath: null,
     lastMovedToPath: null,
   };
-}
-
-function normalizeCategoryLabel(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function findCategoryByLabel(label: string, categories: ManagedCategory[]): ManagedCategory | undefined {

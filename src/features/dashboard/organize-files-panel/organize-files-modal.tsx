@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Pencil, Sparkles } from "lucide-react";
-import { Button } from "@/components/not-use-ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/not-use-ui/card";
-import { Input } from "@/components/not-use-ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { splitDestinationPath } from "@/lib/path-utils";
+import { findCategoryColor } from "@/lib/category-utils";
+import { normalizeCategoryName } from "@/lib/text-utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import type { OrganizePreviewItem } from "@/types/domain";
-import type { OrganizeWorkflow } from "./use-organize-workflow";
+import type { OrganizeWorkflow } from "@/hooks/organize/use-organize-workflow";
 
 interface OrganizeFilesModalProps {
   workflow: OrganizeWorkflow;
@@ -22,32 +25,6 @@ function splitLockNotice(message: string): { summary: string; details: string[] 
     .map((line) => line.trim())
     .filter(Boolean);
   return { summary, details };
-}
-
-function normalizeCategoryName(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function findCategoryColor(name: string, palette: Array<{ name: string; color: string }>): string | null {
-  const normalized = normalizeCategoryName(name);
-  if (!normalized) {
-    return null;
-  }
-
-  const matched = palette.find((item) => normalizeCategoryName(item.name) === normalized);
-  return matched?.color ?? null;
-}
-
-function splitDestinationPath(destinationPath: string): { folderPath: string; fileName: string } {
-  const slashIndex = Math.max(destinationPath.lastIndexOf("/"), destinationPath.lastIndexOf("\\"));
-  if (slashIndex < 0) {
-    return { folderPath: "", fileName: destinationPath };
-  }
-
-  return {
-    folderPath: destinationPath.slice(0, slashIndex),
-    fileName: destinationPath.slice(slashIndex + 1),
-  };
 }
 
 function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: OrganizeWorkflow }) {
@@ -193,7 +170,7 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
           )}
           <Button
             size="sm"
-            variant={item.moveStatus === "completed" ? "outline-solid" : "default"}
+            variant={item.moveStatus === "completed" ? "outline" : "default"}
             onClick={() => {
               if (item.moveStatus === "completed") {
                 void workflow.undoSingleItem(item);
@@ -353,10 +330,6 @@ function FileCard({ item, workflow }: { item: OrganizePreviewItem; workflow: Org
 }
 
 export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
-  if (!workflow.modalOpen) {
-    return null;
-  }
-
   const isLockWarning = Boolean(workflow.errorMessage?.startsWith("Skipped "));
   const [showWarningDetails, setShowWarningDetails] = useState(false);
   const parsedWarning = workflow.errorMessage ? splitLockNotice(workflow.errorMessage) : null;
@@ -364,6 +337,10 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
   useEffect(() => {
     setShowWarningDetails(false);
   }, [workflow.errorMessage]);
+
+  if (!workflow.modalOpen) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
-import type { OnboardingStep } from "./types";
-import { STEPS } from "./types";
+import type { OnboardingStep } from "@/types/onboarding";
+import { STEPS } from "@/constants/onboarding";
 
 interface StepProgressProps {
   currentStep: OnboardingStep;

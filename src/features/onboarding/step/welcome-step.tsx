@@ -1,5 +1,5 @@
 import { BrainCircuit, Cpu, Files, Folder, Sparkles } from "lucide-react";
-import { Button } from "@/components/not-use-ui/button";
+import { Button } from "@/components/ui/button";
 
 interface WelcomeStepProps {
   onNext: () => void;

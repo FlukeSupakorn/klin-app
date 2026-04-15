@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { OrganizeResumeBubble } from "@/features/dashboard/organize-files-panel/organize-resume-bubble";
-import { useOrganizeWorkflowStore } from "@/features/dashboard/organize-files-panel/use-organize-workflow-store";
+import { useOrganizeWorkflowStore } from "@/hooks/organize/use-organize-workflow-store";
 import { computeOrganizeWorkflowMetrics } from "@/features/dashboard/organize-files-panel/organize-workflow-utils";
 
 export function GlobalOrganizeResumeBubble() {

@@ -19,7 +19,8 @@ impl FileCommand for DeleteFileCommand {
 
 pub fn move_file(source: &Path, destination: &Path) -> Result<(), String> {
     if let Some(parent) = destination.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| format!("create destination parent failed: {err}"))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|err| format!("create destination parent failed: {err}"))?;
     }
     std::fs::rename(source, destination).map_err(|err| format!("move file failed: {err}"))
 }
@@ -58,7 +59,11 @@ pub fn list_subdirectories(path: &Path) -> Result<Vec<SubdirEntry>, String> {
             let has_children = std::fs::read_dir(&p)
                 .map(|mut d| d.any(|e| e.map(|e| e.path().is_dir()).unwrap_or(false)))
                 .unwrap_or(false);
-            Some(SubdirEntry { name, path: path_str, has_children })
+            Some(SubdirEntry {
+                name,
+                path: path_str,
+                has_children,
+            })
         })
         .collect();
     entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));

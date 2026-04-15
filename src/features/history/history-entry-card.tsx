@@ -4,29 +4,17 @@ import {
   Clock,
   Sparkles,
 } from "lucide-react";
-import { Badge } from "@/components/not-use-ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { normalizeCategoryName } from "@/lib/text-utils";
+import { findCategoryColor } from "@/lib/category-utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { theme } from "@/theme/theme";
-import type { HistoryEntry } from "@/features/history/history-types";
+import type { HistoryEntry } from "@/types/history";
 import { HistoryCalendarDetails } from "@/features/history/history-calendar-details";
 import { HistoryOrganizeDetails } from "@/features/history/history-organize-details";
 import { HistorySummaryDetails } from "@/features/history/history-summary-details";
 import { formatTime, getFolderTail } from "@/features/history/history-utils";
-
-function normalizeCategoryName(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function findCategoryColor(name: string, palette: Array<{ name: string; color: string }>): string | null {
-  const normalized = normalizeCategoryName(name);
-  if (!normalized) {
-    return null;
-  }
-
-  const matched = palette.find((item) => normalizeCategoryName(item.name) === normalized);
-  return matched?.color ?? null;
-}
 
 function hexToRgba(hex: string, alpha: number): string | null {
   const normalized = hex.trim().replace("#", "");

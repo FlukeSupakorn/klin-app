@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
 import { WatcherOverviewCard } from "@/features/dashboard/watcher-overview-card";
 import { RecentMovementsSection } from "@/features/dashboard/recent-movements-section";
-import type { HistoryEntry } from "@/features/history/history-types";
+import type { HistoryEntry } from "@/types/history";
 import { historyApiService } from "@/services/history-api-service";
 import { FileText, ArrowRight } from "lucide-react";
 
@@ -11,19 +11,31 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const [recentHistoryEntries, setRecentHistoryEntries] = useState<HistoryEntry[]>([]);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const firstPage = await historyApiService.list({ limit: 20, offset: 0 });
-        const rows = firstPage.entries
-          .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
-          .slice(0, 5);
-        setRecentHistoryEntries(rows);
-      } catch {
-        setRecentHistoryEntries([]);
-      }
-    })();
+  const loadRecentHistory = useCallback(async () => {
+    try {
+      const firstPage = await historyApiService.list({ limit: 20, offset: 0 });
+      const rows = firstPage.entries
+        .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
+        .slice(0, 5);
+      setRecentHistoryEntries(rows);
+    } catch {
+      setRecentHistoryEntries([]);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadRecentHistory();
+
+    const onHistoryUpdated = () => {
+      void loadRecentHistory();
+    };
+
+    window.addEventListener("klin:history-updated", onHistoryUpdated);
+
+    return () => {
+      window.removeEventListener("klin:history-updated", onHistoryUpdated);
+    };
+  }, [loadRecentHistory]);
 
   const handleOpenRecentHistoryEntry = (entryId: string) => {
     navigate("/history", { state: { expandedEntryId: entryId } });

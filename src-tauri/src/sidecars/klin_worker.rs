@@ -28,18 +28,16 @@ pub fn spawn_klin_worker<R: tauri::Runtime>(
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(line) => {
-                    eprintln!("[klin-worker] {}", String::from_utf8_lossy(&line));
+                    tracing::info!("[klin-worker] {}", String::from_utf8_lossy(&line));
                 }
                 CommandEvent::Stderr(line) => {
-                    eprintln!(
-                        "[klin-worker][stderr] {}",
-                        String::from_utf8_lossy(&line)
-                    );
+                    tracing::info!("[klin-worker][stderr] {}", String::from_utf8_lossy(&line));
                 }
                 CommandEvent::Terminated(payload) => {
-                    eprintln!(
+                    tracing::info!(
                         "[klin-worker] terminated (code: {:?}, signal: {:?})",
-                        payload.code, payload.signal
+                        payload.code,
+                        payload.signal
                     );
                     break;
                 }
@@ -48,7 +46,7 @@ pub fn spawn_klin_worker<R: tauri::Runtime>(
         }
     });
 
-    eprintln!("[klin-worker] Spawned — data_dir: {}", app_data_dir);
+    tracing::info!("[klin-worker] Spawned — data_dir: {}", app_data_dir);
 
     Ok(child)
 }
