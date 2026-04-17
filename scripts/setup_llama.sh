@@ -70,7 +70,7 @@ case "$OS" in
             echo "Unsupported Linux architecture: $ARCH"
             exit 1
         fi
-        CMAKE_EXTRA_FLAGS=("-DGGML_METAL=OFF")
+        CMAKE_EXTRA_FLAGS=("-DGGML_METAL=OFF" "-DGGML_CUDA=ON")
         SERVER_BIN="llama-server"
         NPROC=$(nproc)
         ;;
