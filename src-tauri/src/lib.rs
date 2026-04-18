@@ -186,8 +186,7 @@ pub fn run() {
 
     // Load .env file (silently ignore if not found)
     let loaded = infrastructure::runtime_env::preload_process_env();
-    let resolved_chat = infrastructure::runtime_env::get("KLIN_CHAT_MODEL_PATH")
-        .or_else(|| infrastructure::runtime_env::get("KLIN_MODEL_PATH"));
+    let resolved_chat = infrastructure::runtime_env::get("KLIN_CHAT_MODEL_PATH");
     let resolved_embed = infrastructure::runtime_env::get("KLIN_EMBED_MODEL_PATH");
     tracing::info!(
         "[startup] env: path={}, loaded={}, chat_model={:?}, embed_model={:?}, worker_external={}",

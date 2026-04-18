@@ -339,7 +339,7 @@ interface TauriClient {
 
 | Variable | Default | คำอธิบาย |
 |---|---|---|
-| `KLIN_CHAT_MODEL_PATH` | (required) | path ของ chat/vision model `.gguf` (fallback: `KLIN_MODEL_PATH`) |
+| `KLIN_CHAT_MODEL_PATH` | (required) | path ของ chat/vision model `.gguf` |
 | `KLIN_CHAT_PORT` | `8080` | port ที่ chat llama-server ฟัง (fallback: `KLIN_LLAMA_PORT`) |
 | `KLIN_N_GPU_LAYERS` | `-1` | จำนวน layer บน GPU (-1 = ทั้งหมด) |
 | `KLIN_CTX_SIZE` | `4096` | context window size |

@@ -87,7 +87,7 @@ After this, run `bun tauri dev` normally — no separate terminal needed.
 1. Copy `.env.example` to `.env`.
 2. In `.env`, enable:
 	- `KLIN_WORKER_EXTERNAL=true`
-3. Ensure `KLIN_MODEL_PATH` is set in `.env` so Tauri launches the `llama-server` sidecar.
+3. Ensure `KLIN_CHAT_MODEL_PATH` is set in `.env` so Tauri launches the `llama-server` sidecar.
 4. Start `klin-worker` from source in the worker repo:
 
 ```bash

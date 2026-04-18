@@ -122,10 +122,23 @@ fn validate_model_path(slot: ModelSlot, model_path: &str) -> Result<(), String> 
             model_path
         ));
     }
+    if matches!(slot, ModelSlot::Chat) {
+        let lower = model_path.to_ascii_lowercase();
+        if lower.contains("mmproj") {
+            return Err(
+                "KLIN_CHAT_MODEL_PATH points to an mmproj projector GGUF. Set chat model to a text/vision LLM GGUF and keep projector in KLIN_MMPROJ_PATH.".to_string(),
+            );
+        }
+
+        let mmproj_path = runtime_env::get("KLIN_MMPROJ_PATH").unwrap_or_default();
+        if !mmproj_path.is_empty() && mmproj_path == model_path {
+            return Err(
+                "KLIN_CHAT_MODEL_PATH and KLIN_MMPROJ_PATH point to the same file. Use the LLM GGUF for chat and projector GGUF for KLIN_MMPROJ_PATH.".to_string(),
+            );
+        }
+    }
     if matches!(slot, ModelSlot::Embed) {
-        let chat_path = runtime_env::get("KLIN_CHAT_MODEL_PATH")
-            .or_else(|| runtime_env::get("KLIN_MODEL_PATH"))
-            .unwrap_or_default();
+        let chat_path = runtime_env::get("KLIN_CHAT_MODEL_PATH").unwrap_or_default();
         if !chat_path.is_empty() && chat_path == model_path {
             return Err(
                 "KLIN_EMBED_MODEL_PATH points to the same GGUF as chat — set a real embedding model.".to_string(),
@@ -237,13 +250,11 @@ fn spawn_slot<R: tauri::Runtime>(
 
     let (model_path, args) = match slot.slot {
         ModelSlot::Chat => {
-            let model_path = runtime_env::get("KLIN_CHAT_MODEL_PATH")
-                .or_else(|| runtime_env::get("KLIN_MODEL_PATH"))
-                .unwrap_or_default();
+            let model_path = runtime_env::get("KLIN_CHAT_MODEL_PATH").unwrap_or_default();
 
             if model_path.is_empty() {
                 return Err(format!(
-                    "KLIN_CHAT_MODEL_PATH (or KLIN_MODEL_PATH) not set — skipping llama-server[{}].",
+                    "KLIN_CHAT_MODEL_PATH not set — skipping llama-server[{}].",
                     label
                 ));
             }

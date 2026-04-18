@@ -90,9 +90,9 @@ fn fallback_model_path(name: &str) -> Option<String> {
             let l = f.to_ascii_lowercase();
             l.ends_with(".gguf") && l.contains("embed")
         }),
-        "KLIN_CHAT_MODEL_PATH" | "KLIN_MODEL_PATH" => find_model_path(|f| {
+        "KLIN_CHAT_MODEL_PATH" => find_model_path(|f| {
             let l = f.to_ascii_lowercase();
-            l.ends_with(".gguf") && !l.contains("embed")
+            l.ends_with(".gguf") && !l.contains("embed") && !l.contains("mmproj")
         }),
         "KLIN_MMPROJ_PATH" => find_model_path(|f| {
             let l = f.to_ascii_lowercase();
