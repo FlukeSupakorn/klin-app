@@ -1,0 +1,16 @@
+{
+  "run_id": "20260419T150455Z",
+  "status": "success",
+  "build_date_utc": "2026-04-19T15:04:55Z",
+  "finished_utc": "2026-04-19T15:17:19Z",
+  "duration_seconds": 744,
+  "os": "MINGW64_NT-10.0-26200",
+  "arch": "x86_64",
+  "llama_repo": "https://github.com/ggml-org/llama.cpp.git",
+  "llama_tag": "b8848",
+  "llama_release_link": "\"https://github.com/ggml-org/llama.cpp/releases/tag/b8848\"",
+  "binary_size_bytes": 76151808,
+  "binary_size_mb": 72.62,   
+  "vulkan_mode": "enabled",
+  "cmake_generator": "Visual Studio 18 2026"
+}
