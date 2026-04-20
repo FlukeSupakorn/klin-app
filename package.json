@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "bun@1.2.0",
   "scripts": {
-    "dev:vite": "bunx @react-grab/copilot@latest && vite",
+    "dev:vite": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "api:organize": "node scripts/organize-api-server.mjs",
@@ -34,7 +34,6 @@
     "react": "^19.0.0",
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.0.0",
-    "react-grab": "^0.1.25",
     "react-markdown": "^9.0.1",
     "react-resizable-panels": "^4.7.3",
     "react-router-dom": "^6.28.1",
@@ -49,7 +48,6 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
-    "@react-grab/copilot": "^0.1.26",
     "@tailwindcss/postcss": "^4.2.1",
     "@tauri-apps/cli": "^2.1.0",
     "@types/node": "^22.10.2",
