@@ -5,38 +5,45 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { normalizeCategoryName } from "@/lib/text-utils";
+import { findCategoryColor } from "@/lib/category-utils";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { theme } from "@/theme/theme";
-import type { HistoryEntry } from "@/features/history/history-types";
+import type { HistoryEntry } from "@/types/history";
 import { HistoryCalendarDetails } from "@/features/history/history-calendar-details";
 import { HistoryOrganizeDetails } from "@/features/history/history-organize-details";
 import { HistorySummaryDetails } from "@/features/history/history-summary-details";
 import { formatTime, getFolderTail } from "@/features/history/history-utils";
 
+function hexToRgba(hex: string, alpha: number): string | null {
+  const normalized = hex.trim().replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    return null;
+  }
+
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 interface HistoryEntryCardProps {
   entry: HistoryEntry;
   isExpanded: boolean;
-  isScoreExpanded: boolean;
-  selectedScoreCategory?: string;
   onToggleExpand: () => void;
-  onToggleScores: () => void;
   onRequestEditMovedTo: (entryId: string) => void;
-  onUseScoreFolder: (entryId: string, categoryName: string) => void;
   onOpenSummary: (path: string) => void;
 }
 
 export function HistoryEntryCard({
   entry,
   isExpanded,
-  isScoreExpanded,
-  selectedScoreCategory,
   onToggleExpand,
-  onToggleScores,
   onRequestEditMovedTo,
-  onUseScoreFolder,
   onOpenSummary,
 }: HistoryEntryCardProps) {
+  const categories = useCategoryManagementStore((state) => state.categories);
   const actionTheme = theme.actions[entry.type];
   const Icon = actionTheme.icon;
   const organizeEntry = entry.type === "organize" ? entry : null;
@@ -56,11 +63,15 @@ export function HistoryEntryCard({
       ? `From: ${calendarEntry.sourceFileName} · Meet: ${calendarEntry.meetingTime}`
       : entry.subtitle);
 
+  const topCategoryName = organizeEntry?.scores[0]?.name ?? "";
+  const topCategoryScore = Math.round((organizeEntry?.scores[0]?.score ?? 0) * 100);
+  const topCategoryColor = findCategoryColor(topCategoryName, categories);
+
   return (
-    <Card className={cn("relative overflow-hidden transition-colors", isExpanded && "bg-muted/20")}>
+    <div className={cn("relative overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-border/80", isExpanded && "border-primary/20 bg-card")}>
       <span className={cn("pointer-events-none absolute bottom-0 left-0 top-0 w-1", actionTheme.accent)} />
       <button type="button" onClick={onToggleExpand} className="w-full text-left">
-        <CardHeader className="p-4">
+        <div className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
               <div className={cn("rounded-lg border p-2", actionTheme.iconWrap)}>
@@ -68,11 +79,21 @@ export function HistoryEntryCard({
               </div>
               <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className={cn("uppercase", actionTheme.badge)}>{entry.type}</Badge>
                   {entry.type === "organize" && (
-                    <Badge variant="secondary" className="gap-1">
+                    <Badge
+                      variant="secondary"
+                      className="gap-1"
+                      style={topCategoryColor ? {
+                        backgroundColor: hexToRgba(topCategoryColor, 0.12) ?? undefined,
+                        borderColor: hexToRgba(topCategoryColor, 0.4) ?? undefined,
+                        color: topCategoryColor,
+                      } : undefined}
+                    >
+                      {topCategoryColor && (
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: topCategoryColor }} />
+                      )}
                       <Sparkles className="h-3 w-3" />
-                      Top: {entry.scores[0]?.name ?? "-"} {Math.round((entry.scores[0]?.score ?? 0) * 100)}%
+                      {topCategoryName || "-"} {topCategoryScore}%
                     </Badge>
                   )}
                 </div>
@@ -80,7 +101,7 @@ export function HistoryEntryCard({
                 {organizeEntry ? (
                   <>
                     <div className="min-w-0">
-                      <CardTitle className="truncate text-lg" title={displayTitle}>
+                      <p className="truncate text-base font-bold" title={displayTitle}>
                         {isRenamed ? (
                           <>
                             <span className="font-normal text-foreground/70">{organizeEntry.oldName}</span>
@@ -90,7 +111,7 @@ export function HistoryEntryCard({
                         ) : (
                           organizeEntry.oldName
                         )}
-                      </CardTitle>
+                      </p>
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm text-foreground/80" title={displaySubtitle}>
@@ -109,7 +130,7 @@ export function HistoryEntryCard({
                   </>
                 ) : (
                   <>
-                    <CardTitle className="truncate text-lg" title={displayTitle}>{displayTitle}</CardTitle>
+                    <p className="truncate text-base font-bold" title={displayTitle}>{displayTitle}</p>
                     <p className="truncate text-sm text-muted-foreground" title={displaySubtitle}>{displaySubtitle}</p>
                   </>
                 )}
@@ -124,19 +145,15 @@ export function HistoryEntryCard({
               {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </div>
           </div>
-        </CardHeader>
+        </div>
       </button>
 
       {isExpanded && (
-        <CardContent className="border-t border-border/50 p-4">
+        <div className="border-t border-border/50 p-4">
           {entry.type === "organize" && (
             <HistoryOrganizeDetails
               entry={entry}
-              isShowAllScores={isScoreExpanded}
-              selectedScoreCategory={selectedScoreCategory}
-              onToggleScores={onToggleScores}
               onRequestEditMovedTo={onRequestEditMovedTo}
-              onUseScoreFolder={onUseScoreFolder}
             />
           )}
 
@@ -145,8 +162,8 @@ export function HistoryEntryCard({
           )}
 
           {entry.type === "calendar" && <HistoryCalendarDetails entry={entry} />}
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </div>
   );
 }

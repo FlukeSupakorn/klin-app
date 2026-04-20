@@ -1,15 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, FolderOpen, CheckCircle2, FolderSearch, Trash2, FolderPlus } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, ChevronDown, FolderOpen, FolderPlus, FolderSearch, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { categoryManagementService } from "@/services/category-management-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useAutomationStore } from "@/stores/use-automation-store";
-import { theme } from "@/theme/theme";
+import { cn } from "@/lib/utils";
+import { BatchCategoryModal } from "@/features/categories/batch-category-modal";
+import {
+  CATEGORY_ICON_OPTIONS,
+  getCategoryIcon,
+  withAlpha,
+} from "@/features/categories/category-appearance";
 import type { ManagedCategory } from "@/types/domain";
+
+function joinDefaultFolderPath(basePath: string, categoryName: string): string {
+  const normalizedBase = basePath.trim().replace(/[\\/]+$/, "");
+  const normalizedName = categoryName.trim();
+  return normalizedBase ? `${normalizedBase}/${normalizedName}` : normalizedName;
+}
+
+function normalizeHexColor(value: string, fallback = "#6366f1"): string {
+  const trimmed = value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return fallback;
+}
 
 export type SettingsDialogSection = "default-folder" | "watched-folders" | "categories";
 
@@ -18,6 +36,8 @@ type ModalMode = "edit" | "add";
 interface CategoryFormState {
   name: string;
   description: string;
+  color: string;
+  icon: string;
   folderPath: string;
   enabled: boolean;
   aiLearned: boolean;
@@ -26,340 +46,635 @@ interface CategoryFormState {
 const emptyForm: CategoryFormState = {
   name: "",
   description: "",
+  color: "#6366f1",
+  icon: "FileText",
   folderPath: "",
   enabled: true,
   aiLearned: true,
 };
 
-interface SettingsManagementDialogsProps {
-  open: boolean;
-  sections: SettingsDialogSection[];
-  title?: string;
-  description?: string;
-  onClose: () => void;
-}
-
-export function SettingsManagementDialogs({
-  open,
-  sections,
-  title = "Settings",
-  description = "Manage folders and categories.",
-  onClose,
-}: SettingsManagementDialogsProps) {
+function DefaultFolderSection() {
   const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
   const categories = useCategoryManagementStore((state) => state.categories);
-  const setDefaultFolder = useCategoryManagementStore((state) => state.setDefaultFolder);
-  const addCategory = useCategoryManagementStore((state) => state.addCategory);
-  const updateCategory = useCategoryManagementStore((state) => state.updateCategory);
-  const watchedFolders = useAutomationStore((state) => state.watchedFolders);
-  const addWatchedFolder = useAutomationStore((state) => state.addWatchedFolder);
-  const removeWatchedFolder = useAutomationStore((state) => state.removeWatchedFolder);
+  const enabledCount = useMemo(() => categories.filter((c) => c.enabled).length, [categories]);
 
   const [draftDefaultFolder, setDraftDefaultFolder] = useState(defaultFolder);
-  const [newWatchedFolderPath, setNewWatchedFolderPath] = useState("");
-  const [modalMode, setModalMode] = useState<ModalMode | null>(null);
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [formState, setFormState] = useState<CategoryFormState>(emptyForm);
-
-  const enabledCount = useMemo(() => categories.filter((category) => category.enabled).length, [categories]);
-  const showDefaultFolder = sections.includes("default-folder");
-  const showWatchedFolders = sections.includes("watched-folders");
-  const showCategories = sections.includes("categories");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setDraftDefaultFolder(defaultFolder);
   }, [defaultFolder]);
 
+  const persist = async (path: string) => {
+    const normalized = path.trim();
+    if (!normalized) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      await categoryManagementService.saveDefaultFolder(normalized);
+      categoryManagementService.syncToAutomationStores();
+      setDraftDefaultFolder(normalized);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save default folder");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const browseAndSave = async () => {
+    const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
+    if (folder) await persist(folder);
+  };
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-background p-4">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Default</p>
+        <h3 className="font-black">Default Folder</h3>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={draftDefaultFolder}
+          onChange={(e) => setDraftDefaultFolder(e.target.value)}
+          placeholder="Base path for categories"
+          className="border-border bg-muted"
+        />
+        <Button variant="outline" onClick={() => void browseAndSave()} disabled={isSaving}>
+          Browse Folder
+        </Button>
+        <Button
+          onClick={() => {
+            if (!draftDefaultFolder.trim()) return;
+            void persist(draftDefaultFolder.trim());
+          }}
+          disabled={isSaving}
+        >
+          {isSaving ? "Saving..." : "Save"}
+        </Button>
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <p className="text-xs text-muted-foreground">
+        {enabledCount} categor{enabledCount !== 1 ? "ies" : "y"} enabled
+      </p>
+    </div>
+  );
+}
+
+function WatchedFoldersSection() {
+  const watchedFolders = useAutomationStore((state) => state.watchedFolders);
+  const addWatchedFolder = useAutomationStore((state) => state.addWatchedFolder);
+  const removeWatchedFolder = useAutomationStore((state) => state.removeWatchedFolder);
+
+  const [newPath, setNewPath] = useState("");
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-background p-4">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Monitoring</p>
+        <h3 className="font-black">Watched Folders</h3>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Button
+          variant="outline"
+          className="justify-start gap-2"
+          onClick={async () => addWatchedFolder(await tauriClient.getDownloadsFolder())}
+        >
+          <FolderPlus className="h-4 w-4" /> Add Downloads
+        </Button>
+        <Button
+          variant="outline"
+          className="justify-start gap-2"
+          onClick={async () => {
+            const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
+            if (folder) addWatchedFolder(folder);
+          }}
+        >
+          <FolderPlus className="h-4 w-4" /> Browse Folder
+        </Button>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={newPath}
+          onChange={(e) => setNewPath(e.target.value)}
+          placeholder="Paste folder path"
+          className="border-border bg-muted"
+        />
+        <Button
+          onClick={() => {
+            if (!newPath.trim()) return;
+            addWatchedFolder(newPath.trim());
+            setNewPath("");
+          }}
+        >
+          Add
+        </Button>
+      </div>
+      <div className="space-y-2">
+        {watchedFolders.length === 0 ? (
+          <div className="rounded-lg border-2 border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+            No folders being watched yet.
+          </div>
+        ) : (
+          watchedFolders.map((folder) => (
+            <div key={folder} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+              <div className="flex min-w-0 items-center gap-3">
+                <FolderSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <p className="truncate font-mono text-sm">{folder}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeWatchedFolder(folder)}
+                className="ml-3 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface CategoriesSectionProps {
+  onOpenAdd: () => void;
+  onOpenEdit: (category: ManagedCategory) => void;
+  onOpenBatch: () => void;
+}
+
+function CategoriesSection({ onOpenAdd, onOpenEdit, onOpenBatch }: CategoriesSectionProps) {
+  const categories = useCategoryManagementStore((state) => state.categories);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
+  }, [categories]);
+
+  const toggleCategoryEnabled = (category: ManagedCategory) => {
+    void categoryManagementService
+      .updateCategoryInWorker(category.id, { enabled: !category.enabled })
+      .then(() => categoryManagementService.syncToAutomationStores());
+  };
+
+  const handleDeleteCategory = (category: ManagedCategory) => {
+    void categoryManagementService
+      .deleteCategoryInWorker(category.id)
+      .then(() => categoryManagementService.syncToAutomationStores());
+  };
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-background p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">AI Classification</p>
+          <h3 className="font-black">Categories</h3>
+        </div>
+        <div ref={dropdownRef} className="relative flex">
+          <Button className="h-8 gap-2 rounded-r-none border-r border-primary/30 text-xs" onClick={onOpenAdd}>
+            <Plus className="h-3.5 w-3.5" /> Add Category
+          </Button>
+          <Button
+            className="h-8 w-7 rounded-l-none px-1.5 text-xs"
+            onClick={() => setShowDropdown((prev) => !prev)}
+            aria-label="More import options"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Button>
+          {showDropdown && (
+            <div className="absolute right-0 top-full z-10 mt-1 w-52 overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDropdown(false);
+                  onOpenBatch();
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/60"
+              >
+                <FolderSearch className="h-4 w-4 text-primary" />
+                Import from Folders
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="space-y-2">
+        {sortedCategories.map((category) => (
+          <div
+            key={category.id}
+            className={cn(
+              "relative rounded-lg border border-border p-3 transition-colors",
+              category.enabled ? "bg-muted/30" : "bg-muted/10 opacity-60",
+            )}
+          >
+            {category.isAutoDescription && (
+              <span
+                className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-amber-400"
+                title="Description auto-generated from folder path — edit to customize"
+              />
+            )}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const Icon = getCategoryIcon(category.icon);
+                    return (
+                      <span
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-md border"
+                        style={{
+                          color: category.color,
+                          borderColor: withAlpha(category.color, "66"),
+                          backgroundColor: withAlpha(category.color, "1a"),
+                        }}
+                        title={category.icon}
+                      >
+                        <Icon className="h-3 w-3" />
+                      </span>
+                    );
+                  })()}
+                  <span
+                    className="inline-block h-3 w-3 rounded-full border border-border"
+                    style={{ backgroundColor: category.color }}
+                    title={category.color}
+                  />
+                  <span className="text-sm font-black">{category.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleCategoryEnabled(category)}
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-widest transition-colors",
+                      category.enabled ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {category.enabled ? "Enabled" : "Disabled"}
+                  </button>
+                </div>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{category.description}</p>
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <FolderOpen className="h-3 w-3" />
+                  <span className="truncate font-mono">{category.folderPath}</span>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span
+                  className={cn(
+                    "flex items-center gap-1 text-[10px] font-black uppercase tracking-widest",
+                    category.aiLearned ? "text-primary" : "text-muted-foreground",
+                  )}
+                >
+                  <CheckCircle2 className="h-3 w-3" />
+                  {category.aiLearned ? "AI ready" : "Learning"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onOpenEdit(category)}
+                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCategory(category)}
+                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface CategoryEditorModalProps {
+  mode: ModalMode;
+  formState: CategoryFormState;
+  onFormChange: Dispatch<SetStateAction<CategoryFormState>>;
+  onClose: () => void;
+  onSave: () => Promise<void>;
+  saveError: string | null;
+  isSaving: boolean;
+}
+
+function CategoryEditorModal({ mode, formState, onFormChange, onClose, onSave, saveError, isSaving }: CategoryEditorModalProps) {
+  const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-background/80 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Category</p>
+            <h2 className="font-syne text-lg font-black uppercase tracking-tight">
+              {mode === "edit" ? "Edit Category" : "Add Category"}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-4 p-6">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Name</label>
+            <Input
+              value={formState.name}
+              onChange={(e) => {
+                const nextName = e.target.value;
+                onFormChange((state) => {
+                  if (mode !== "add") return { ...state, name: nextName };
+                  const prevAutoPath = joinDefaultFolderPath(defaultFolder, state.name.trim() || "New Category");
+                  const shouldAutoUpdatePath = state.folderPath.trim() === prevAutoPath;
+                  return {
+                    ...state,
+                    name: nextName,
+                    folderPath: shouldAutoUpdatePath
+                      ? joinDefaultFolderPath(defaultFolder, nextName.trim() || "New Category")
+                      : state.folderPath,
+                  };
+                });
+              }}
+              className="border-border bg-muted"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description</label>
+            <textarea
+              value={formState.description}
+              onChange={(e) => onFormChange((state) => ({ ...state, description: e.target.value }))}
+              className="min-h-25 w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-hidden"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Icon</label>
+            <div className="grid grid-cols-8 gap-1.5">
+              {CATEGORY_ICON_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                return (
+                  <button
+                    key={option.name}
+                    type="button"
+                    onClick={() => onFormChange((state) => ({ ...state, icon: option.name }))}
+                    className={cn(
+                      "h-8 w-8 rounded-md border flex items-center justify-center transition-all",
+                      formState.icon === option.name
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-muted/30 text-muted-foreground hover:text-foreground",
+                    )}
+                    title={option.label}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Color</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={formState.color}
+                onChange={(e) => onFormChange((state) => ({ ...state, color: e.target.value }))}
+                className="h-9 w-12 cursor-pointer rounded border border-border bg-muted p-1"
+              />
+              <Input
+                value={formState.color}
+                onChange={(e) => onFormChange((state) => ({ ...state, color: e.target.value }))}
+                className="border-border bg-muted font-mono"
+                placeholder="#6366f1"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Folder Path</label>
+            <div className="flex items-center gap-2">
+              <Input
+                value={formState.folderPath}
+                onChange={(e) => onFormChange((state) => ({ ...state, folderPath: e.target.value }))}
+                placeholder="Folder path"
+                className="border-border bg-muted font-mono"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
+                  if (!folder) return;
+                  onFormChange((state) => ({ ...state, folderPath: folder }));
+                }}
+                className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs">
+            <CheckCircle2 className={cn("h-3.5 w-3.5", formState.aiLearned ? "text-primary" : "text-muted-foreground")} />
+            <span className={formState.aiLearned ? "text-foreground" : "text-muted-foreground"}>
+              {formState.aiLearned ? "AI learned" : "AI learning"}
+            </span>
+          </div>
+          {saveError && <p className="text-xs text-destructive">{saveError}</p>}
+          <div className="flex justify-between pt-1">
+            <Button variant="outline" onClick={onClose} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button onClick={() => void onSave()} disabled={isSaving}>
+              {isSaving ? "Saving..." : mode === "edit" ? "Save Changes" : "Add Category"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface SettingsManagementDialogsProps {
+  open: boolean;
+  sections: SettingsDialogSection[];
+  onClose: () => void;
+}
+
+export function SettingsManagementDialogs({ open, sections, onClose }: SettingsManagementDialogsProps) {
+  const defaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
+
+  const [modalMode, setModalMode] = useState<ModalMode | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [formState, setFormState] = useState<CategoryFormState>(emptyForm);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchInitialFolders, setBatchInitialFolders] = useState<string[]>([]);
+
+  const showDefaultFolder = sections.includes("default-folder");
+  const showWatchedFolders = sections.includes("watched-folders");
+  const showCategories = sections.includes("categories");
+
+  useEffect(() => {
+    if (!open) return;
+    void categoryManagementService.refreshCategoriesFromWorker().then(() => {
+      categoryManagementService.syncToAutomationStores();
+    });
+  }, [open]);
+
+  const openAddModal = () => {
+    setModalMode("add");
+    setEditingCategoryId(null);
+    setSaveError(null);
+    setIsSavingCategory(false);
+    setFormState({ ...emptyForm, folderPath: joinDefaultFolderPath(defaultFolder, "New Category") });
+  };
+
   const openEditModal = (category: ManagedCategory) => {
     setModalMode("edit");
     setEditingCategoryId(category.id);
+    setSaveError(null);
+    setIsSavingCategory(false);
     setFormState({
       name: category.name,
       description: category.description,
+      color: category.color,
+      icon: category.icon,
       folderPath: category.folderPath,
       enabled: category.enabled,
       aiLearned: category.aiLearned,
     });
   };
 
-  const openAddModal = () => {
-    setModalMode("add");
-    setEditingCategoryId(null);
-    setFormState({
-      ...emptyForm,
-      folderPath: `${defaultFolder}/New Category`,
-    });
-  };
-
   const closeCategoryEditor = () => {
     setModalMode(null);
     setEditingCategoryId(null);
+    setSaveError(null);
+    setIsSavingCategory(false);
     setFormState(emptyForm);
   };
 
-  const toggleCategoryEnabled = (category: ManagedCategory) => {
-    updateCategory(category.id, { enabled: !category.enabled });
-    categoryManagementService.syncToAutomationStores();
+  const openBatchModal = async () => {
+    const picked = await tauriClient.pickFoldersForBatch().catch(() => [] as string[]);
+    if (!picked.length) return;
+    setBatchInitialFolders(picked);
+    setShowBatchModal(true);
   };
 
-  const handleSaveCategory = () => {
-    if (!formState.name.trim() || !formState.description.trim() || !formState.folderPath.trim()) {
+  const handleSaveCategory = async () => {
+    const normalizedName = formState.name.trim();
+    if (!normalizedName) {
+      setSaveError("Category name is required");
       return;
     }
 
-    if (modalMode === "edit" && editingCategoryId) {
-      updateCategory(editingCategoryId, {
-        name: formState.name.trim(),
-        description: formState.description.trim(),
-        folderPath: formState.folderPath.trim(),
-        enabled: formState.enabled,
-        aiLearned: formState.aiLearned,
-      });
+    if (modalMode === "edit" && !editingCategoryId) {
+      setSaveError("Category ID is missing");
+      return;
     }
 
-    if (modalMode === "add") {
-      addCategory({
-        name: formState.name.trim(),
-        description: formState.description.trim(),
-        folderPath: formState.folderPath.trim(),
-        enabled: formState.enabled,
-        aiLearned: formState.aiLearned,
-      });
-    }
+    const normalizedDescription = formState.description.trim();
+    const normalizedColor = normalizeHexColor(formState.color, "#6366f1");
+    const normalizedFolderPath = formState.folderPath.trim() || joinDefaultFolderPath(defaultFolder, normalizedName);
 
-    categoryManagementService.syncToAutomationStores();
-    closeCategoryEditor();
+    setSaveError(null);
+    setIsSavingCategory(true);
+
+    try {
+      if (modalMode === "edit" && editingCategoryId) {
+        await categoryManagementService.updateCategoryInWorker(editingCategoryId, {
+          name: normalizedName,
+          description: normalizedDescription,
+          color: normalizedColor,
+          icon: formState.icon,
+          folderPath: normalizedFolderPath,
+          enabled: formState.enabled,
+          aiLearned: formState.aiLearned,
+        });
+      }
+
+      if (modalMode === "add") {
+        await categoryManagementService.addCategoryToWorker({
+          name: normalizedName,
+          description: normalizedDescription,
+          color: normalizedColor,
+          icon: formState.icon,
+          folderPath: normalizedFolderPath,
+          enabled: formState.enabled,
+          aiLearned: formState.aiLearned,
+          isAutoDescription: false,
+        });
+      }
+
+      categoryManagementService.syncToAutomationStores();
+      closeCategoryEditor();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Failed to save category");
+    } finally {
+      setIsSavingCategory(false);
+    }
   };
 
-  if (!open) {
-    return null;
-  }
+  if (!open) return null;
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4">
-        <Card className="w-full max-w-5xl">
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-xs">
+        <div className="flex w-full max-w-2xl flex-col rounded-2xl border border-border bg-card shadow-2xl" style={{ maxHeight: "85vh" }}>
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
             <div>
-              <CardTitle className="text-xl">{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Configuration</p>
+              <h2 className="font-syne text-xl font-black uppercase tracking-tight">Manage Settings</h2>
             </div>
-            <Button variant="outline" onClick={onClose}>Close</Button>
-          </CardHeader>
-
-          <CardContent className="max-h-[70vh] space-y-6 overflow-y-auto pr-1">
-            {showDefaultFolder && (
-              <div className="rounded-2xl border border-border/60 p-4">
-                <h3 className="text-sm font-semibold">Default Folder</h3>
-                <p className="mb-3 text-xs text-muted-foreground">Base folder for categories.</p>
-                <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                  <Input
-                    value={draftDefaultFolder}
-                    onChange={(event) => setDraftDefaultFolder(event.target.value)}
-                    className="bg-background"
-                  />
-                  <Button
-                    onClick={() => {
-                      if (!draftDefaultFolder.trim()) {
-                        return;
-                      }
-                      setDefaultFolder(draftDefaultFolder.trim());
-                      categoryManagementService.syncToAutomationStores();
-                    }}
-                  >
-                    Change
-                  </Button>
-                  <Badge variant="secondary">{enabledCount} enabled</Badge>
-                </div>
-              </div>
-            )}
-
-            {showWatchedFolders && (
-              <div className="rounded-2xl border border-border/60 p-4">
-                <h3 className="text-sm font-semibold">Watched Folders</h3>
-                <p className="mb-3 text-xs text-muted-foreground">Folders to watch.</p>
-
-                <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                  <Button
-                    variant="outline"
-                    className="justify-start gap-2"
-                    onClick={async () => addWatchedFolder(await tauriClient.getDownloadsFolder())}
-                  >
-                    <FolderPlus className="h-4 w-4" /> Add Downloads
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start gap-2"
-                    onClick={() => addWatchedFolder("C:/Users/User/Desktop")}
-                  >
-                    <FolderPlus className="h-4 w-4" /> Add Desktop
-                  </Button>
-                </div>
-
-                <div className="mb-3 flex gap-2">
-                  <Input
-                    value={newWatchedFolderPath}
-                    onChange={(event) => setNewWatchedFolderPath(event.target.value)}
-                    placeholder="Folder path"
-                    className="bg-muted/30"
-                  />
-                  <Button
-                    onClick={() => {
-                      if (!newWatchedFolderPath.trim()) {
-                        return;
-                      }
-                      addWatchedFolder(newWatchedFolderPath.trim());
-                      setNewWatchedFolderPath("");
-                    }}
-                  >
-                    Add Path
-                  </Button>
-                </div>
-
-                <div className="space-y-3 max-h-[30vh] overflow-y-auto pr-1">
-                  {watchedFolders.length === 0 ? (
-                    <div className="rounded-2xl border-2 border-dashed py-10 text-center text-muted-foreground">
-                      No folders being watched yet.
-                    </div>
-                  ) : (
-                    watchedFolders.map((folder) => (
-                      <div key={folder} className="flex items-center justify-between rounded-xl border border-border/60 p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                            <FolderSearch className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="font-mono text-sm font-medium">{folder}</p>
-                            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Active Watch</p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeWatchedFolder(folder)}
-                          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 space-y-4 overflow-y-auto p-6">
+            {showDefaultFolder && <DefaultFolderSection />}
+            {showWatchedFolders && <WatchedFoldersSection />}
             {showCategories && (
-              <div className="rounded-2xl border border-border/60 p-4">
-                <div className="mb-3 flex items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-sm font-semibold">Categories</h3>
-                    <p className="text-xs text-muted-foreground">Name, description, and folder.</p>
-                  </div>
-                  <Button className="gap-2" onClick={openAddModal}>
-                    <Plus className="h-4 w-4" /> Add New Category
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  {categories.map((category) => (
-                    <div
-                      key={category.id}
-                      className={`rounded-xl border border-border/60 p-4 transition-colors ${
-                        category.enabled ? "bg-background" : "bg-muted/40"
-                      }`}
-                    >
-                      <div className="mb-2 flex items-start justify-between gap-4">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className={category.enabled ? "font-semibold" : "font-semibold text-muted-foreground"}>{category.name}</h3>
-                            <button
-                              type="button"
-                              onClick={() => toggleCategoryEnabled(category)}
-                              className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                                category.enabled
-                                  ? "border-transparent bg-primary text-primary-foreground"
-                                  : "border-border bg-background text-muted-foreground"
-                              }`}
-                              aria-pressed={category.enabled}
-                              title="Toggle enabled state"
-                            >
-                              {category.enabled ? "Enabled" : "Disabled"}
-                            </button>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{category.description}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="gap-2" onClick={() => openEditModal(category)}>
-                            <Pencil className="h-3 w-3" /> Edit
-                          </Button>
-                        </div>
-                      </div>
-                      <div className={`flex items-center justify-between gap-2 text-xs ${category.enabled ? "text-primary" : "text-muted-foreground"}`}>
-                        <div className="flex items-center gap-2">
-                          <FolderOpen className="h-3 w-3" /> {category.folderPath}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`h-2 w-2 rounded-full ${category.aiLearned ? theme.status.aiLearnedDot : theme.status.warningDot}`} />
-                          <span className="text-[11px]">{category.aiLearned ? "AI understood" : "AI learning"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <CategoriesSection
+                onOpenAdd={openAddModal}
+                onOpenEdit={openEditModal}
+                onOpenBatch={() => void openBatchModal()}
+              />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
+      {showBatchModal && (
+        <BatchCategoryModal
+          initialFolders={batchInitialFolders}
+          onClose={() => {
+            setShowBatchModal(false);
+            setBatchInitialFolders([]);
+            void categoryManagementService.refreshCategoriesFromWorker().then(() => {
+              categoryManagementService.syncToAutomationStores();
+            });
+          }}
+        />
+      )}
+
       {modalMode && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/30 p-4">
-          <Card className="w-full max-w-2xl">
-            <CardHeader>
-              <CardTitle>{modalMode === "edit" ? "Edit Category" : "Add New Category"}</CardTitle>
-              <CardDescription>{modalMode === "edit" ? "Update category details." : "Create a new category."}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Category Name</label>
-                <Input
-                  value={formState.name}
-                  onChange={(event) => setFormState((state) => ({ ...state, name: event.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Description</label>
-                <textarea
-                  value={formState.description}
-                  onChange={(event) => setFormState((state) => ({ ...state, description: event.target.value }))}
-                  className="min-h-[120px] w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Folder Path</label>
-                <Input
-                  value={formState.folderPath}
-                  onChange={(event) => setFormState((state) => ({ ...state, folderPath: event.target.value }))}
-                />
-                <p className="mt-1 text-xs text-primary">Resolved path: {formState.folderPath}</p>
-              </div>
-              <div className="flex items-center gap-3 rounded-lg bg-muted/40 p-3 text-sm">
-                {formState.aiLearned ? (
-                  <CheckCircle2 className={`h-4 w-4 ${theme.status.successMutedText}`} />
-                ) : (
-                  <FolderSearch className={`h-4 w-4 ${theme.status.warningText}`} />
-                )}
-                {formState.aiLearned
-                  ? "AI already understands this category."
-                  : "AI learning this category • 72%"}
-              </div>
-              <div className="flex justify-between pt-2">
-                <Button variant="ghost" onClick={closeCategoryEditor}>Cancel</Button>
-                <Button onClick={handleSaveCategory}>{modalMode === "edit" ? "Save Changes" : "Add Category"}</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <CategoryEditorModal
+          mode={modalMode}
+          formState={formState}
+          onFormChange={setFormState}
+          onClose={closeCategoryEditor}
+          onSave={handleSaveCategory}
+          saveError={saveError}
+          isSaving={isSavingCategory}
+        />
       )}
     </>
   );

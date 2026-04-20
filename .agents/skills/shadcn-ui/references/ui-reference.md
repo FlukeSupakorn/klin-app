@@ -279,14 +279,14 @@ Creates a custom style from scratch without extending shadcn/ui. It installs spe
  "bg": "#dfe5f2",
  "border": "#000",
  "text": "#000",
- "ring": "#000"
+ "ring-3": "#000"
  },
  "dark": {
  "main": "#88aaee",
  "bg": "#272933",
  "border": "#000",
  "text": "#e6e6e6",
- "ring": "#fff"
+ "ring-3": "#fff"
  }
  }
 }
@@ -820,7 +820,7 @@ The main component that wraps toggle group items.
 | Prop | Type | Default |
 |------------|-------------------------------------|-------------|
 | `type` | `"single" | "multiple"` | `"single"` |
-| `variant` | `"default" | "outline"` | `"default"` |
+| `variant` | `"default" | "outline-solid"` | `"default"` |
 | `size` | `"default" | "sm" | "lg"` | `"default"` |
 | `spacing` | `number` | `0` |
 | `className`| `string` | `''` |
@@ -1004,7 +1004,7 @@ Defines a custom theme with specific color variables for both light and dark mod
  "foreground": "oklch(0.141 0.005 285.823)",
  "primary": "oklch(0.546 0.245 262.881)",
  "primary-foreground": "oklch(0.97 0.014 254.604)",
- "ring": "oklch(0.746 0.16 232.661)",
+ "ring-3": "oklch(0.746 0.16 232.661)",
  "sidebar-primary": "oklch(0.546 0.245 262.881)",
  "sidebar-primary-foreground": "oklch(0.97 0.014 254.604)",
  "sidebar-ring": "oklch(0.746 0.16 232.661)"
@@ -1014,7 +1014,7 @@ Defines a custom theme with specific color variables for both light and dark mod
  "foreground": "oklch(0.141 0.005 285.823)",
  "primary": "oklch(0.707 0.165 254.624)",
  "primary-foreground": "oklch(0.97 0.014 254.604)",
- "ring": "oklch(0.707 0.165 254.624)",
+ "ring-3": "oklch(0.707 0.165 254.624)",
  "sidebar-primary": "oklch(0.707 0.165 254.624)",
  "sidebar-primary-foreground": "oklch(0.97 0.014 254.604)",
  "sidebar-ring": "oklch(0.707 0.165 254.624)"

@@ -1,102 +1,56 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
-import { ActiveCategoriesCard } from "@/features/dashboard/active-categories-card";
-import { AutomationEngineCard } from "@/features/dashboard/automation-engine-card";
+import { WatcherOverviewCard } from "@/features/dashboard/watcher-overview-card";
 import { RecentMovementsSection } from "@/features/dashboard/recent-movements-section";
-import { CustomCalendarCard } from "@/features/dashboard/custom-calendar-card";
-import { QuickNotesCard } from "@/features/dashboard/quick-notes-card";
-import { CategoryDistributionCard } from "@/features/dashboard/category-distribution-card";
-import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
-import { CalendarEventModal } from "@/features/calendar/event-modal";
-import type { HistoryEntry } from "@/features/history/history-types";
+import type { HistoryEntry } from "@/types/history";
 import { historyApiService } from "@/services/history-api-service";
-import { useCalendarStore } from "@/features/calendar/use-calendar-store";
-import { useAuthStore } from "@/features/auth/use-auth-store";
-import { useAutomationStore } from "@/stores/use-automation-store";
-import { useCategoryManagementStore } from "@/stores/use-category-management-store";
-import { useCategoryStore } from "@/stores/use-category-store";
-import { useLogStore } from "@/stores/use-log-store";
+import { FileText, ArrowRight } from "lucide-react";
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const logs = useLogStore((state) => state.logs);
-  const categories = useCategoryStore((state) => state.categories);
-  const managedCategories = useCategoryManagementStore((state) => state.categories);
-  const watchedFolders = useAutomationStore((state) => state.watchedFolders);
-  const isRunning = useAutomationStore((state) => state.isRunning);
-  const lastScanTime = useAutomationStore((state) => state.lastScanTime);
-  const selectedDate = useCalendarStore((state) => state.selectedDate);
-  const visibleMonth = useCalendarStore((state) => state.visibleMonth);
-  const setVisibleMonth = useCalendarStore((state) => state.setVisibleMonth);
-  const setSelectedDate = useCalendarStore((state) => state.setSelectedDate);
-  const openDateModal = useCalendarStore((state) => state.openDateModal);
-  const loadVisibleMonth = useCalendarStore((state) => state.loadVisibleMonth);
-  const getEventsForDate = useCalendarStore((state) => state.getEventsForDate);
-  const isLoadingMonth = useCalendarStore((state) => state.isLoadingMonth);
-  const isCalendarOffline = useCalendarStore((state) => state.isOffline);
-  const calendarError = useCalendarStore((state) => state.error);
-  const authToken = useAuthStore((state) => state.accessToken);
-  const [openCategoryManager, setOpenCategoryManager] = useState(false);
   const [recentHistoryEntries, setRecentHistoryEntries] = useState<HistoryEntry[]>([]);
 
-  const activeManagedCategories = managedCategories.filter((category) => category.enabled);
-  const isGoogleConnected = Boolean(authToken);
-
-  useEffect(() => {
-    if (!isGoogleConnected) {
-      return;
+  const loadRecentHistory = useCallback(async () => {
+    try {
+      const firstPage = await historyApiService.list({ limit: 20, offset: 0 });
+      const rows = firstPage.entries
+        .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
+        .slice(0, 5);
+      setRecentHistoryEntries(rows);
+    } catch {
+      setRecentHistoryEntries([]);
     }
-
-    void loadVisibleMonth(visibleMonth);
-  }, [isGoogleConnected, loadVisibleMonth, visibleMonth]);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const historyRows = await historyApiService.list();
-        const rows = historyRows
-          .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
-          .slice(0, 5);
-
-        setRecentHistoryEntries(rows);
-      } catch {
-        setRecentHistoryEntries([]);
-      }
-    })();
   }, []);
 
-  const openDateWithEvents = (date: Date, _eventCount: number) => {
-    setSelectedDate(date);
-    openDateModal(date);
+  useEffect(() => {
+    void loadRecentHistory();
 
-    if (isGoogleConnected) {
-      setVisibleMonth(date);
-      void loadVisibleMonth(date);
-    }
-  };
+    const onHistoryUpdated = () => {
+      void loadRecentHistory();
+    };
+
+    window.addEventListener("klin:history-updated", onHistoryUpdated);
+
+    return () => {
+      window.removeEventListener("klin:history-updated", onHistoryUpdated);
+    };
+  }, [loadRecentHistory]);
 
   const handleOpenRecentHistoryEntry = (entryId: string) => {
     navigate("/history", { state: { expandedEntryId: entryId } });
   };
 
   return (
-    <div className="grid grid-cols-1 items-start gap-6 pb-10 xl:grid-cols-[minmax(0,1.65fr)_minmax(360px,1fr)]">
+    <div className="space-y-7 pb-12">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Home</p>
+        <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Dashboard</h2>
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]">
       <section className="space-y-6">
-
         <OrganizeFilesPanel />
-
-        <ActiveCategoriesCard
-          activeManagedCategories={activeManagedCategories}
-          onOpenCategoryManager={() => setOpenCategoryManager(true)}
-        />
-
-        <AutomationEngineCard
-          isRunning={isRunning}
-          watchedFoldersCount={watchedFolders.length}
-          lastScanTime={lastScanTime}
-        />
-
         <RecentMovementsSection
           recentEntries={recentHistoryEntries}
           onOpenEntry={handleOpenRecentHistoryEntry}
@@ -104,45 +58,44 @@ export function DashboardPage() {
       </section>
 
       <section className="space-y-6">
-        <CustomCalendarCard
-          selectedDate={selectedDate}
-          visibleMonth={visibleMonth}
-          isGoogleConnected={isGoogleConnected}
-          isLoadingMonth={isLoadingMonth}
-          isCalendarOffline={isCalendarOffline}
-          calendarError={calendarError}
-          getEventsForDate={getEventsForDate}
-          onPrevMonth={() => {
-            const previousMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
-            setVisibleMonth(previousMonth);
-            if (isGoogleConnected) {
-              void loadVisibleMonth(previousMonth);
-            }
-          }}
-          onNextMonth={() => {
-            const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1);
-            setVisibleMonth(nextMonth);
-            if (isGoogleConnected) {
-              void loadVisibleMonth(nextMonth);
-            }
-          }}
-          onSelectDate={openDateWithEvents}
-        />
+        <WatcherOverviewCard />
 
-        <QuickNotesCard />
+        <Link to="/notes" className="block">
+          <div className="group flex items-center justify-between rounded-2xl bg-card px-6 py-5 shadow-xs ring-1 ring-border/70 transition-all duration-150 hover:bg-accent/70">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Quick Access</p>
+                <p className="text-sm font-semibold text-foreground">Notes</p>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform duration-150 group-hover:translate-x-1 group-hover:text-primary" />
+          </div>
+        </Link>
 
-        <CategoryDistributionCard categories={categories} logs={logs} />
+        <Link to="/calendar" className="block">
+          <div className="group flex items-center justify-between rounded-2xl bg-card px-6 py-5 shadow-xs ring-1 ring-border/70 transition-all duration-150 hover:bg-accent/70">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-secondary/15 text-secondary">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Quick Access</p>
+                <p className="text-sm font-semibold text-foreground">Calendar</p>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform duration-150 group-hover:translate-x-1 group-hover:text-secondary" />
+          </div>
+        </Link>
       </section>
-
-      <SettingsManagementDialogs
-        open={openCategoryManager}
-        sections={["categories"]}
-        title="Manage Categories"
-        description="Edit your categories."
-        onClose={() => setOpenCategoryManager(false)}
-      />
-
-      <CalendarEventModal />
+      </div>
     </div>
   );
 }

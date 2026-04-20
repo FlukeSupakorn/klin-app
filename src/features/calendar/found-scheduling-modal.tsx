@@ -12,7 +12,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[110px_1fr] gap-2 text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span className="break-words text-foreground">{value || "-"}</span>
+      <span className="wrap-break-word text-foreground">{value || "-"}</span>
     </div>
   );
 }
@@ -25,8 +25,8 @@ export function FoundSchedulingModal({ open, event, onClose }: FoundSchedulingMo
   return (
     <Dialog.Root open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[100] bg-foreground/30" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-[110] w-[min(560px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-5 shadow-xl">
+        <Dialog.Overlay className="fixed inset-0 z-100 bg-foreground/30" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-110 w-[min(560px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-5 shadow-xl">
           <Dialog.Title className="text-lg font-semibold">Found Scheduling</Dialog.Title>
           <Dialog.Description className="mt-1 text-sm text-muted-foreground">
             Calendar request detected from /calendar

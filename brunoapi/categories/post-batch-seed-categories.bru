@@ -1,0 +1,92 @@
+meta {
+  name: Batch Seed Categories
+  type: http
+  seq: 5
+}
+
+post {
+  url: http://127.0.0.1:8000/api/categories/batch
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "categories": [
+      {
+        "name": "Photos & Media",
+        "description": "Photos, videos, screenshots, and other media files.\nphoto, picture, image, screenshot, wallpaper, album, selfie, video, clip, recording, media file, camera photo, gallery, รูปภาพ, ภาพถ่าย, สกรีนช็อต, วิดีโอ, อัลบั้ม, กล้อง, .jpg, .jpeg, .png, .heic, .gif, .mp4, .mov, .avi, .mkv",
+        "enabled": true,
+        "folder_path": "",
+        "color": "#06b6d4"
+      },
+      {
+        "name": "Creative Projects",
+        "description": "Creative and artistic works including writing, design, media production, and creative output.\ncreative writing, stories, poems, scripts, screenplays, design briefs, moodboards, portfolios, illustrations, video projects, music composition, branding, content creation, งานสร้างสรรค์, งานศิลปะ, นิยาย, บทกวี, บทภาพยนตร์, โปรเจคออกแบบ, พอร์ตโฟลิโอ, ภาพประกอบ, ดนตรี, .psd, .ai, .blend, .fig, .sketch",
+        "enabled": true,
+        "folder_path": "",
+        "color": "#ec4899"
+      },
+      {
+        "name": "Work & Business",
+        "description": "Professional work documents, business files, and project planning materials.\nproject plan, meeting notes, presentation, proposal, company profile, business strategy, roadmap, sprint planning, OKR, KPI, client deliverable, internal document, report, documentation, เอกสารบริษัท, แผนงาน, โน้ตประชุม, โปรเจคงาน, ข้อเสนอ, กลยุทธ์ธุรกิจ, .pptx, .xlsx, .docx, .pdf",
+        "enabled": true,
+        "folder_path": "",
+        "color": "#3b82f6"
+      },
+      {
+        "name": "Finance & Invoices",
+        "description": "Financial records, billing documents, and payment information.\ninvoice, receipt, billing statement, bank statement, transaction history, tax document, payment confirmation, credit card statement, expense report, ใบเสร็จ, ใบกำกับภาษี, รายการเดินบัญชี, ภาษี, รายรับรายจ่าย, .pdf, .xlsx, .csv",
+        "enabled": true,
+        "folder_path": "",
+        "color": "#22c55e"
+      },
+      {
+        "name": "Legal & Contracts",
+        "description": "Legal agreements, contracts, and official documents.\ncontract, agreement, NDA, terms and conditions, legal notice, license agreement, court document, compliance document, สัญญา, ข้อตกลง, เอกสารกฎหมาย, หนังสือแจ้ง, ข้อกำหนด",
+        "enabled": true,
+        "folder_path": "",
+        "color": "#64748b"
+      },
+      {
+        "name": "Education & Research",
+        "description": "Learning materials, academic papers, and research documents.\nlecture notes, study material, textbook, syllabus, assignment, research paper, journal article, thesis draft, dataset description, โน้ตเรียน, หนังสือเรียน, รายงาน, งานวิจัย, วิทยานิพนธ์, บทความวิชาการ",
+        "enabled": true,
+        "folder_path": "",
+        "color": "#f59e0b"
+      },
+      {
+        "name": "Personal",
+        "description": "Private personal files, identification, and daily life documents.\npersonal letter, diary, journal, private note, family document, personal record, ID card copy, certificate, บันทึกส่วนตัว, จดหมาย, เอกสารส่วนตัว, ครอบครัว",
+        "enabled": true,
+        "folder_path": "",
+        "color": "#a855f7"
+      },
+      {
+        "name": "Travel",
+        "description": "Travel bookings, itineraries, and travel documents.\nflight ticket, boarding pass, hotel reservation, itinerary, visa document, travel insurance, ตั๋วเครื่องบิน, แผนการเดินทาง, จองโรงแรม, วีซ่า",
+        "enabled": true,
+        "folder_path": "",
+        "color": "#0ea5e9"
+      },
+      {
+        "name": "Health & Medical",
+        "description": "Medical reports, prescriptions, and healthcare documents.\nmedical report, lab result, prescription, doctor appointment, treatment plan, hospital bill, ผลตรวจ, ใบสั่งยา, ใบรับรองแพทย์, โรงพยาบาล",
+        "enabled": true,
+        "folder_path": "",
+        "color": "#ef4444"
+      },
+      {
+        "name": "General Documents",
+        "description": "Unclassified or mixed documents that do not fit another category.\nmiscellaneous document, general file, uncategorized, เอกสารทั่วไป",
+        "enabled": true,
+        "folder_path": "",
+        "color": "#78716c"
+      }
+    ]
+  }
+}

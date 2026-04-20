@@ -1,0 +1,25 @@
+meta {
+  name: Create Category Travel Planning
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://127.0.0.1:8000/api/categories
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Travel Planning",
+    "description": "Flight tickets, hotel confirmations, itinerary files, transport bookings, travel insurance documents, and trip checklists.",
+    "enabled": true,
+    "folder_path": "",
+    "color": "#f59e0b"
+  }
+}

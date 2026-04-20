@@ -1,0 +1,11 @@
+meta {
+  name: Get Categories
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://127.0.0.1:8000/api/categories?active_only=false
+  body: none
+  auth: none
+}

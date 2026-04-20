@@ -1,0 +1,17 @@
+{
+  "run_id": "20260420T073031Z",
+  "status": "success",
+  "build_date_utc": "2026-04-20T07:30:31Z",
+  "finished_utc": "2026-04-20T07:31:38Z",
+  "duration_seconds": 67,
+  "os": "Darwin",
+  "arch": "arm64",
+  "llama_repo": "https://github.com/ggml-org/llama.cpp.git",
+  "llama_tag": "b8851",
+  "llama_commit": "e365e658f07b63371489570dfde597f199b26c23",
+  "llama_release_link": "\"https://github.com/ggml-org/llama.cpp/releases/tag/b8851\"",
+  "binary_size_bytes": 18362432,
+  "binary_size_mb": 17.51,
+  "vulkan_mode": "not-applicable",
+  "cmake_generator": ""
+}

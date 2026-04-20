@@ -5,6 +5,37 @@
   "windows": ["*"],
   "permissions": [
     "core:default",
-    "core:event:allow-listen"
+    "core:event:allow-listen",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/llama-server",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/klin-worker",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/llama-server",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "binaries/klin-worker",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    "shell:allow-kill"
   ]
 }

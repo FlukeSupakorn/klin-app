@@ -1,19 +1,18 @@
 import type {
   CategoryScore,
   ManagedCategory,
+  OrganizeAnalyzeFileResult,
   OrganizeAnalyzeRequest,
-  OrganizeAnalyzeResponse,
   OrganizePreviewItem,
 } from "@/types/domain";
+import { withLlama } from "@/services/llama-service";
+import { isAbortError } from "@/lib/error-utils";
+import { normalizeCategoryLabel } from "@/lib/text-utils";
 
 const ORGANIZE_API_URL_CANDIDATES = [
-  "http://localhost:3000/organize",
-  "http://localhost:3000/organize/analyze",
+  "http://127.0.0.1:8000/api/organize",
+  "http://localhost:8000/api/organize",
 ];
-
-function normalizeCategoryLabel(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
 
 function findMatchingManagedCategoryName(rawName: string, categoryCatalog: ManagedCategory[]): string | null {
   const normalizedRaw = normalizeCategoryLabel(rawName);
@@ -70,52 +69,19 @@ function normalizeScore(value: number): number {
   return Number(value.toFixed(4));
 }
 
-function parseScoreEntries(rawScore: unknown): CategoryScore[] {
-  if (Array.isArray(rawScore)) {
-    return rawScore
-      .map((entry) => {
-        if (!entry || typeof entry !== "object") {
-          return null;
-        }
-        const name = "name" in entry ? String(entry.name ?? "") : "";
-        const score = "score" in entry ? Number(entry.score) : Number.NaN;
-        if (!name) {
-          return null;
-        }
-        return { name, score: normalizeScore(score) };
-      })
-      .filter((entry): entry is CategoryScore => entry !== null)
-      .sort((a, b) => b.score - a.score);
+function parseScoreEntries(fileResult: OrganizeAnalyzeFileResult | undefined): CategoryScore[] {
+  if (!fileResult) {
+    return [];
   }
 
-  if (rawScore && typeof rawScore === "object") {
-    return Object.entries(rawScore)
-      .map(([name, score]) => ({
-        name,
-        score: normalizeScore(Number(score)),
-      }))
-      .filter((entry) => entry.name.length > 0)
-      .sort((a, b) => b.score - a.score);
-  }
-
-  if (typeof rawScore === "string") {
-    return rawScore
-      .replace(/^[\[{\s]+|[\]}\s]+$/g, "")
-      .split(",")
-      .map((chunk) => chunk.trim())
-      .filter(Boolean)
-      .map((chunk) => {
-        const [namePart, scorePart] = chunk.split(":");
-        return {
-          name: (namePart ?? "").trim(),
-          score: normalizeScore(Number((scorePart ?? "0").trim())),
-        };
-      })
-      .filter((entry) => entry.name.length > 0)
-      .sort((a, b) => b.score - a.score);
-  }
-
-  return [];
+  return fileResult.categories
+    .map((entry) => ({
+      categoryId: entry.category_id,
+      name: entry.name,
+      score: normalizeScore(entry.score),
+    }))
+    .filter((entry) => entry.name.length > 0)
+    .sort((a, b) => b.score - a.score);
 }
 
 function parseSuggestedNames(rawName: unknown): string[] {
@@ -143,78 +109,89 @@ function parseSuggestedNames(rawName: unknown): string[] {
   return [];
 }
 
-function buildRequest(paths: string[], categoryCatalog: ManagedCategory[]): OrganizeAnalyzeRequest {
-  const enabledCategories = categoryCatalog.filter((category) => category.enabled);
+function parseWorkerSuggestedNames(fileResult: OrganizeAnalyzeFileResult | undefined): string[] {
+  if (!fileResult) {
+    return [];
+  }
 
+  // Keep compatibility with older payloads while preferring v3 `suggested_names`.
+  const analysis = fileResult.analysis as {
+    suggested_names?: unknown;
+    suggested_name?: unknown;
+  };
+
+  if (Array.isArray(analysis.suggested_names)) {
+    return analysis.suggested_names.map((entry) => String(entry).trim()).filter(Boolean);
+  }
+
+  return parseSuggestedNames(analysis.suggested_name);
+}
+
+function buildRequest(paths: string[]): OrganizeAnalyzeRequest {
   return {
-    filePaths: paths,
-    categories: enabledCategories.map((category) => ({
-      name: category.name,
-      description: category.description,
-    })),
+    file_paths: paths,
   };
 }
 
-function normalizeResultMap(payload: unknown): Record<string, Record<string, unknown>> {
+function normalizeResults(payload: unknown): Map<string, OrganizeAnalyzeFileResult> {
   if (!payload || typeof payload !== "object") {
-    return {};
+    return new Map();
   }
 
-  const root = payload as {
-    result?: unknown;
-    reuslt?: unknown;
-  };
-
-  const candidate = root.result ?? root.reuslt;
-
-  if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
-    return candidate as Record<string, Record<string, unknown>>;
+  const root = payload as { results?: unknown };
+  if (!root.results || typeof root.results !== "object" || Array.isArray(root.results)) {
+    return new Map();
   }
 
-  if (Array.isArray(candidate)) {
-    return candidate.reduce<Record<string, Record<string, unknown>>>((acc, entry) => {
-      if (!entry || typeof entry !== "object") {
-        return acc;
-      }
+  const resultMap = new Map<string, OrganizeAnalyzeFileResult>();
+  Object.entries(root.results as Record<string, unknown>).forEach(([filePath, value]) => {
+    if (value && typeof value === "object") {
+      resultMap.set(filePath, value as OrganizeAnalyzeFileResult);
+    }
+  });
 
-      Object.entries(entry).forEach(([filePath, value]) => {
-        if (value && typeof value === "object") {
-          acc[filePath] = value as Record<string, unknown>;
-        }
-      });
-
-      return acc;
-    }, {});
-  }
-
-  return {};
+  return resultMap;
 }
 
-async function postAnalyze(requestPayload: OrganizeAnalyzeRequest): Promise<unknown> {
-  let lastError: unknown = null;
-
-  for (const url of ORGANIZE_API_URL_CANDIDATES) {
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestPayload),
-      });
-
-      if (!response.ok) {
-        lastError = new Error(`Organize API error: ${response.status} at ${url}`);
-        continue;
-      }
-
-      return await response.json();
-    } catch (error) {
-      lastError = error;
-    }
+async function postAnalyze(requestPayload: OrganizeAnalyzeRequest, signal?: AbortSignal): Promise<unknown> {
+  if (signal?.aborted) {
+    throw new DOMException("Request aborted", "AbortError");
   }
 
-  throw lastError ?? new Error("Organize API unavailable");
+  return withLlama(['chat', 'embed'], async () => {
+    let lastError: unknown = null;
+
+    for (const url of ORGANIZE_API_URL_CANDIDATES) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestPayload),
+          signal,
+        });
+
+        if (!response.ok) {
+          if (signal?.aborted) {
+            throw new DOMException("Request aborted", "AbortError");
+          }
+          lastError = new Error(`Organize API error: ${response.status} at ${url}`);
+          continue;
+        }
+
+        return await response.json();
+      } catch (error) {
+        if (signal?.aborted || isAbortError(error)) {
+          throw error;
+        }
+
+        lastError = error;
+      }
+    }
+
+    throw lastError ?? new Error("Organize API unavailable");
+  });
 }
 
 function buildFallbackScores(categoryCatalog: ManagedCategory[]): CategoryScore[] {
@@ -223,40 +200,124 @@ function buildFallbackScores(categoryCatalog: ManagedCategory[]): CategoryScore[
 }
 
 export const organizeApiService = {
-  async analyze(paths: string[], categoryCatalog: ManagedCategory[]): Promise<OrganizePreviewItem[]> {
+  async analyze(paths: string[], categoryCatalog: ManagedCategory[], signal?: AbortSignal): Promise<OrganizePreviewItem[]> {
     if (paths.length === 0) {
       return [];
     }
 
-    const requestPayload = buildRequest(paths, categoryCatalog);
-    const payload = (await postAnalyze(requestPayload)) as OrganizeAnalyzeResponse & { reuslt?: unknown };
-    const resultMap = normalizeResultMap(payload);
+    const requestPayload = buildRequest(paths);
+    const payload = await postAnalyze(requestPayload, signal);
+    const resultMap = normalizeResults(payload);
 
     const categoryPathMap = new Map(categoryCatalog.map((category) => [category.name, category.folderPath]));
 
     return paths.map((path, index) => {
       const fileName = path.split(/[\\/]/).pop() ?? `file-${index + 1}`;
-      const fileResult = resultMap[path];
-      const topScores = parseScoreEntries(fileResult?.score);
+      const fileResult = resultMap.get(path);
+      const topScores = parseScoreEntries(fileResult);
       const alignedScores = alignScoresToManagedCategories(topScores, categoryCatalog);
       const fallbackScores = alignedScores.length > 0 ? alignedScores : buildFallbackScores(categoryCatalog);
       const selectedCategory = fallbackScores[0]?.name ?? "Uncategorized";
-      const destinationFolder = categoryPathMap.get(selectedCategory) ?? categoryCatalog[0]?.folderPath ?? "";
-      const suggestedNames = parseSuggestedNames(fileResult?.new_name);
+      const destinationFolder =
+        categoryPathMap.get(selectedCategory) ?? categoryCatalog[0]?.folderPath ?? "";
+      const suggestedNames = parseWorkerSuggestedNames(fileResult);
 
       return {
         id: crypto.randomUUID(),
+        workerFileId: fileResult?.file_id ?? null,
         fileName,
         currentPath: path,
         suggestedNames,
         suggestedName: null,
         selectedCategory,
+        // Keep original filename unless user explicitly applies a suggested name in the UI.
         destinationPath: destinationFolder ? `${destinationFolder}/${fileName}` : fileName,
         confidence: fallbackScores[0]?.score ?? 0,
         topScores: fallbackScores,
-        summary: typeof fileResult?.summary === "string" ? fileResult.summary : null,
-        calendar: typeof fileResult?.calendar === "string" ? fileResult.calendar : null,
+        summary: fileResult?.analysis?.summary ?? fileResult?.error ?? null,
+        calendar: null,
+        analysisStatus: fileResult?.error ? "failed" : "completed",
+        analysisError: fileResult?.error ?? null,
+        moveStatus: "idle",
+        lastMovedFromPath: null,
+        lastMovedToPath: null,
       };
     });
+  },
+
+  async analyzeOne(path: string, categoryCatalog: ManagedCategory[], signal?: AbortSignal): Promise<OrganizePreviewItem> {
+    const [item] = await this.analyze([path], categoryCatalog, signal);
+    if (item) {
+      return item;
+    }
+
+    const fileName = path.split(/[\\/]/).pop() ?? "unknown-file";
+    return {
+      id: crypto.randomUUID(),
+      workerFileId: null,
+      fileName,
+      currentPath: path,
+      suggestedNames: [],
+      suggestedName: null,
+      selectedCategory: "Uncategorized",
+      destinationPath: fileName,
+      confidence: 0,
+      topScores: [{ name: "Uncategorized", score: 0 }],
+      summary: null,
+      calendar: null,
+      analysisStatus: "failed",
+      analysisError: "No analysis result returned by worker.",
+      moveStatus: "idle",
+      lastMovedFromPath: null,
+      lastMovedToPath: null,
+    };
+  },
+
+  async applyDecision(input: {
+    fileId: string;
+    selectedName: string | null;
+    selectedCategory: { id: string; name: string; score: number } | null;
+  }): Promise<void> {
+    const urlCandidates = [
+      "http://127.0.0.1:8000/api/organize/apply",
+      "http://localhost:8000/api/organize/apply",
+    ];
+
+    const payload = {
+      file_id: input.fileId,
+      selected_name: input.selectedName,
+      selected_category: input.selectedCategory
+        ? {
+          id: input.selectedCategory.id,
+          name: input.selectedCategory.name,
+          score: input.selectedCategory.score,
+        }
+        : null,
+    };
+
+    let lastError: unknown = null;
+
+    for (const url of urlCandidates) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          lastError = new Error(`Organize apply API error: ${response.status} at ${url}`);
+          continue;
+        }
+
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError ?? new Error("Organize apply API unavailable");
   },
 };

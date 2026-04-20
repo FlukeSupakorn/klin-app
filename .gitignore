@@ -12,6 +12,8 @@ build/
 coverage/
 .vite/
 *.local
+vite.config.d.ts
+vite.config.js
 
 *.log
 npm-debug.log*
@@ -93,3 +95,8 @@ test-results/
 *.bak
 *.orig
 *.rej
+
+# Models
+models/
+
+Notes/

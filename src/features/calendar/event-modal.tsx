@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { googleAuthService } from "@/features/auth/google-auth-service";
-import { useAuthStore } from "@/features/auth/use-auth-store";
-import { useCalendarStore } from "@/features/calendar/use-calendar-store";
+import { useAuthStore } from "@/hooks/auth/use-auth-store";
+import { useCalendarStore } from "@/hooks/calendar/use-calendar-store";
 import { tauriClient } from "@/services/tauri-client";
 
 function formatEventTime(start: Date, end: Date, isAllDay: boolean): string {
@@ -61,10 +61,10 @@ export function CalendarEventModal() {
   return (
     <Dialog.Root open={isOpen} onOpenChange={(nextOpen) => (!nextOpen ? close() : undefined)}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[80] bg-foreground/30" />
+        <Dialog.Overlay className="fixed inset-0 z-80 bg-foreground/30" />
         <Dialog.Content
           className={cn(
-            "fixed left-1/2 top-1/2 z-[90] w-[min(560px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-5 shadow-xl",
+            "fixed left-1/2 top-1/2 z-90 w-[min(560px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-5 shadow-xl",
             "max-h-[70vh] overflow-y-auto",
           )}
         >

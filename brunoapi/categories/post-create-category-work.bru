@@ -1,0 +1,25 @@
+meta {
+  name: Create Category Work Deep
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://127.0.0.1:8000/api/categories
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Work Deep Focus",
+    "description": "Project plans, architecture notes, sprint docs, backlog grooming notes, technical deep-dive documents, and delivery artifacts.",
+    "enabled": true,
+    "folder_path": "",
+    "color": "#2563eb"
+  }
+}

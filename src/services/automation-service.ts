@@ -1,78 +1,100 @@
-import { v4 as uuidv4 } from "uuid";
-import { ScoringStrategyFactory } from "@/lib/ai-scoring-service";
-import { RuleEngine } from "@/services/rule-engine";
+import { organizeApiService } from "@/services/organize-api-service";
+import { categoryManagementService } from "@/services/category-management-service";
 import { tauriClient } from "@/services/tauri-client";
-import { useCategoryStore } from "@/stores/use-category-store";
-import { useLogStore } from "@/stores/use-log-store";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
+import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
-import { useRuleStore } from "@/stores/use-rule-store";
+import { normalizePath } from "@/lib/path-utils";
 import type { AutomationJob, AutomationLog } from "@/types/domain";
-
-const scorer = ScoringStrategyFactory.create("mock");
-
-function shouldExclude(filePath: string, patterns: string[]) {
-  return patterns.some((pattern) => filePath.toLowerCase().includes(pattern.toLowerCase()));
-}
 
 export async function processAutomationJob(job: AutomationJob): Promise<void> {
   const start = performance.now();
-  const categoryStore = useCategoryStore.getState();
-  const ruleStore = useRuleStore.getState();
-  const privacyStore = usePrivacyStore.getState();
 
-  if (shouldExclude(job.filePath, privacyStore.exclusionPatterns)) {
-    return;
-  }
+  try {
+    const privacyStore = usePrivacyStore.getState();
+    if (privacyStore.isLocked(job.filePath)) {
+      return;
+    }
 
-  const categories = categoryStore.categories.filter((item) => item.active).map((item) => item.name);
-  const scoring = await scorer.score({
-    fileName: job.fileName,
-    contentPreview: job.contentPreview,
-    categories,
-  });
+    let enabledCategories = useCategoryManagementStore
+      .getState()
+      .categories.filter((category) => category.enabled);
 
-  const selected = scoring.categories[0];
-  const targetFolder = RuleEngine.resolveTargetFolder(selected.name, ruleStore.categoryToFolderMap);
-  const processingTimeMs = Math.round(performance.now() - start);
+    if (enabledCategories.length === 0) {
+      await categoryManagementService.refreshCategoriesFromWorker().catch(() => undefined);
+      categoryManagementService.syncToAutomationStores();
+      enabledCategories = useCategoryManagementStore
+        .getState()
+        .categories.filter((category) => category.enabled);
+    }
 
-  if (!targetFolder) {
-    const unmappedLog: AutomationLog = {
-      id: uuidv4(),
+    const analyzed = await organizeApiService.analyzeOne(job.filePath, enabledCategories);
+    const topScore = analyzed.topScores[0];
+    const processingTimeMs = Math.round(performance.now() - start);
+
+    if (analyzed.analysisStatus === "failed" || !topScore) {
+      const failedLog: AutomationLog = {
+        id: crypto.randomUUID(),
+        itemType: "file",
+        fileName: job.fileName,
+        originalPath: job.filePath,
+        movedTo: "",
+        chosenCategory: analyzed.selectedCategory,
+        score: analyzed.confidence,
+        allScores: analyzed.topScores,
+        timestamp: new Date().toISOString(),
+        processingTimeMs,
+        status: "failed",
+        errorMessage: analyzed.analysisError ?? "Worker analysis failed",
+      };
+
+      useHistoryStore.getState().appendLog(failedLog);
+      await tauriClient.writeHistory({ log: failedLog });
+      return;
+    }
+
+    const shouldMove = normalizePath(analyzed.currentPath) !== normalizePath(analyzed.destinationPath);
+    if (shouldMove) {
+      await tauriClient.moveFile({
+        sourcePath: analyzed.currentPath,
+        destinationPath: analyzed.destinationPath,
+      });
+    }
+
+    const log: AutomationLog = {
+      id: crypto.randomUUID(),
+      itemType: "file",
+      fileName: analyzed.fileName,
+      originalPath: analyzed.currentPath,
+      movedTo: shouldMove ? analyzed.destinationPath : analyzed.currentPath,
+      chosenCategory: analyzed.selectedCategory,
+      score: topScore.score,
+      allScores: analyzed.topScores,
+      timestamp: new Date().toISOString(),
+      processingTimeMs,
+      status: "completed",
+    };
+
+    useHistoryStore.getState().appendLog(log);
+    await tauriClient.writeHistory({ log });
+  } catch (error) {
+    const processingTimeMs = Math.round(performance.now() - start);
+    const failedLog: AutomationLog = {
+      id: crypto.randomUUID(),
       itemType: "file",
       fileName: job.fileName,
       originalPath: job.filePath,
       movedTo: "",
-      chosenCategory: selected.name,
-      score: selected.score,
-      allScores: scoring.categories,
+      chosenCategory: "Uncategorized",
+      score: 0,
+      allScores: [],
       timestamp: new Date().toISOString(),
       processingTimeMs,
       status: "failed",
-      errorMessage: "No active mapping for selected category",
+      errorMessage: error instanceof Error ? error.message : "Automation job failed",
     };
 
-    useLogStore.getState().appendLog(unmappedLog);
-    await tauriClient.writeLog({ log: unmappedLog });
-    return;
+    useHistoryStore.getState().appendLog(failedLog);
+    await tauriClient.writeHistory({ log: failedLog }).catch(() => undefined);
   }
-
-  const destinationPath = `${targetFolder}/${job.fileName}`;
-  await tauriClient.moveFile({ sourcePath: job.filePath, destinationPath });
-
-  const log: AutomationLog = {
-    id: uuidv4(),
-    itemType: "file",
-    fileName: job.fileName,
-    originalPath: job.filePath,
-    movedTo: destinationPath,
-    chosenCategory: selected.name,
-    score: selected.score,
-    allScores: scoring.categories,
-    timestamp: new Date().toISOString(),
-    processingTimeMs,
-    status: "completed",
-  };
-
-  useLogStore.getState().appendLog(log);
-  await tauriClient.writeLog({ log });
 }

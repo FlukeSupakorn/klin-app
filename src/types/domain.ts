@@ -1,4 +1,5 @@
 export type AutomationStatus = "queued" | "processing" | "completed" | "failed";
+export type OrganizeMoveStatus = "idle" | "processing" | "completed" | "failed";
 
 export interface Category {
   id: string;
@@ -11,12 +12,16 @@ export interface ManagedCategory {
   id: string;
   name: string;
   description: string;
+  color: string;
+  icon: string;
   folderPath: string;
   enabled: boolean;
   aiLearned: boolean;
+  isAutoDescription: boolean;
 }
 
 export interface CategoryScore {
+  categoryId?: string;
   name: string;
   score: number;
 }
@@ -47,7 +52,7 @@ export interface AutomationLog {
 }
 
 export interface PrivacyConfig {
-  exclusionPatterns: string[];
+  lockedPaths: string[];
 }
 
 export interface AutomationJob {
@@ -69,6 +74,7 @@ export interface PaginationState {
 
 export interface OrganizePreviewItem {
   id: string;
+  workerFileId: string | null;
   fileName: string;
   currentPath: string;
   suggestedNames: string[];
@@ -79,23 +85,54 @@ export interface OrganizePreviewItem {
   topScores: CategoryScore[];
   summary: string | null;
   calendar: string | null;
+  analysisStatus: AutomationStatus;
+  analysisError: string | null;
+  moveStatus: OrganizeMoveStatus;
+  // Tracks the exact file move operation so undo remains correct even if UI destination is edited later.
+  lastMovedFromPath?: string | null;
+  lastMovedToPath?: string | null;
 }
 
 export interface OrganizeAnalyzeRequest {
-  filePaths: string[];
-  categories: Array<{
-    name: string;
-    description: string;
-  }>;
+  file_paths: string[];
+}
+
+export interface OrganizeAnalyzeCategoryScore {
+  category_id: string;
+  name: string;
+  score: number;
+}
+
+export interface OrganizeAnalyzeAnalysis {
+  summary?: string | null;
+  suggested_names: string[];
 }
 
 export interface OrganizeAnalyzeFileResult {
-  score: Record<string, number>;
-  new_name: string[];
-  summary: string | null;
-  calendar: string | null;
+  file_id: string;
+  analysis: OrganizeAnalyzeAnalysis;
+  categories: OrganizeAnalyzeCategoryScore[];
+  error: string | null;
 }
 
 export interface OrganizeAnalyzeResponse {
-  result: Record<string, OrganizeAnalyzeFileResult>;
+  results: Record<string, OrganizeAnalyzeFileResult>;
+}
+
+export interface FileSearchRequest {
+  query: string;
+}
+
+export interface FileSearchResultItem {
+  id: string;
+  fileName: string;
+  fileType: string;
+  sizeBytes: number;
+  folder: string;
+  lastEdited: string;
+  path: string;
+}
+
+export interface FileSearchResponse {
+  results: FileSearchResultItem[];
 }

@@ -1,15 +1,40 @@
 {
   "version": 1,
   "skills": {
+    "deployment-pipeline-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "c7dddefd50c9904a883b7471fb64b7b129e976d5d3c6066b3545cac13a324d16"
+    },
+    "embedding-tauri-sidecars": {
+      "source": "dchuk/claude-code-tauri-skills",
+      "sourceType": "github",
+      "computedHash": "abaed98d5bea4674fbf5c17e9b2bc64c579425a57f57738a0e1b527178c91733"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
-      "computedHash": "516bd2154eb843a8240e43d5b285229129853114ad7075a5e141e1c08e408c84"
+      "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
+    },
+    "github-actions": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "computedHash": "6f6ace43488e5476241409aeb7636cd926222b146be4255752aded52ce0bc8c6"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "computedHash": "507f011a70e8b3ae242bdc0bb5b39fd91a1d4049a0f3c281991ccf84973d591c"
     },
     "shadcn-ui": {
       "source": "giuseppe-trisciuoglio/developer-kit",
       "sourceType": "github",
       "computedHash": "b418209ba816e012ac72e71a8256350a9676d1b31102112e4b174c91026033f8"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "a6a44d5498f7e8f68289902f3dedfc6f38ae0cee1e96527c80724cf27f727c2a"
     }
   }
 }

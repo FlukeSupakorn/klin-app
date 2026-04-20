@@ -1,4 +1,4 @@
-import type { HistoryEntry } from "@/features/history/history-types";
+import type { HistoryEntry } from "@/types/history";
 
 interface HistoryCalendarDetailsProps {
   entry: Extract<HistoryEntry, { type: "calendar" }>;
