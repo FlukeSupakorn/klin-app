@@ -79,7 +79,6 @@ jobs:
           workspaces: src-tauri
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0.6.1
+        uses: tauri-apps/tauri-action@action-v0.6.2
         with:
-          projectPath: klin-app
           args: --no-default-features
