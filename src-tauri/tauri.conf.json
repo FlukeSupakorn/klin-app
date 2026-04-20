@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["deb", "msi", "dmg", "app"],
     "externalBin": [
       "binaries/llama-server",
       "binaries/klin-worker"
