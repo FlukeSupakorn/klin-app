@@ -99,6 +99,7 @@ cleanup_and_finalize() {
             echo "  \"arch\": \"$(json_escape "$ARCH")\","
             echo "  \"llama_repo\": \"$(json_escape "$REPO_URL")\","
             echo "  \"llama_tag\": \"$(json_escape "$VERSION")\","
+            echo "  \"llama_commit\": \"$(json_escape "$LLAMA_COMMIT")\","
             echo "  \"llama_release_link\": \"$(json_escape \"$LLAMA_RELEASE_LINK\")\","
             echo "  \"binary_size_bytes\": ${TARGET_BIN_SIZE_BYTES},"
             echo "  \"binary_size_mb\": ${TARGET_BIN_SIZE_MB},"
@@ -177,7 +178,6 @@ log "llama.release_link=${LLAMA_RELEASE_LINK}"
 
 # ── Platform-specific settings ───────────────────────────────────────
 CMAKE_EXTRA_FLAGS=()
-CMAKE_GENERATOR_ARGS=()
 WINDOWS_GENERATORS=()
 BUILD_CONFIG=""
 case "$OS" in
@@ -198,7 +198,11 @@ case "$OS" in
             echo "Unsupported Linux architecture: $ARCH"
             exit 1
         fi
-        CMAKE_EXTRA_FLAGS=("-DGGML_METAL=OFF" "-DGGML_CUDA=ON")
+        if command -v nvcc >/dev/null 2>&1; then
+            CMAKE_EXTRA_FLAGS=("-DGGML_METAL=OFF" "-DGGML_CUDA=ON")
+        else
+            CMAKE_EXTRA_FLAGS=("-DGGML_METAL=OFF" "-DGGML_CUDA=OFF")
+        fi
         SERVER_BIN="llama-server"
         NPROC=$(nproc)
         ;;
@@ -273,7 +277,7 @@ if [[ "$OS" == MINGW* || "$OS" == MSYS* || "$OS" == CYGWIN* ]]; then
         fi
     fi
 else
-    cmake "${CMAKE_GENERATOR_ARGS[@]}" -B "${TMP_DIR}/build" -S "$TMP_DIR" \
+    cmake -B "${TMP_DIR}/build" -S "$TMP_DIR" \
         -DBUILD_SHARED_LIBS=OFF \
         -DLLAMA_BUILD_SERVER=ON \
         -DCMAKE_BUILD_TYPE=Release \
