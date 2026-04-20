@@ -75,7 +75,7 @@ jobs:
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: klin-app/src-tauri
+          workspaces: src-tauri
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
