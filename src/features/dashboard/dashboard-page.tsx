@@ -24,7 +24,7 @@ const searchResultGrads = [
   "var(--purple)",
 ];
 
-const catIcons = [Sparkles, BookOpen, DollarSign, Folder, FileText, FileEdit];
+const catIcons = [Sparkles, BookOpen, DollarSign, Folder, FileText, Zap];
 
 function getHourGreeting() {
   const h = new Date().getHours();
