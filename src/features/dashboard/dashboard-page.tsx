@@ -13,20 +13,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const catGradients = [
-  "linear-gradient(135deg,#f59e0b,#ef4444)",
-  "linear-gradient(135deg,#8b5cf6,#6d28d9)",
-  "linear-gradient(135deg,#10b981,#0891b2)",
-  "linear-gradient(135deg,#4a7cf7,#7c3aed)",
-  "linear-gradient(135deg,#6366f1,#4a7cf7)",
-  "linear-gradient(135deg,#f97316,#ef4444)",
-];
+const PRIMARY_BG = "var(--primary)";
+const SECONDARY_BG = "var(--secondary)";
+const PRIMARY_FG = "var(--primary-foreground)";
+const SECONDARY_FG = "var(--secondary-foreground)";
 
 const searchResultGrads = [
-  "linear-gradient(135deg,#4a7cf7,#7c3aed)",
-  "linear-gradient(135deg,#10b981,#0891b2)",
-  "linear-gradient(135deg,#f59e0b,#ef4444)",
-  "linear-gradient(135deg,#8b5cf6,#6d28d9)",
+  "var(--primary)",
+  "var(--success)",
+  "var(--warning)",
+  "#8b5cf6",
 ];
 
 const catIcons = [Sparkles, BookOpen, DollarSign, Folder, FileText, FileEdit];
@@ -39,7 +35,7 @@ function getHourGreeting() {
 }
 
 function confColor(c: number): string {
-  return c >= 80 ? "#10b981" : c >= 65 ? "#d97706" : "#ef4444";
+  return c >= 80 ? "var(--success)" : c >= 65 ? "var(--warning)" : "var(--destructive)";
 }
 
 export function DashboardPage() {
@@ -53,6 +49,7 @@ export function DashboardPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchSubmitted, setSearchSubmitted] = useState(false);
   const [showDrop, setShowDrop] = useState(false);
+  const [hoveredCard, setHoveredCard] = useState<number | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
   const categories = useCategoryManagementStore((state) => state.categories);
@@ -120,11 +117,11 @@ export function DashboardPage() {
   const displayCats = activeCategories.slice(0, 4);
 
   const quickActions = [
-    { lbl: "Scan", icon: ScanSearch, grad: "linear-gradient(135deg,#10b981,#0891b2)", to: null },
-    { lbl: "History", icon: History, grad: "linear-gradient(135deg,#f59e0b,#ef4444)", to: "/history" },
-    { lbl: "Notes", icon: FileEdit, grad: "linear-gradient(135deg,#8b5cf6,#7c3aed)", to: "/notes" },
-    { lbl: "Calendar", icon: CalendarDays, grad: "linear-gradient(135deg,#ef4444,#f97316)", to: "/calendar" },
-    { lbl: "Settings", icon: Settings, grad: "linear-gradient(135deg,#6b7a9a,#4a5568)", to: "/settings" },
+    { lbl: "Scan", icon: ScanSearch, to: null },
+    { lbl: "History", icon: History, to: "/history" },
+    { lbl: "Notes", icon: FileEdit, to: "/notes" },
+    { lbl: "Calendar", icon: CalendarDays, to: "/calendar" },
+    { lbl: "Settings", icon: Settings, to: "/settings" },
   ];
 
   return (
@@ -144,7 +141,7 @@ export function DashboardPage() {
             className="flex items-center gap-2 rounded-[12px] border bg-card px-3 transition-all"
             style={{
               borderColor: showDrop ? "var(--primary)" : "var(--border)",
-              boxShadow: showDrop ? "0 0 0 3px rgba(74,124,247,0.12)" : "0 2px 14px rgba(74,124,247,0.07)",
+              boxShadow: showDrop ? "0 0 0 3px var(--primary-soft)" : "var(--shadow-xs)",
             }}
           >
             <Search className="h-3.5 w-3.5 shrink-0 transition-colors" style={{ color: showDrop ? "var(--primary)" : "var(--muted-foreground)" }} />
@@ -168,7 +165,7 @@ export function DashboardPage() {
           {/* Search results dropdown */}
           {showDrop && (searchSubmitted || searchLoading || searchError) && (
             <div className="klin-slide-up absolute left-0 top-[calc(100%+8px)] z-50 w-[400px] overflow-hidden rounded-[16px] border border-border bg-card"
-              style={{ boxShadow: "0 12px 40px rgba(74,124,247,0.15)" }}>
+              style={{ boxShadow: "0 12px 40px var(--primary-border)" }}>
               <div className="flex items-center gap-1.5 border-b border-border px-3.5 py-2.5"
                 style={{ background: "var(--muted)" }}>
                 <Zap className="h-3 w-3 text-primary" />
@@ -221,27 +218,33 @@ export function DashboardPage() {
         >
           {displayCats.map((cat, i) => {
             const IconComp = catIcons[i % catIcons.length];
-            const grad = cat.color ? `linear-gradient(135deg,${cat.color},${cat.color}cc)` : catGradients[i % catGradients.length];
+            const isActive = hoveredCard !== null ? hoveredCard === i : i === 0;
+            const bg = isActive ? PRIMARY_BG : PRIMARY_FG;
+            const fg = isActive ? PRIMARY_FG : SECONDARY_FG;
+            const iconBg = isActive ? "rgba(255,255,255,0.18)" : "var(--primary-soft)";
             return (
               <div
                 key={cat.id}
-                className="relative cursor-pointer overflow-hidden rounded-[18px] px-5 py-[18px] text-white"
-                style={{ background: grad }}
+                className="cursor-pointer rounded-[18px] px-5 py-[18px]"
+                style={{
+                  background: bg,
+                  color: fg,
+                  transition: "background 0.2s ease, color 0.2s ease",
+                  boxShadow: isActive ? "0 4px 16px var(--primary-border)" : "0 2px 10px var(--primary-tint)",
+                }}
                 onClick={() => navigate("/settings")}
+                onMouseEnter={() => setHoveredCard(i)}
+                onMouseLeave={() => setHoveredCard(null)}
               >
-                <div className="pointer-events-none absolute -right-[18px] -top-[18px] h-[72px] w-[72px] rounded-full"
-                  style={{ background: "rgba(255,255,255,0.10)" }} />
-                <div className="pointer-events-none absolute -bottom-[22px] right-3.5 h-[50px] w-[50px] rounded-full"
-                  style={{ background: "rgba(255,255,255,0.07)" }} />
                 <div className="mb-3 flex h-[34px] w-[34px] items-center justify-center rounded-[10px]"
-                  style={{ background: "rgba(255,255,255,0.22)" }}>
-                  <IconComp className="h-4 w-4 text-white" />
+                  style={{ background: iconBg, transition: "background 0.2s ease" }}>
+                  <IconComp className="h-4 w-4" style={{ color: fg }} />
                 </div>
                 <div className="text-[26px] font-extrabold leading-none" style={{ letterSpacing: "-1px" }}>
                   {i + 1}
                 </div>
                 <div className="mt-1 truncate text-[11.5px] font-bold opacity-90">{cat.name}</div>
-                <div className="mt-0.5 text-[10px] opacity-70">{cat.description || "AI organized"}</div>
+                <div className="mt-0.5 text-[10px] opacity-60">{cat.description || "AI organized"}</div>
               </div>
             );
           })}
@@ -253,72 +256,62 @@ export function DashboardPage() {
         {/* Left: AI Organizer card */}
         <div
           className="flex flex-col overflow-hidden rounded-[18px] border border-border bg-card"
-          style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+          style={{ boxShadow: "var(--shadow-xs)" }}
         >
-          <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-5 py-3.5">
-            <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px]"
-              style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)" }}>
-              <Zap className="h-3.5 w-3.5 text-white" />
+          <div className="shrink-0 border-b border-border px-5 py-3.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px]"
+                style={{ background: "var(--primary)" }}>
+                <Zap className="h-3.5 w-3.5 text-white" />
+              </div>
+              <div>
+                <div className="text-[13px] font-extrabold text-foreground">AI Organizer</div>
+                <div className="text-[11px] text-muted-foreground">Drop files — AI categorizes automatically</div>
+              </div>
+              <div className="ml-auto">
+                <span className="rounded-full px-2.5 py-1 text-[10px] font-bold"
+                  style={{ background: "var(--primary-soft)", color: "var(--primary)" }}>
+                  AI Active
+                </span>
+              </div>
             </div>
-            <div>
-              <div className="text-[13px] font-extrabold text-foreground">AI Organizer</div>
-              <div className="text-[11px] text-muted-foreground">Drop files — AI categorizes automatically</div>
-            </div>
-            <div className="ml-auto">
-              <span className="rounded-full px-2.5 py-1 text-[10px] font-bold"
-                style={{ background: "rgba(74,124,247,0.10)", color: "#4a7cf7" }}>
-                AI Active
-              </span>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {quickActions.map((q) => (
+                <button
+                  key={q.lbl}
+                  onClick={() => { if (q.to) navigate(q.to); }}
+                  className="flex items-center gap-1.5 rounded-[9px] border border-border bg-muted/60 px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+                >
+                  <q.icon className="h-3 w-3" />
+                  {q.lbl}
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="flex flex-1 flex-col overflow-hidden p-4">
             <OrganizeFilesPanel />
           </div>
-
-          {/* Quick Actions */}
-          <div className="shrink-0 border-t border-border px-5 pb-4 pt-3">
-            <div className="mb-2.5 text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
-              Quick Actions
-            </div>
-            <div className="flex gap-2.5">
-              {quickActions.map((q) => (
-                <button
-                  key={q.lbl}
-                  onClick={() => { if (q.to) navigate(q.to); }}
-                  className="flex flex-1 flex-col items-center gap-1.5 border-none bg-transparent"
-                >
-                  <div
-                    className="flex h-11 w-11 items-center justify-center rounded-[14px]"
-                    style={{ background: q.grad, boxShadow: "0 4px 10px rgba(0,0,0,0.10)" }}
-                  >
-                    <q.icon className="h-[18px] w-[18px] text-white" />
-                  </div>
-                  <span className="text-[10.5px] font-semibold text-muted-foreground">{q.lbl}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Right: Live Activity stream */}
         <div
           className="flex flex-col overflow-hidden rounded-[18px] border border-border bg-card"
-          style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+          style={{ boxShadow: "var(--shadow-xs)" }}
         >
           <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3.5">
             <div>
               <div className="text-[13px] font-extrabold text-foreground">Live Activity</div>
               <div className="text-[11px] text-muted-foreground">AI movements in real time</div>
             </div>
-            <div className="klin-pulse-dot h-2 w-2 rounded-full" style={{ background: "#10b981" }} />
+            <div className="klin-pulse-dot h-2 w-2 rounded-full" style={{ background: "var(--success)" }} />
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {recentHistoryEntries.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-3 p-6 opacity-60">
                 <div className="flex h-12 w-12 items-center justify-center rounded-[14px]"
-                  style={{ background: "rgba(74,124,247,0.08)", border: "1.5px solid rgba(74,124,247,0.15)" }}>
+                  style={{ background: "var(--primary-tint)", border: "1.5px solid var(--primary-border)" }}>
                   <History className="h-5 w-5 text-primary" />
                 </div>
                 <div className="text-center">
@@ -328,7 +321,8 @@ export function DashboardPage() {
               </div>
             ) : (
               recentHistoryEntries.map((entry, i) => {
-                const grad = catGradients[i % catGradients.length];
+                const iconBg = i % 2 === 0 ? PRIMARY_BG : SECONDARY_BG;
+                const iconFg = i % 2 === 0 ? PRIMARY_FG : SECONDARY_FG;
                 const name = entry.type === "organize" ? entry.oldName : entry.title;
                 const cat = entry.type === "organize" ? (entry.scores[0]?.name ?? "Unknown") : entry.type;
                 const conf = entry.type === "organize" ? Math.round((entry.scores[0]?.score ?? 0) * 100) : 0;
@@ -341,8 +335,8 @@ export function DashboardPage() {
                     className="flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-muted/40"
                   >
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
-                      style={{ background: grad }}>
-                      <FileText className="h-[15px] w-[15px] text-white" />
+                      style={{ background: iconBg }}>
+                      <FileText className="h-[15px] w-[15px]" style={{ color: iconFg }} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[12.5px] font-bold text-foreground">{name}</div>
@@ -362,7 +356,7 @@ export function DashboardPage() {
             <button
               onClick={() => navigate("/history")}
               className="w-full rounded-[10px] py-2 text-[12.5px] font-bold text-primary transition-colors hover:bg-primary/10"
-              style={{ background: "rgba(74,124,247,0.06)" }}
+              style={{ background: "var(--primary-tint)" }}
             >
               View Full History →
             </button>

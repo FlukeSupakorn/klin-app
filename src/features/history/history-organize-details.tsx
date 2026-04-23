@@ -32,7 +32,7 @@ export function HistoryOrganizeDetails({ entry, onRequestEditMovedTo }: HistoryO
         {/* Moved To */}
         <div
           className="relative rounded-[12px] border p-3"
-          style={{ background: "var(--card)", borderColor: "rgba(74,124,247,0.2)" }}
+          style={{ background: "var(--card)", borderColor: "var(--primary-border)" }}
         >
           <div className="mb-1.5 flex items-center justify-between">
             <div className="text-[10px] font-extrabold uppercase tracking-widest text-primary">
@@ -42,7 +42,7 @@ export function HistoryOrganizeDetails({ entry, onRequestEditMovedTo }: HistoryO
               type="button"
               onClick={(e) => { e.stopPropagation(); onRequestEditMovedTo(entry.id); }}
               className="flex items-center gap-1 rounded-[7px] px-2 py-0.5 text-[11px] font-bold text-primary transition-colors hover:opacity-70"
-              style={{ background: "rgba(74,124,247,0.10)" }}
+              style={{ background: "var(--primary-soft)" }}
             >
               <Pencil className="h-2.5 w-2.5" />
               Edit

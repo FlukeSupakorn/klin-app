@@ -181,7 +181,7 @@ export function HistoryPage() {
         {/* Search */}
         <div
           className="flex w-[200px] items-center gap-2 rounded-[12px] border border-border bg-card px-3"
-          style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+          style={{ boxShadow: "var(--shadow-xs)" }}
         >
           <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <input
@@ -195,7 +195,7 @@ export function HistoryPage() {
         {/* Filter pills */}
         <div
           className="flex gap-1 rounded-[12px] border border-border bg-card p-1"
-          style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+          style={{ boxShadow: "var(--shadow-xs)" }}
         >
           {TYPE_FILTERS.map((f) => {
             const active = typeFilter === f.value;

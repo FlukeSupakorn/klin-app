@@ -8,14 +8,14 @@ import { HistoryOrganizeDetails } from "@/features/history/history-organize-deta
 import { HistorySummaryDetails } from "@/features/history/history-summary-details";
 import { formatTime, getFolderTail } from "@/features/history/history-utils";
 
-const ENTRY_GRADIENTS: Record<string, string> = {
-  organize: "linear-gradient(135deg,#4a7cf7,#7c3aed)",
-  summary: "linear-gradient(135deg,#8b5cf6,#6d28d9)",
-  calendar: "linear-gradient(135deg,#10b981,#0891b2)",
+const ENTRY_COLORS: Record<string, string> = {
+  organize: "var(--primary)",
+  summary: "#8b5cf6",
+  calendar: "var(--success)",
 };
 
 function confColor(c: number): string {
-  return c >= 80 ? "#10b981" : c >= 65 ? "#d97706" : "#ef4444";
+  return c >= 80 ? "var(--success)" : c >= 65 ? "var(--warning)" : "var(--destructive)";
 }
 
 interface HistoryEntryCardProps {
@@ -42,9 +42,7 @@ export function HistoryEntryCard({
   const topCategoryScore = Math.round((organizeEntry?.scores[0]?.score ?? 0) * 100);
   const topCategoryColor = findCategoryColor(topCategoryName, categories);
 
-  const grad = topCategoryColor
-    ? `linear-gradient(135deg,${topCategoryColor},${topCategoryColor}bb)`
-    : ENTRY_GRADIENTS[entry.type] ?? ENTRY_GRADIENTS.organize;
+  const grad = topCategoryColor ?? ENTRY_COLORS[entry.type] ?? ENTRY_COLORS.organize;
 
   const fileName = organizeEntry?.oldName ?? (calendarEntry?.meetingTitle ?? entry.title);
   const fromFolder = organizeEntry ? getFolderTail(organizeEntry.fromPath) : null;
@@ -56,7 +54,7 @@ export function HistoryEntryCard({
         "overflow-hidden rounded-[14px] border border-border bg-card transition-all",
         isExpanded && "border-primary/20",
       )}
-      style={{ boxShadow: "0 2px 10px rgba(74,124,247,0.06)" }}
+      style={{ boxShadow: "0 2px 10px var(--primary-tint)" }}
     >
       <button type="button" onClick={onToggleExpand} className="w-full text-left">
         <div className="flex items-center gap-0">
@@ -94,9 +92,9 @@ export function HistoryEntryCard({
                   <div
                     className="rounded-[7px] border px-2.5 py-0.5 text-[11px] font-bold"
                     style={{
-                      background: "rgba(74,124,247,0.08)",
-                      borderColor: "rgba(74,124,247,0.2)",
-                      color: "#4a7cf7",
+                      background: "var(--primary-tint)",
+                      borderColor: "var(--primary-border)",
+                      color: "var(--primary)",
                       maxWidth: 140,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -149,7 +147,7 @@ export function HistoryEntryCard({
       {isExpanded && (
         <div
           className="border-t border-border px-5 py-4"
-          style={{ background: "rgba(74,124,247,0.02)", animation: "klin-fade-in 0.2s ease" }}
+          style={{ background: "var(--primary-tint)", animation: "klin-fade-in 0.2s ease" }}
         >
           {entry.type === "organize" && (
             <HistoryOrganizeDetails entry={entry} onRequestEditMovedTo={onRequestEditMovedTo} />

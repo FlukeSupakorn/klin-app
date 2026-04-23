@@ -184,7 +184,7 @@ export function SettingsPage() {
         {/* Sub-nav sidebar */}
         <div
           className="flex flex-col overflow-hidden rounded-[18px] border border-border bg-card p-3"
-          style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+          style={{ boxShadow: "var(--shadow-xs)" }}
         >
           <div className="mb-2 px-2 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
             Sections
@@ -202,7 +202,7 @@ export function SettingsPage() {
                       ? "text-white"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
-                  style={active ? { background: "linear-gradient(135deg,#4a7cf7,#7c3aed)", boxShadow: "0 4px 12px rgba(74,124,247,0.25)" } : undefined}
+                  style={active ? { background: "var(--primary)", boxShadow: "0 4px 12px var(--primary-border)" } : undefined}
                 >
                   <tab.icon className="h-3.5 w-3.5 shrink-0" />
                   {tab.label}
@@ -231,7 +231,7 @@ export function SettingsPage() {
         {/* Content panel */}
         <div
           className="overflow-hidden overflow-y-auto rounded-[18px] border border-border bg-card"
-          style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+          style={{ boxShadow: "var(--shadow-xs)" }}
         >
           {/* Account tab */}
           {activeTab === "account" && (
@@ -241,7 +241,7 @@ export function SettingsPage() {
                   {/* Not connected — gradient banner */}
                   <div
                     className="relative overflow-hidden px-6 pb-6 pt-7"
-                    style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)" }}
+                    style={{ background: "var(--primary)" }}
                   >
                     <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }} />
                     <div className="pointer-events-none absolute -bottom-5 left-20 h-20 w-20 rounded-full" style={{ background: "rgba(255,255,255,0.05)" }} />
@@ -261,8 +261,8 @@ export function SettingsPage() {
                   <div className="p-6 space-y-5">
                     <div className="grid grid-cols-2 gap-3">
                       {[
-                        { icon: <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2.5"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: "Calendar Sync", sub: "See your events in KLIN", color: "#4a7cf7" },
-                        { icon: <UserCircle2 className="h-3.5 w-3.5" />, label: "Profile Sync", sub: "Name & photo", color: "#10b981" },
+                        { icon: <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2.5"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: "Calendar Sync", sub: "See your events in KLIN", color: "var(--primary)" },
+                        { icon: <UserCircle2 className="h-3.5 w-3.5" />, label: "Profile Sync", sub: "Name & photo", color: "var(--success)" },
                       ].map((f) => (
                         <div key={f.label} className="flex items-center gap-3 rounded-[12px] border border-border p-3 opacity-60" style={{ background: "var(--muted)" }}>
                           <div className="flex h-8 w-8 items-center justify-center rounded-[9px] shrink-0" style={{ background: `${f.color}1a`, color: f.color }}>
@@ -280,7 +280,7 @@ export function SettingsPage() {
                       onClick={() => void login()}
                       disabled={authStatus === "loading"}
                       className="flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[13.5px] font-bold text-white transition-colors disabled:opacity-60"
-                      style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)", boxShadow: "0 4px 14px rgba(74,124,247,0.30)" }}
+                      style={{ background: "var(--primary)", boxShadow: "0 4px 14px var(--primary-glow)" }}
                     >
                       <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M21.8 10.2H12v3.8h5.7c-.5 2.6-2.7 4.4-5.7 4.4-3.5 0-6.3-2.8-6.3-6.3s2.8-6.3 6.3-6.3c1.5 0 2.9.5 4 1.4l2.8-2.8C16.7 2.8 14.5 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.5 0 9.7-3.8 9.7-10-.1-.6-.1-1.2-.2-1.8z"/>
@@ -294,7 +294,7 @@ export function SettingsPage() {
                   {/* Connected — profile banner */}
                   <div
                     className="relative flex items-center gap-4 overflow-hidden px-6 py-6"
-                    style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)" }}
+                    style={{ background: "var(--primary)" }}
                   >
                     <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }} />
                     {profile?.picture ? (
@@ -303,7 +303,7 @@ export function SettingsPage() {
                         style={{ border: "3px solid rgba(255,255,255,0.25)" }} />
                     ) : (
                       <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-[22px] font-extrabold text-white"
-                        style={{ background: "linear-gradient(135deg,#ea4335,#fbbc05)", border: "3px solid rgba(255,255,255,0.25)" }}>
+                        style={{ background: "#ea4335", border: "3px solid rgba(255,255,255,0.25)" }}>
                         {profileInitial}
                       </div>
                     )}
@@ -325,8 +325,8 @@ export function SettingsPage() {
                   <div className="p-6 space-y-5">
                     <div className="grid grid-cols-2 gap-3">
                       {[
-                        { icon: <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2.5"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: "Google Calendar", sub: "Events syncing", color: "#4a7cf7" },
-                        { icon: <UserCircle2 className="h-3.5 w-3.5" />, label: "Google Profile", sub: "Name & avatar active", color: "#10b981" },
+                        { icon: <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2.5"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: "Google Calendar", sub: "Events syncing", color: "var(--primary)" },
+                        { icon: <UserCircle2 className="h-3.5 w-3.5" />, label: "Google Profile", sub: "Name & avatar active", color: "var(--success)" },
                       ].map((f) => (
                         <div key={f.label} className="flex items-center gap-3 rounded-[12px] border border-border p-3" style={{ background: "var(--muted)" }}>
                           <div className="flex h-8 w-8 items-center justify-center rounded-[9px] shrink-0" style={{ background: `${f.color}1a`, color: f.color }}>
@@ -343,7 +343,7 @@ export function SettingsPage() {
                     <button
                       onClick={() => void logout()}
                       className="flex items-center gap-2 rounded-[12px] border px-4 py-2.5 text-[13px] font-bold transition-colors hover:bg-destructive/10"
-                      style={{ borderColor: "rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.06)", color: "#ef4444" }}
+                      style={{ borderColor: "var(--destructive-border)", background: "var(--destructive-tint)", color: "var(--destructive)" }}
                     >
                       <X className="h-3.5 w-3.5" />
                       Disconnect Google Account
@@ -362,7 +362,7 @@ export function SettingsPage() {
               <div className="flex items-center gap-3">
                 <div
                   className="flex h-8 w-8 items-center justify-center rounded-[10px]"
-                  style={{ background: "linear-gradient(135deg,#10b981,#0891b2)" }}
+                  style={{ background: "var(--success)" }}
                 >
                   <Settings className="h-4 w-4 text-white" />
                 </div>
@@ -374,7 +374,7 @@ export function SettingsPage() {
 
               <div
                 className="flex items-center justify-between rounded-[14px] border border-border p-4"
-                style={{ background: "rgba(74,124,247,0.03)" }}
+                style={{ background: "var(--primary-tint)" }}
               >
                 <div>
                   <div className="text-[13px] font-bold text-foreground">Manage Settings</div>
@@ -400,7 +400,7 @@ export function SettingsPage() {
                 <div className="flex items-center gap-3">
                   <div
                     className="flex h-8 w-8 items-center justify-center rounded-[10px]"
-                    style={{ background: "linear-gradient(135deg,#f59e0b,#ef4444)" }}
+                    style={{ background: "var(--warning)" }}
                   >
                     <Zap className="h-4 w-4 text-white" />
                   </div>
@@ -431,7 +431,7 @@ export function SettingsPage() {
 
               <div
                 className="flex items-center justify-between rounded-[14px] border border-border p-4"
-                style={{ background: "rgba(74,124,247,0.03)" }}
+                style={{ background: "var(--primary-tint)" }}
               >
                 <div>
                   <div className="text-[13px] font-bold text-foreground">Manual Scan</div>
@@ -453,7 +453,7 @@ export function SettingsPage() {
 
               {isRunning && (
                 <div className="rounded-[14px] border border-dashed border-border p-4 space-y-3"
-                  style={{ background: "rgba(74,124,247,0.03)" }}>
+                  style={{ background: "var(--primary-tint)" }}>
                   <div className="flex items-center justify-between">
                     <div className="text-[12px] font-bold text-foreground">Watcher File Count</div>
                     <button
@@ -491,7 +491,7 @@ export function SettingsPage() {
 
               {import.meta.env.DEV && (
                 <div className="rounded-[14px] border p-4 space-y-4"
-                  style={{ borderColor: "rgba(74,124,247,0.2)", background: "rgba(74,124,247,0.04)" }}>
+                  style={{ borderColor: "var(--primary-border)", background: "var(--primary-tint)" }}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Terminal className="h-3.5 w-3.5 text-primary" />
@@ -502,7 +502,7 @@ export function SettingsPage() {
                         onClick={() => void checkFastApiHealth(true)}
                         disabled={isRefreshingDevHealth}
                         className="flex items-center gap-1.5 rounded-[9px] border px-3 py-1.5 text-[11.5px] font-bold transition-colors disabled:opacity-50"
-                        style={{ borderColor: "rgba(74,124,247,0.2)", color: "#4a7cf7" }}
+                        style={{ borderColor: "var(--primary-border)", color: "var(--primary)" }}
                       >
                         <RefreshCw className={cn("h-3 w-3", isRefreshingDevHealth && "animate-spin")} />
                         Refresh
@@ -510,7 +510,7 @@ export function SettingsPage() {
                       <button
                         onClick={() => navigate("/settings/api-logs")}
                         className="flex items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-[11.5px] font-bold text-white transition-colors"
-                        style={{ background: "rgba(74,124,247,0.85)" }}
+                        style={{ background: "var(--primary)" }}
                       >
                         <Activity className="h-3 w-3" />
                         API Logs
@@ -572,7 +572,7 @@ export function SettingsPage() {
                 <div className="flex items-center gap-3">
                   <div
                     className="flex h-8 w-8 items-center justify-center rounded-[10px]"
-                    style={{ background: "linear-gradient(135deg,#8b5cf6,#6d28d9)" }}
+                    style={{ background: "#8b5cf6" }}
                   >
                     <ShieldCheck className="h-4 w-4 text-white" />
                   </div>

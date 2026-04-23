@@ -53,12 +53,12 @@ function splitLockNotice(message: string): { summary: string; details: string[] 
 }
 
 const noteGradients = [
-  "linear-gradient(135deg,#4a7cf7,#7c3aed)",
-  "linear-gradient(135deg,#10b981,#0891b2)",
-  "linear-gradient(135deg,#f59e0b,#ef4444)",
-  "linear-gradient(135deg,#8b5cf6,#6d28d9)",
-  "linear-gradient(135deg,#f97316,#ef4444)",
-  "linear-gradient(135deg,#6366f1,#4a7cf7)",
+  "var(--primary)",
+  "var(--success)",
+  "var(--warning)",
+  "#8b5cf6",
+  "#f97316",
+  "#6366f1",
 ];
 
 export function NotesPage() {
@@ -318,7 +318,7 @@ export function NotesPage() {
   if (view === "editor") {
     return (
       <div className="flex h-full flex-col gap-0 overflow-hidden rounded-[18px] border border-border bg-card"
-        style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}>
+        style={{ boxShadow: "var(--shadow-xs)" }}>
         {/* Editor toolbar */}
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-3">
           <button
@@ -340,7 +340,7 @@ export function NotesPage() {
             onClick={() => void handleSaveToAppFolder()}
             disabled={isSaving || isSummarizing}
             className="rounded-[9px] px-3.5 py-1.5 text-[12.5px] font-bold text-white transition-colors disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)" }}
+            style={{ background: "var(--primary)" }}
           >
             {isSaving ? "Saving..." : "Save"}
           </button>
@@ -382,7 +382,7 @@ export function NotesPage() {
 
         {summarySourceFiles.length > 0 && (
           <div className="shrink-0 border-b border-border px-4 py-2 text-[11px] text-primary"
-            style={{ background: "rgba(74,124,247,0.05)" }}>
+            style={{ background: "var(--primary-tint)" }}>
             <div className="mb-0.5 flex items-center gap-1.5 font-bold uppercase tracking-wider">
               <Files className="h-3 w-3" />
               Summary source files
@@ -393,7 +393,7 @@ export function NotesPage() {
 
         {isSummarizing && (
           <div className="shrink-0 border-b border-border px-4 py-2 text-[11px] text-primary"
-            style={{ background: "rgba(74,124,247,0.05)" }}>
+            style={{ background: "var(--primary-tint)" }}>
             <div className="flex flex-wrap items-center gap-2">
               <Loader2 className="h-3 w-3 animate-spin" />
               <span>
@@ -401,7 +401,7 @@ export function NotesPage() {
                 <span className="ml-1 animate-pulse">|</span>
               </span>
               <span className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                style={{ background: "rgba(74,124,247,0.10)" }}>
+                style={{ background: "var(--primary-soft)" }}>
                 {summarizeElapsedSec}s
               </span>
               <button onClick={handleStopSummarize}
@@ -414,7 +414,7 @@ export function NotesPage() {
 
         {editorError && (
           <div className="shrink-0 border-b border-destructive/20 px-4 py-2 text-[12px] text-destructive"
-            style={{ background: "rgba(239,68,68,0.06)" }}>
+            style={{ background: "var(--destructive-tint)" }}>
             {editorError}
           </div>
         )}
@@ -425,7 +425,7 @@ export function NotesPage() {
               isLockWarningNotice
                 ? "border-amber-500/30 text-amber-700"
                 : "border-primary/20 text-primary")}
-            style={{ background: isLockWarningNotice ? "rgba(245,158,11,0.06)" : "rgba(74,124,247,0.05)" }}
+            style={{ background: isLockWarningNotice ? "rgba(245,158,11,0.06)" : "var(--primary-tint)" }}
           >
             <div className="flex items-start gap-2">
               {isLockWarningNotice && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
@@ -497,7 +497,7 @@ export function NotesPage() {
         <div className="flex items-center gap-2">
           <div
             className="flex items-center gap-2 rounded-[12px] border border-border bg-card px-3 py-2"
-            style={{ width: 180, boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+            style={{ width: 180, boxShadow: "var(--shadow-xs)" }}
           >
             <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <input
@@ -510,7 +510,7 @@ export function NotesPage() {
           <button
             onClick={handleAddNote}
             className="flex items-center gap-1.5 rounded-[12px] px-3.5 py-2 text-[12.5px] font-bold text-white transition-all hover:opacity-90"
-            style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)", boxShadow: "0 4px 14px rgba(74,124,247,0.30)" }}
+            style={{ background: "var(--primary)", boxShadow: "0 4px 14px var(--primary-border)" }}
           >
             <Plus className="h-3.5 w-3.5" />
             Add Note
@@ -519,7 +519,7 @@ export function NotesPage() {
             onClick={() => void handleSummarizeFromFiles()}
             disabled={isSummarizing}
             className="flex items-center gap-1.5 rounded-[12px] border border-border bg-card px-3.5 py-2 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
-            style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+            style={{ boxShadow: "var(--shadow-xs)" }}
           >
             {isSummarizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             AI Summarize
@@ -530,7 +530,7 @@ export function NotesPage() {
       {/* Global notices */}
       {editorError && (
         <div className="shrink-0 rounded-[12px] border border-destructive/20 px-4 py-3 text-[12px] text-destructive"
-          style={{ background: "rgba(239,68,68,0.06)" }}>
+          style={{ background: "var(--destructive-tint)" }}>
           {editorError}
         </div>
       )}
@@ -549,7 +549,7 @@ export function NotesPage() {
           <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-4 rounded-[18px] border border-border bg-card">
             <div
               className="flex h-14 w-14 items-center justify-center rounded-[16px]"
-              style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)", boxShadow: "0 6px 20px rgba(74,124,247,0.30)" }}
+              style={{ background: "var(--primary)", boxShadow: "0 6px 20px var(--primary-border)" }}
             >
               <FileText className="h-6 w-6 text-white" />
             </div>
@@ -565,7 +565,7 @@ export function NotesPage() {
               <button
                 onClick={handleAddNote}
                 className="flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-[12.5px] font-bold text-white transition-all hover:opacity-90"
-                style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)" }}
+                style={{ background: "var(--primary)" }}
               >
                 <Plus className="h-3.5 w-3.5" />
                 Create First Note
@@ -583,7 +583,7 @@ export function NotesPage() {
                   type="button"
                   onClick={() => void handleOpenNote(note)}
                   className="w-full overflow-hidden rounded-[16px] border border-border bg-card text-left transition-all hover:shadow-md"
-                  style={{ boxShadow: "0 2px 10px rgba(74,124,247,0.07)" }}
+                  style={{ boxShadow: "0 2px 10px var(--primary-tint)" }}
                 >
                   {/* Gradient header strip */}
                   <div

@@ -181,7 +181,7 @@ export function AppShell() {
       {/* ─── Sidebar ─── */}
       <aside
         className="flex h-full w-[220px] shrink-0 flex-col overflow-y-auto border-r border-border bg-card"
-        style={{ boxShadow: "2px 0 14px rgba(74,124,247,0.06)" }}
+        style={{ boxShadow: "var(--shadow-xs)" }}
       >
         {/* Logo + Watcher card */}
         <div className="shrink-0 border-b border-border p-4">
@@ -189,7 +189,7 @@ export function AppShell() {
           <div className="mb-4 flex items-center gap-2.5">
             <div
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
-              style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)" }}
+              style={{ background: "var(--primary)" }}
             >
               <Folder className="h-4 w-4 text-white" />
             </div>
@@ -199,7 +199,7 @@ export function AppShell() {
           {/* Watcher gradient card */}
           <div
             className="relative overflow-hidden rounded-[14px] p-3.5 text-white"
-            style={{ background: "linear-gradient(135deg,#4a7cf7 0%,#7c3aed 100%)" }}
+            style={{ background: "var(--primary)" }}
           >
             <div
               className="pointer-events-none absolute -right-5 -top-5 h-20 w-20 rounded-full"
@@ -282,7 +282,7 @@ export function AppShell() {
               style={{
                 background: profile?.picture
                   ? undefined
-                  : "linear-gradient(135deg,#4a7cf7,#7c3aed)",
+                  : "var(--primary)",
               }}
             >
               {profile?.picture ? (
@@ -316,12 +316,12 @@ export function AppShell() {
       {/* New File Detected toast */}
       {recentDetectedFiles.length > 0 && (
         <div className="klin-toast-in pointer-events-none fixed bottom-6 right-6 z-50 w-[320px] max-w-[90vw] overflow-hidden rounded-[16px] border border-border bg-card shadow-lg">
-          <div className="h-0.5 w-full" style={{ background: "linear-gradient(90deg,#4a7cf7,#7c3aed)" }} />
+          <div className="h-0.5 w-full" style={{ background: "var(--primary)" }} />
           <div className="p-3.5">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <div className="flex h-6 w-6 items-center justify-center rounded-[7px]"
-                  style={{ background: "linear-gradient(135deg,#10b981,#0891b2)" }}>
+                  style={{ background: "var(--success)" }}>
                   <Zap className="h-3 w-3 text-white" />
                 </div>
                 <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-500">New File Detected</p>

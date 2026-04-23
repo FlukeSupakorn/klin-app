@@ -28,7 +28,7 @@ export function OrganizeFilesPanel() {
           flex: 1,
           borderRadius: 14,
           border: `2px dashed ${workflow.isDraggingOver ? "var(--primary)" : "var(--border)"}`,
-          background: workflow.isDraggingOver ? "rgba(74,124,247,0.06)" : "var(--muted)",
+          background: workflow.isDraggingOver ? "var(--primary-tint)" : "var(--muted)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -43,12 +43,12 @@ export function OrganizeFilesPanel() {
             borderRadius: 18,
             background: workflow.isDraggingOver
               ? "var(--primary)"
-              : "rgba(74,124,247,0.12)",
+              : "var(--primary-soft)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             transition: "all 0.2s",
-            boxShadow: workflow.isDraggingOver ? "0 8px 24px rgba(74,124,247,0.3)" : "none",
+            boxShadow: workflow.isDraggingOver ? "0 8px 24px var(--primary-glow)" : "none",
           }}
         >
           <Upload
@@ -72,7 +72,7 @@ export function OrganizeFilesPanel() {
           className="flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-bold text-white transition-all hover:opacity-90"
           style={{
             background: "var(--primary)",
-            boxShadow: "0 4px 14px rgba(74,124,247,0.30)",
+            boxShadow: "0 4px 14px var(--primary-glow)",
           }}
         >
           <FolderOpen className="h-3.5 w-3.5" />

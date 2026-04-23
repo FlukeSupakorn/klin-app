@@ -91,7 +91,7 @@ export function CalendarPage() {
         {isGoogleConnected && (
           <div
             className="flex items-center gap-1.5 rounded-[12px] border px-3 py-1.5"
-            style={{ background: "rgba(74,124,247,0.06)", borderColor: "rgba(74,124,247,0.2)" }}
+            style={{ background: "var(--primary-tint)", borderColor: "var(--primary-border)" }}
           >
             <svg className="h-3.5 w-3.5 text-primary" viewBox="0 0 24 24" fill="currentColor">
               <path d="M21.8 10.2H12v3.8h5.7c-.5 2.6-2.7 4.4-5.7 4.4-3.5 0-6.3-2.8-6.3-6.3s2.8-6.3 6.3-6.3c1.5 0 2.9.5 4 1.4l2.8-2.8C16.7 2.8 14.5 2 12 2 6.5 2 2 6.5 2 12s4.5 10 10 10c5.5 0 9.7-3.8 9.7-10-.1-.6-.1-1.2-.2-1.8z"/>
@@ -131,14 +131,14 @@ export function CalendarPage() {
         {/* Calendar grid */}
         <div
           className="flex flex-col overflow-hidden rounded-[18px] border border-border bg-card"
-          style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+          style={{ boxShadow: "var(--shadow-xs)" }}
         >
           {/* Month nav */}
           <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
             <div className="flex items-center gap-2.5">
               <div
                 className="flex h-8 w-8 items-center justify-center rounded-[10px]"
-                style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)" }}
+                style={{ background: "var(--primary)" }}
               >
                 <CalendarDays className="h-4 w-4 text-white" />
               </div>
@@ -201,12 +201,12 @@ export function CalendarPage() {
                     )}
                     style={{
                       background: isToday
-                        ? "linear-gradient(135deg,#4a7cf7,#7c3aed)"
+                        ? "var(--primary)"
                         : isSelected
-                          ? "rgba(74,124,247,0.08)"
+                          ? "var(--primary-tint)"
                           : undefined,
                       border: isSelected && !isToday ? "1.5px solid var(--primary)" : "1.5px solid transparent",
-                      boxShadow: isToday ? "0 4px 14px rgba(74,124,247,0.35)" : undefined,
+                      boxShadow: isToday ? "0 4px 14px var(--primary-glow)" : undefined,
                     }}
                     onMouseEnter={(e) => {
                       if (!isToday && inCurrentMonth)
@@ -216,7 +216,7 @@ export function CalendarPage() {
                       if (!isToday && !isSelected)
                         e.currentTarget.style.background = "transparent";
                       else if (isSelected && !isToday)
-                        e.currentTarget.style.background = "rgba(74,124,247,0.08)";
+                        e.currentTarget.style.background = "var(--primary-tint)";
                     }}
                   >
                     <span
@@ -254,7 +254,7 @@ export function CalendarPage() {
         {/* Day detail panel */}
         <div
           className="flex flex-col overflow-hidden rounded-[18px] border border-border bg-card"
-          style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+          style={{ boxShadow: "var(--shadow-xs)" }}
         >
           <div className="shrink-0 border-b border-border p-4">
             <div className="text-[11px] font-bold text-muted-foreground">Selected day</div>
@@ -267,7 +267,7 @@ export function CalendarPage() {
                 style={
                   selEvts.length === 0
                     ? { background: "var(--muted)", color: "var(--muted-foreground)" }
-                    : { background: "rgba(74,124,247,0.10)", color: "#4a7cf7" }
+                    : { background: "var(--primary-soft)", color: "var(--primary)" }
                 }
               >
                 {selEvts.length === 0 ? "No events" : `${selEvts.length} event${selEvts.length > 1 ? "s" : ""}`}
