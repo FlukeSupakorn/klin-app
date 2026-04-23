@@ -1,7 +1,5 @@
 import { FolderOpen, Upload } from "lucide-react";
 import { FileDropOverlay } from "@/features/dashboard/file-drop-overlay";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { OrganizeFilesModal } from "@/features/dashboard/organize-files-panel/organize-files-modal";
 import { useOrganizeWorkflow } from "@/hooks/organize/use-organize-workflow";
@@ -10,37 +8,77 @@ export function OrganizeFilesPanel() {
   const workflow = useOrganizeWorkflow();
 
   return (
-    <>
+    <div className="flex h-full flex-col">
       <FileDropOverlay visible={workflow.isDraggingOver} />
 
-      <Card className="border border-border bg-card shadow-none">
-        <CardContent className="p-0">
-          <div
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={workflow.handleDrop}
-            onClick={() => void workflow.handleAddFiles()}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                void workflow.handleAddFiles();
-              }
-            }}
-            className="flex min-h-[320px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-muted/20 px-8 py-16 text-center transition-all duration-150 hover:border-primary/40 hover:bg-primary/5"
-          >
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-              <Upload className="h-8 w-8 text-primary" />
-            </div>
-            <p className="text-lg font-black text-foreground">Organize Files</p>
-            <p className="mt-1 text-sm text-muted-foreground">Drag files here or click to select</p>
-            <div className="mt-4 flex items-center gap-2">
-              <FolderOpen className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-bold text-muted-foreground">AI-powered categorization</span>
-            </div>
+      <div
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={workflow.handleDrop}
+        onClick={() => void workflow.handleAddFiles()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            void workflow.handleAddFiles();
+          }
+        }}
+        className="cursor-pointer select-none transition-all duration-200"
+        style={{
+          flex: 1,
+          borderRadius: 14,
+          border: `2px dashed ${workflow.isDraggingOver ? "var(--primary)" : "var(--border)"}`,
+          background: workflow.isDraggingOver ? "rgba(74,124,247,0.06)" : "var(--muted)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+        }}
+      >
+        <div
+          style={{
+            width: 60,
+            height: 60,
+            borderRadius: 18,
+            background: workflow.isDraggingOver
+              ? "var(--primary)"
+              : "rgba(74,124,247,0.12)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s",
+            boxShadow: workflow.isDraggingOver ? "0 8px 24px rgba(74,124,247,0.3)" : "none",
+          }}
+        >
+          <Upload
+            className="h-7 w-7"
+            style={{ color: workflow.isDraggingOver ? "#fff" : "var(--primary)" }}
+          />
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <div className="text-[15px] font-extrabold text-foreground">
+            {workflow.isDraggingOver ? "Release to organize" : "Drop files here"}
           </div>
-        </CardContent>
-      </Card>
+          <div className="mt-1 text-[12px] text-muted-foreground">
+            or click to browse your computer
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); void workflow.handleAddFiles(); }}
+          className="flex items-center gap-2 rounded-[12px] px-4 py-2 text-[13px] font-bold text-white transition-all hover:opacity-90"
+          style={{
+            background: "var(--primary)",
+            boxShadow: "0 4px 14px rgba(74,124,247,0.30)",
+          }}
+        >
+          <FolderOpen className="h-3.5 w-3.5" />
+          Browse Files
+        </button>
+      </div>
 
       <OrganizeFilesModal workflow={workflow} />
 
@@ -49,6 +87,6 @@ export function OrganizeFilesPanel() {
         sections={["default-folder", "categories"]}
         onClose={() => workflow.setOpenSettingsWindow(false)}
       />
-    </>
+    </div>
   );
 }

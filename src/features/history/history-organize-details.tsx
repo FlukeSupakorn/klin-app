@@ -1,5 +1,4 @@
 import { Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import type { HistoryEntry } from "@/types/history";
 
 interface HistoryOrganizeDetailsProps {
@@ -7,49 +6,77 @@ interface HistoryOrganizeDetailsProps {
   onRequestEditMovedTo: (entryId: string) => void;
 }
 
-export function HistoryOrganizeDetails({
-  entry,
-  onRequestEditMovedTo,
-}: HistoryOrganizeDetailsProps) {
+export function HistoryOrganizeDetails({ entry, onRequestEditMovedTo }: HistoryOrganizeDetailsProps) {
   const isRenamed = entry.oldName !== entry.newName;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
-          <p className="mb-1 text-xs text-muted-foreground">From</p>
-          <p className="truncate font-medium" title={entry.fromPath}>{entry.fromPath}</p>
-        </div>
-        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
-          <div className="mb-1 flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">Moved To</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs"
-              onClick={() => onRequestEditMovedTo(entry.id)}
-            >
-              <Pencil className="mr-1 h-3.5 w-3.5" />
-              Edit
-            </Button>
+        {/* From */}
+        <div
+          className="rounded-[12px] border p-3"
+          style={{ background: "var(--card)", borderColor: "var(--border)" }}
+        >
+          <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+            From
           </div>
-          <p className="truncate font-medium" title={entry.toPath}>{entry.toPath}</p>
+          <div
+            className="truncate text-[11.5px] text-foreground"
+            style={{ fontFamily: "'JetBrains Mono',monospace", lineHeight: 1.5, wordBreak: "break-all" }}
+            title={entry.fromPath}
+          >
+            {entry.fromPath}
+          </div>
+        </div>
+
+        {/* Moved To */}
+        <div
+          className="relative rounded-[12px] border p-3"
+          style={{ background: "var(--card)", borderColor: "rgba(74,124,247,0.2)" }}
+        >
+          <div className="mb-1.5 flex items-center justify-between">
+            <div className="text-[10px] font-extrabold uppercase tracking-widest text-primary">
+              Moved To
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRequestEditMovedTo(entry.id); }}
+              className="flex items-center gap-1 rounded-[7px] px-2 py-0.5 text-[11px] font-bold text-primary transition-colors hover:opacity-70"
+              style={{ background: "rgba(74,124,247,0.10)" }}
+            >
+              <Pencil className="h-2.5 w-2.5" />
+              Edit
+            </button>
+          </div>
+          <div
+            className="truncate text-[11.5px] text-primary"
+            style={{ fontFamily: "'JetBrains Mono',monospace", lineHeight: 1.5, wordBreak: "break-all" }}
+            title={entry.toPath}
+          >
+            {entry.toPath}
+          </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
-        <p className="mb-1 text-xs text-muted-foreground">Rename</p>
-        <p className="font-medium">
+      {/* Rename */}
+      <div
+        className="rounded-[12px] border p-3"
+        style={{ background: "var(--card)", borderColor: "var(--border)" }}
+      >
+        <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+          Rename
+        </div>
+        <div className="text-[12.5px]">
           {isRenamed ? (
             <>
-              <span className="font-normal text-foreground/70">{entry.oldName}</span>
-              <span className="px-1.5 text-foreground/50">→</span>
-              <span className="font-semibold text-foreground">{entry.newName}</span>
+              <span className="text-muted-foreground">{entry.oldName}</span>
+              <span className="mx-2 text-muted-foreground/50">→</span>
+              <span className="font-bold text-foreground">{entry.newName}</span>
             </>
           ) : (
-            "No rename"
+            <span className="italic text-muted-foreground">No rename</span>
           )}
-        </p>
+        </div>
       </div>
     </div>
   );

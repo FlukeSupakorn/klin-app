@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import "@uiw/react-md-editor/markdown-editor.css";
-import { AlertTriangle, ArrowLeft, FilePlus2, Files, Loader2, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AlertTriangle, ArrowLeft, Files, FileText, Loader2, Plus, Search, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { notesApiService } from "@/services/notes-api-service";
 import { notesFileService, type NoteFileItem } from "@/services/notes-file-service";
@@ -14,23 +12,14 @@ import { usePrivacyStore } from "@/stores/use-privacy-store";
 type NotesView = "list" | "editor";
 
 function formatBytes(value: number): string {
-  if (value < 1024) {
-    return `${value} B`;
-  }
-
+  if (value < 1024) return `${value} B`;
   const kb = value / 1024;
-  if (kb < 1024) {
-    return `${kb.toFixed(1)} KB`;
-  }
-
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
 function formatDate(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) {
-    return "Unknown";
-  }
-
+  if (!Number.isFinite(ms) || ms <= 0) return "Unknown";
   return new Date(ms).toLocaleString();
 }
 
@@ -63,11 +52,21 @@ function splitLockNotice(message: string): { summary: string; details: string[] 
   return { summary, details };
 }
 
+const noteGradients = [
+  "linear-gradient(135deg,#4a7cf7,#7c3aed)",
+  "linear-gradient(135deg,#10b981,#0891b2)",
+  "linear-gradient(135deg,#f59e0b,#ef4444)",
+  "linear-gradient(135deg,#8b5cf6,#6d28d9)",
+  "linear-gradient(135deg,#f97316,#ef4444)",
+  "linear-gradient(135deg,#6366f1,#4a7cf7)",
+];
+
 export function NotesPage() {
   const categories = useCategoryManagementStore((state) => state.categories);
 
   const [view, setView] = useState<NotesView>("list");
   const [notes, setNotes] = useState<NoteFileItem[]>([]);
+  const [notesSearch, setNotesSearch] = useState("");
   const [isLoadingNotes, setIsLoadingNotes] = useState(true);
   const [notesError, setNotesError] = useState<string | null>(null);
 
@@ -88,6 +87,12 @@ export function NotesPage() {
   const [editorError, setEditorError] = useState<string | null>(null);
   const [showNoticeDetails, setShowNoticeDetails] = useState(false);
 
+  const filteredNotes = useMemo(() => {
+    const q = notesSearch.trim().toLowerCase();
+    if (!q) return notes;
+    return notes.filter((n) => stripMdSuffix(n.fileName).toLowerCase().includes(q));
+  }, [notes, notesSearch]);
+
   const categoryOptions = useMemo(
     () => categories.filter((category) => category.enabled && category.folderPath.trim().length > 0),
     [categories],
@@ -103,7 +108,6 @@ export function NotesPage() {
   const refreshNotes = async () => {
     setIsLoadingNotes(true);
     setNotesError(null);
-
     try {
       const [noteRows, appFolder] = await Promise.all([
         notesFileService.listAppNotes(),
@@ -119,20 +123,14 @@ export function NotesPage() {
     }
   };
 
-  useEffect(() => {
-    void refreshNotes();
-  }, []);
+  useEffect(() => { void refreshNotes(); }, []);
 
   useEffect(() => {
-    if (!isSummarizing || !summarizeStartedAt) {
-      return;
-    }
-
+    if (!isSummarizing || !summarizeStartedAt) return;
     const timer = setInterval(() => {
       const seconds = Math.max(0, Math.floor((Date.now() - summarizeStartedAt) / 1000));
       setSummarizeElapsedSec(seconds);
     }, 500);
-
     return () => clearInterval(timer);
   }, [isSummarizing, summarizeStartedAt]);
 
@@ -174,14 +172,9 @@ export function NotesPage() {
       for (const path of filePaths) {
         const match = getLockMatch(path);
         if (match) {
-          blocked.push({
-            source: match.source,
-            fileName: getPathTail(path),
-            lockedByName: getPathTail(match.lockedPath),
-          });
+          blocked.push({ source: match.source, fileName: getPathTail(path), lockedByName: getPathTail(match.lockedPath) });
           continue;
         }
-
         allowed.push(path);
       }
 
@@ -200,22 +193,13 @@ export function NotesPage() {
         })()
         : null;
 
-      if (blockedNotice) {
-        setEditorNotice(blockedNotice);
-      }
+      if (blockedNotice) setEditorNotice(blockedNotice);
+      if (!allowed.length) return;
 
-      if (!allowed.length) {
-        return;
-      }
-
-      const loadingTitle = allowed.length > 1
-        ? `Summary - ${allowed.length} files`
-        : createDefaultTitle("Summary");
+      const loadingTitle = allowed.length > 1 ? `Summary - ${allowed.length} files` : createDefaultTitle("Summary");
       const loadingContent = `# ${loadingTitle}\n\n_Summarizing selected files._`;
       openEditorForDraft(loadingTitle, loadingContent, allowed);
-      setEditorNotice(blockedNotice
-        ? `${blockedNotice} | Summarizing remaining files...`
-        : "Summarizing files. Please wait...");
+      setEditorNotice(blockedNotice ? `${blockedNotice} | Summarizing remaining files...` : "Summarizing files. Please wait...");
 
       let liveTitle = loadingTitle;
       let streamed = "";
@@ -223,10 +207,7 @@ export function NotesPage() {
       const dotPhases = [".", "..", "..."];
       let dotIndex = 0;
       const renderWaiting = () => {
-        if (hasFirstChunk) {
-          return;
-        }
-
+        if (hasFirstChunk) return;
         const dots = dotPhases[dotIndex % dotPhases.length];
         dotIndex += 1;
         setContent(`# ${liveTitle}\n\n_Summarizing selected files${dots}_`);
@@ -248,10 +229,7 @@ export function NotesPage() {
           if (!hasFirstChunk) {
             hasFirstChunk = true;
             setIsStreamingContent(true);
-            if (waitingTimer) {
-              clearInterval(waitingTimer);
-              waitingTimer = null;
-            }
+            if (waitingTimer) { clearInterval(waitingTimer); waitingTimer = null; }
             streamed = "";
           }
           streamed += delta;
@@ -271,9 +249,7 @@ export function NotesPage() {
         setEditorError(error instanceof Error ? error.message : "Failed to summarize selected files");
       }
     } finally {
-      if (waitingTimer) {
-        clearInterval(waitingTimer);
-      }
+      if (waitingTimer) clearInterval(waitingTimer);
       setIsSummarizing(false);
       setIsStreamingContent(false);
       setSummarizeStartedAt(null);
@@ -281,18 +257,11 @@ export function NotesPage() {
     }
   };
 
-  const handleStopSummarize = () => {
-    if (!activeStreamController) {
-      return;
-    }
-
-    activeStreamController.abort();
-  };
+  const handleStopSummarize = () => { activeStreamController?.abort(); };
 
   const handleOpenNote = async (note: NoteFileItem) => {
     setEditorError(null);
     setEditorNotice(null);
-
     try {
       const markdown = await notesFileService.readNote(note.path);
       setTitle(stripMdSuffix(note.fileName));
@@ -306,18 +275,12 @@ export function NotesPage() {
   };
 
   const saveToFolder = async (targetFolder: string, options?: { categoryName?: string }) => {
-    if (!targetFolder.trim()) {
-      setEditorError("Target folder is required.");
-      return;
-    }
-
+    if (!targetFolder.trim()) { setEditorError("Target folder is required."); return; }
     setIsSaving(true);
     setEditorError(null);
-
     try {
       const savedPath = await notesFileService.saveToFolder(targetFolder, title, content);
       setActivePath(savedPath);
-
       try {
         await notesApiService.logNoteHistory({
           fileName: getPathTail(savedPath),
@@ -325,10 +288,7 @@ export function NotesPage() {
           sourceFiles: summarySourceFiles,
           categoryName: options?.categoryName,
         });
-      } catch {
-        // Keep note save successful even if history logging fails.
-      }
-
+      } catch { /* history logging failure is non-fatal */ }
       setEditorNotice(`Saved note to ${savedPath}`);
       await refreshNotes();
     } catch (error) {
@@ -345,249 +305,315 @@ export function NotesPage() {
 
   const handleSaveToPickedFolder = async () => {
     const pickedFolder = await tauriClient.pickFolderForOrganize();
-    if (!pickedFolder) {
-      setEditorNotice("Save to folder cancelled.");
-      return;
-    }
-
+    if (!pickedFolder) { setEditorNotice("Save to folder cancelled."); return; }
     await saveToFolder(pickedFolder);
   };
 
   const handleSaveToCategory = async () => {
     const category = categoryOptions.find((item) => item.id === selectedCategoryId);
-    if (!category?.folderPath) {
-      setEditorError("Select a category with a valid folder path.");
-      return;
-    }
-
+    if (!category?.folderPath) { setEditorError("Select a category with a valid folder path."); return; }
     await saveToFolder(category.folderPath, { categoryName: category.name });
   };
 
-  return (
-    <div className="space-y-6 pb-10">
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Documents</p>
-        <h2 className="font-syne text-2xl font-black uppercase tracking-tight">Notes</h2>
-        {appNotesPath && (
-          <p className="mt-1 truncate text-xs text-muted-foreground">App notes folder: {appNotesPath}</p>
+  if (view === "editor") {
+    return (
+      <div className="flex h-full flex-col gap-0 overflow-hidden rounded-[18px] border border-border bg-card"
+        style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}>
+        {/* Editor toolbar */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+          <button
+            onClick={() => setView("list")}
+            className="flex items-center gap-1.5 rounded-[9px] border border-border px-3 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back
+          </button>
+
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Note title"
+            className="h-9 min-w-[220px] flex-1 rounded-[10px] border border-border bg-background px-3 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+
+          <button
+            onClick={() => void handleSaveToAppFolder()}
+            disabled={isSaving || isSummarizing}
+            className="rounded-[9px] px-3.5 py-1.5 text-[12.5px] font-bold text-white transition-colors disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)" }}
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </button>
+
+          <button
+            onClick={() => void handleSaveToPickedFolder()}
+            disabled={isSaving || isSummarizing}
+            className="rounded-[9px] border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+          >
+            Save to Folder
+          </button>
+
+          <select
+            value={selectedCategoryId}
+            onChange={(e) => setSelectedCategoryId(e.target.value)}
+            className="h-9 min-w-[160px] rounded-[10px] border border-border bg-background px-3 text-[12.5px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          >
+            <option value="">Select category</option>
+            {categoryOptions.map((category) => (
+              <option key={category.id} value={category.id}>{category.name}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => void handleSaveToCategory()}
+            disabled={isSaving || isSummarizing || !selectedCategoryId}
+            className="rounded-[9px] border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+          >
+            Save to Category
+          </button>
+        </div>
+
+        {/* Status strips */}
+        {activePath && (
+          <div className="shrink-0 border-b border-border px-4 py-1.5 text-[11px] text-muted-foreground">
+            Editing: {activePath}
+          </div>
         )}
+
+        {summarySourceFiles.length > 0 && (
+          <div className="shrink-0 border-b border-border px-4 py-2 text-[11px] text-primary"
+            style={{ background: "rgba(74,124,247,0.05)" }}>
+            <div className="mb-0.5 flex items-center gap-1.5 font-bold uppercase tracking-wider">
+              <Files className="h-3 w-3" />
+              Summary source files
+            </div>
+            <p className="truncate">{summarySourceFiles.join(" | ")}</p>
+          </div>
+        )}
+
+        {isSummarizing && (
+          <div className="shrink-0 border-b border-border px-4 py-2 text-[11px] text-primary"
+            style={{ background: "rgba(74,124,247,0.05)" }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>
+                {isStreamingContent ? "Writing summary" : "Preparing summary"}
+                <span className="ml-1 animate-pulse">|</span>
+              </span>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                style={{ background: "rgba(74,124,247,0.10)" }}>
+                {summarizeElapsedSec}s
+              </span>
+              <button onClick={handleStopSummarize}
+                className="rounded-[7px] border border-border px-2 py-0.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-muted">
+                Stop
+              </button>
+            </div>
+          </div>
+        )}
+
+        {editorError && (
+          <div className="shrink-0 border-b border-destructive/20 px-4 py-2 text-[12px] text-destructive"
+            style={{ background: "rgba(239,68,68,0.06)" }}>
+            {editorError}
+          </div>
+        )}
+
+        {editorNotice && (
+          <div
+            className={cn("shrink-0 border-b px-4 py-2 text-[12px]",
+              isLockWarningNotice
+                ? "border-amber-500/30 text-amber-700"
+                : "border-primary/20 text-primary")}
+            style={{ background: isLockWarningNotice ? "rgba(245,158,11,0.06)" : "rgba(74,124,247,0.05)" }}
+          >
+            <div className="flex items-start gap-2">
+              {isLockWarningNotice && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+              <div className="space-y-1">
+                <p>
+                  {parsedEditorNotice?.summary ?? editorNotice}
+                  {isLockWarningNotice && (parsedEditorNotice?.details.length ?? 0) > 0 && (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        onClick={() => setShowNoticeDetails((prev) => !prev)}
+                        className="text-[11px] font-bold underline underline-offset-2"
+                      >
+                        {showNoticeDetails ? "Hide details" : "Read more"}
+                      </button>
+                    </>
+                  )}
+                </p>
+                {isLockWarningNotice && showNoticeDetails && (parsedEditorNotice?.details.length ?? 0) > 0 && (
+                  <ul className="list-disc space-y-0.5 pl-4 text-[11px]">
+                    {parsedEditorNotice?.details.map((detail) => <li key={detail}>{detail}</li>)}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Split editor */}
+        <div className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden">
+          <div className="flex flex-col overflow-hidden border-r border-border">
+            <div className="shrink-0 border-b border-border px-4 py-2 text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">
+              Write (.md)
+            </div>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="flex-1 resize-none bg-card px-4 py-3 font-mono text-[13px] text-foreground focus:outline-none"
+              placeholder="Write markdown content..."
+            />
+          </div>
+          <div className="flex flex-col overflow-hidden">
+            <div className="shrink-0 border-b border-border px-4 py-2 text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">
+              Preview
+            </div>
+            <div data-color-mode="dark" className="flex-1 overflow-y-auto px-4 py-3">
+              <MDEditor.Markdown source={content} style={{ backgroundColor: "transparent", color: "inherit" }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-5">
+      {/* Header */}
+      <div className="flex shrink-0 items-center gap-3">
+        <div className="flex-1">
+          <div className="text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">Documents</div>
+          <h1 className="mt-0.5 text-[21px] font-extrabold tracking-tight text-foreground" style={{ letterSpacing: "-0.4px" }}>
+            Notes
+          </h1>
+          {appNotesPath && (
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{appNotesPath}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2 rounded-[12px] border border-border bg-card px-3 py-2"
+            style={{ width: 180, boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+          >
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <input
+              value={notesSearch}
+              onChange={(e) => setNotesSearch(e.target.value)}
+              placeholder="Search notes..."
+              className="w-full bg-transparent text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none"
+            />
+          </div>
+          <button
+            onClick={handleAddNote}
+            className="flex items-center gap-1.5 rounded-[12px] px-3.5 py-2 text-[12.5px] font-bold text-white transition-all hover:opacity-90"
+            style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)", boxShadow: "0 4px 14px rgba(74,124,247,0.30)" }}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Note
+          </button>
+          <button
+            onClick={() => void handleSummarizeFromFiles()}
+            disabled={isSummarizing}
+            className="flex items-center gap-1.5 rounded-[12px] border border-border bg-card px-3.5 py-2 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
+            style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+          >
+            {isSummarizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            AI Summarize
+          </button>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={handleAddNote} size="sm" className="gap-1.5">
-          <FilePlus2 className="h-4 w-4" />
-          Add Note
-        </Button>
-        <Button onClick={() => void handleSummarizeFromFiles()} size="sm" variant="secondary" className="gap-1.5">
-          {isSummarizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          Summarize Notes
-        </Button>
-      </div>
-
+      {/* Global notices */}
       {editorError && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div className="shrink-0 rounded-[12px] border border-destructive/20 px-4 py-3 text-[12px] text-destructive"
+          style={{ background: "rgba(239,68,68,0.06)" }}>
           {editorError}
         </div>
       )}
 
-      {editorNotice && (
-        <div
-          className={cn(
-            "rounded-lg border px-4 py-3 text-sm",
-            isLockWarningNotice
-              ? "border-amber-500/40 bg-amber-500/10 text-amber-700"
-              : "border-primary/20 bg-primary/10 text-primary",
-          )}
-        >
-          <div className="flex items-start gap-2">
-            {isLockWarningNotice && <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}
-            <div className="space-y-2">
-              <p className="leading-5">
-                {parsedEditorNotice?.summary ?? editorNotice}
-                {isLockWarningNotice && (parsedEditorNotice?.details.length ?? 0) > 0 && (
-                  <>
-                    {" "}
-                    <button
-                      type="button"
-                      onClick={() => setShowNoticeDetails((prev) => !prev)}
-                      className="text-xs font-semibold underline underline-offset-2"
-                    >
-                      {showNoticeDetails ? "Hide details" : "Read more"}
-                    </button>
-                  </>
-                )}
-              </p>
-              {isLockWarningNotice && (parsedEditorNotice?.details.length ?? 0) > 0 && (
-                <div className="space-y-2">
-                  {showNoticeDetails && (
-                    <ul className="list-disc space-y-1 pl-4 text-xs">
-                      {parsedEditorNotice?.details.map((detail) => (
-                        <li key={detail}>{detail}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+      {/* Notes masonry grid */}
+      <div className="flex-1 overflow-y-auto pb-4">
+        {isLoadingNotes ? (
+          <div className="rounded-[14px] border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+            Loading notes...
+          </div>
+        ) : notesError ? (
+          <div className="rounded-[14px] border border-destructive/20 bg-destructive/10 p-6 text-center text-sm text-destructive">
+            {notesError}
+          </div>
+        ) : filteredNotes.length === 0 ? (
+          <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-4 rounded-[18px] border border-border bg-card">
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-[16px]"
+              style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)", boxShadow: "0 6px 20px rgba(74,124,247,0.30)" }}
+            >
+              <FileText className="h-6 w-6 text-white" />
             </div>
-          </div>
-        </div>
-      )}
-
-      {view === "list" ? (
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="border-b border-border bg-muted/20 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-muted-foreground">
-            Existing Notes
-          </div>
-
-          <div className="space-y-2 p-3">
-            {isLoadingNotes ? (
-              <div className="rounded-lg border border-border bg-muted/40 px-4 py-5 text-center text-sm text-muted-foreground">
-                Loading notes...
+            <div className="text-center">
+              <div className="text-[14px] font-extrabold text-foreground">
+                {notesSearch ? "No matching notes" : "No notes yet"}
               </div>
-            ) : notesError ? (
-              <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-5 text-center text-sm text-destructive">
-                {notesError}
+              <div className="mt-0.5 text-[12px] text-muted-foreground">
+                {notesSearch ? "Try a different search term" : "Click Add Note or use AI Summarize"}
               </div>
-            ) : notes.length === 0 ? (
-              <div className="rounded-lg border border-border bg-muted/40 px-4 py-5 text-center text-sm text-muted-foreground">
-                No notes found yet. Click Add Note or Summarize Notes.
-              </div>
-            ) : (
-              notes.map((note) => (
-                <button
-                  key={note.path}
-                  type="button"
-                  onClick={() => void handleOpenNote(note)}
-                  className="w-full rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-muted/40"
-                >
-                  <p className="truncate text-sm font-semibold text-foreground">{note.fileName}</p>
-                  <div className="mt-1 grid gap-1 text-[11px] text-muted-foreground">
-                    <p>Size: {formatBytes(note.sizeBytes)}</p>
-                    <p>Last edited: {formatDate(note.lastModifiedMs)}</p>
-                  </div>
-                </button>
-              ))
+            </div>
+            {!notesSearch && (
+              <button
+                onClick={handleAddNote}
+                className="flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-[12.5px] font-bold text-white transition-all hover:opacity-90"
+                style={{ background: "linear-gradient(135deg,#4a7cf7,#7c3aed)" }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Create First Note
+              </button>
             )}
           </div>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-3 py-2">
-            <Button variant="ghost" size="sm" className="gap-1" onClick={() => setView("list")}>
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-
-            <div className="min-w-[220px] flex-1">
-              <Input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Note title"
-                className="h-9 rounded-full border-border bg-background"
-              />
-            </div>
-
-            <Button size="sm" onClick={() => void handleSaveToAppFolder()} disabled={isSaving || isSummarizing}>
-              {isSaving ? "Saving..." : "Save"}
-            </Button>
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void handleSaveToPickedFolder()}
-              disabled={isSaving || isSummarizing}
-            >
-              Save to Folder
-            </Button>
-
-            <select
-              value={selectedCategoryId}
-              onChange={(event) => setSelectedCategoryId(event.target.value)}
-              className={cn(
-                "h-9 min-w-[180px] rounded-full border border-border bg-background px-3 text-sm text-foreground",
-                "focus:outline-hidden focus:ring-2 focus:ring-primary",
-              )}
-            >
-              <option value="">Select category</option>
-              {categoryOptions.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => void handleSaveToCategory()}
-              disabled={isSaving || isSummarizing || !selectedCategoryId}
-            >
-              Save to Category
-            </Button>
+        ) : (
+          <div style={{ columns: "3 220px", gap: "12px" }}>
+            {filteredNotes.map((note, i) => (
+              <div
+                key={note.path}
+                style={{ breakInside: "avoid", marginBottom: "12px" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => void handleOpenNote(note)}
+                  className="w-full overflow-hidden rounded-[16px] border border-border bg-card text-left transition-all hover:shadow-md"
+                  style={{ boxShadow: "0 2px 10px rgba(74,124,247,0.07)" }}
+                >
+                  {/* Gradient header strip */}
+                  <div
+                    className="flex h-[52px] items-center justify-between px-3.5"
+                    style={{ background: noteGradients[i % noteGradients.length] }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-[8px]"
+                        style={{ background: "rgba(255,255,255,0.22)" }}>
+                        <FileText className="h-3.5 w-3.5 text-white" />
+                      </div>
+                      <span className="text-[11px] font-bold text-white opacity-80">Note</span>
+                    </div>
+                  </div>
+                  {/* Card content */}
+                  <div className="px-3.5 py-3">
+                    <div className="truncate text-[13px] font-bold text-foreground">
+                      {stripMdSuffix(note.fileName)}
+                    </div>
+                    <div className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground">
+                      <div>{formatBytes(note.sizeBytes)}</div>
+                      <div>{formatDate(note.lastModifiedMs)}</div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            ))}
           </div>
-
-          {activePath && (
-            <div className="border-b border-border px-4 py-2 text-[11px] text-muted-foreground">Editing: {activePath}</div>
-          )}
-
-          {summarySourceFiles.length > 0 && (
-            <div className="border-b border-border bg-primary/5 px-4 py-2 text-[11px] text-primary">
-              <div className="mb-1 flex items-center gap-1.5 font-black uppercase tracking-wider">
-                <Files className="h-3.5 w-3.5" />
-                Summary source files
-              </div>
-              <p className="truncate">{summarySourceFiles.join(" | ")}</p>
-            </div>
-          )}
-
-          {isSummarizing && (
-            <div className="border-b border-border bg-primary/5 px-4 py-2 text-xs text-primary">
-              <div className="flex flex-wrap items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>
-                  {isStreamingContent ? "Writing summary" : "Preparing summary"}
-                  <span className="ml-1 animate-pulse">|</span>
-                </span>
-                <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                  {summarizeElapsedSec}s
-                </span>
-                <Button size="sm" variant="ghost" onClick={handleStopSummarize} className="h-7 px-2 text-xs">
-                  Stop
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-0 lg:grid-cols-2">
-            <div className="border-b border-border lg:border-b-0 lg:border-r">
-              <div className="border-b border-border px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                Write (.md)
-              </div>
-              <textarea
-                value={content}
-                onChange={(event) => setContent(event.target.value)}
-                className={cn(
-                  "min-h-[460px] w-full resize-none bg-card px-4 py-3 text-sm text-foreground",
-                  "focus:outline-hidden focus:ring-2 focus:ring-primary/40",
-                )}
-                placeholder="Write markdown content..."
-              />
-            </div>
-
-            <div>
-              <div className="border-b border-border px-4 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                Preview
-              </div>
-              <div data-color-mode="dark" className="min-h-[460px] px-4 py-3">
-                <MDEditor.Markdown
-                  source={content}
-                  style={{ backgroundColor: "transparent", color: "inherit" }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -1,10 +1,17 @@
+import { ArrowRight, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { theme } from "@/theme/theme";
-import { Card, CardContent } from "@/components/ui/card";
 import type { HistoryEntry } from "@/types/history";
-import { formatTime, getFolderTail, getPathTail } from "@/features/history/history-utils";
+import { formatTime, getFolderTail } from "@/features/history/history-utils";
+
+const ENTRY_GRADIENTS: Record<string, string> = {
+  organize: "linear-gradient(135deg,#4a7cf7,#7c3aed)",
+  summary: "linear-gradient(135deg,#8b5cf6,#6d28d9)",
+  calendar: "linear-gradient(135deg,#10b981,#0891b2)",
+};
+
+function confColor(c: number): string {
+  return c >= 80 ? "#10b981" : c >= 65 ? "#d97706" : "#ef4444";
+}
 
 interface RecentMovementsSectionProps {
   recentEntries: HistoryEntry[];
@@ -12,88 +19,92 @@ interface RecentMovementsSectionProps {
 }
 
 export function RecentMovementsSection({ recentEntries, onOpenEntry }: RecentMovementsSectionProps) {
-  const getEntryTitle = (entry: HistoryEntry): string => {
-    if (entry.type === "organize") {
-      return entry.oldName !== entry.newName ? `${entry.oldName} → ${entry.newName}` : entry.newName;
-    }
-
-    if (entry.type === "summary") {
-      return entry.title;
-    }
-
+  const getTitle = (entry: HistoryEntry): string => {
+    if (entry.type === "organize") return entry.oldName !== entry.newName ? `${entry.oldName} → ${entry.newName}` : entry.newName;
+    if (entry.type === "summary") return entry.title;
     return entry.meetingTitle || entry.title;
   };
 
-  const getEntrySubtitle = (entry: HistoryEntry): string => {
-    if (entry.type === "organize") {
-      return `${getFolderTail(entry.fromPath)} → ${getFolderTail(entry.toPath)}`;
-    }
-
-    if (entry.type === "summary") {
-      return `${entry.fileNames.length} files · ${getPathTail(entry.summaryPath)}`;
-    }
-
-    return `${entry.sourceFileName} · ${entry.meetingTime}`;
-  };
-
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-black uppercase tracking-tight">Recent Movements</h3>
-        <Link to="/history" className="text-sm font-medium text-primary hover:underline">
-          View all history
+    <div
+      className="overflow-hidden rounded-[18px] border border-border bg-card"
+      style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+    >
+      <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+        <div>
+          <div className="text-[13px] font-extrabold text-foreground">Recent Movements</div>
+          <div className="text-[11px] text-muted-foreground">Latest file operations</div>
+        </div>
+        <Link
+          to="/history"
+          className="text-[12px] font-bold text-primary transition-colors hover:opacity-70"
+        >
+          View all →
         </Link>
       </div>
-      <div className="space-y-2">
+
+      <div className="divide-y divide-border">
         {recentEntries.length === 0 ? (
-          <div className="rounded-2xl border border-dashed bg-muted/20 py-8 text-center text-sm text-muted-foreground">
+          <div className="py-10 text-center text-[13px] text-muted-foreground">
             No movement history yet.
           </div>
         ) : (
           recentEntries.map((entry) => {
-            const actionTheme = theme.actions[entry.type];
-            const Icon = actionTheme.icon;
+            const grad = ENTRY_GRADIENTS[entry.type] ?? ENTRY_GRADIENTS.organize;
+            const organizeEntry = entry.type === "organize" ? entry : null;
+            const conf = organizeEntry ? Math.round((organizeEntry.scores[0]?.score ?? 0) * 100) : 0;
+            const fromFolder = organizeEntry ? getFolderTail(organizeEntry.fromPath) : null;
+            const topCat = organizeEntry?.scores[0]?.name ?? null;
+            const toFolder = organizeEntry ? getFolderTail(organizeEntry.toPath) : null;
 
             return (
-              <Card key={entry.id} className="relative overflow-hidden border bg-muted/30 shadow-none transition-colors hover:bg-muted/40">
-                <span className={cn("pointer-events-none absolute bottom-0 left-0 top-0 w-1", actionTheme.accent)} />
-                <button type="button" onClick={() => onOpenEntry(entry.id)} className="w-full text-left">
-                  <CardContent className="p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className={cn("rounded-md border p-1.5", actionTheme.iconWrap)}>
-                            <Icon className={cn("h-3.5 w-3.5", actionTheme.iconColor)} />
-                          </span>
-                          <p className="max-w-[360px] truncate text-sm font-semibold" title={getEntryTitle(entry)}>
-                            {getEntryTitle(entry)}
-                          </p>
-                        </div>
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => onOpenEntry(entry.id)}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+              >
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
+                  style={{ background: grad }}
+                >
+                  <FileText className="h-[15px] w-[15px] text-white" />
+                </div>
 
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <span className="truncate max-w-[420px]" title={getEntrySubtitle(entry)}>{getEntrySubtitle(entry)}</span>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatTime(entry.timestamp)}
-                          </span>
-                          {entry.type === "organize" && (
-                            <span className={cn("font-semibold", actionTheme.emphasis)}>
-                              {Math.round((entry.scores[0]?.score ?? 0) * 100)}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground">
-                        <ChevronRight className="h-4 w-4" />
-                      </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[12.5px] font-bold text-foreground">{getTitle(entry)}</div>
+                  {organizeEntry && (fromFolder || topCat) && (
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <span className="truncate text-[10.5px] text-muted-foreground" style={{ maxWidth: 90 }}>
+                        {fromFolder}
+                      </span>
+                      <ArrowRight className="h-2.5 w-2.5 shrink-0 text-primary" />
+                      <span
+                        className="truncate text-[10.5px] font-bold"
+                        style={{ color: "#4a7cf7", maxWidth: 90 }}
+                      >
+                        {topCat || toFolder}
+                      </span>
                     </div>
-                  </CardContent>
-                </button>
-              </Card>
+                  )}
+                  {!organizeEntry && (
+                    <div className="mt-0.5 truncate text-[10.5px] text-muted-foreground">
+                      {entry.subtitle}
+                    </div>
+                  )}
+                </div>
+
+                <div className="shrink-0 text-right">
+                  {conf > 0 && (
+                    <div className="text-[11px] font-bold" style={{ color: confColor(conf) }}>
+                      {conf}%
+                    </div>
+                  )}
+                  <div className="mt-0.5 text-[10px] text-muted-foreground">
+                    {formatTime(entry.timestamp)}
+                  </div>
+                </div>
+              </button>
             );
           })
         )}
