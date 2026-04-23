@@ -506,7 +506,6 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
                 background: isLockWarning ? "var(--warning-tint)" : "var(--destructive-tint)",
                 borderColor: isLockWarning ? "var(--warning)" : "var(--destructive)",
                 color: isLockWarning ? "var(--warning)" : "var(--destructive)",
-                borderOpacity: "0.3",
               }}
             >
               <div className="flex items-start gap-2">

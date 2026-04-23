@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import "@uiw/react-md-editor/markdown-editor.css";
-import { AlertTriangle, ArrowLeft, Files, FileText, Loader2, Plus, Search, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCheck, ChevronLeft, Files, FileText, Loader2, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { notesApiService } from "@/services/notes-api-service";
 import { notesFileService, type NoteFileItem } from "@/services/notes-file-service";
@@ -20,7 +20,8 @@ function formatBytes(value: number): string {
 
 function formatDate(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return "Unknown";
-  return new Date(ms).toLocaleString();
+  const d = new Date(ms);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function stripMdSuffix(fileName: string): string {
@@ -38,6 +39,12 @@ function createDefaultTitle(prefix = "Quick-Note"): string {
 function getPathTail(path: string): string {
   const value = path.split(/[\\/]/).pop();
   return value && value.trim().length > 0 ? value : "Quick-Note.md";
+}
+
+function extractPreview(markdown: string): string {
+  const lines = markdown.split("\n");
+  const body = lines.filter((l) => !l.trim().startsWith("#")).join(" ").trim();
+  return body.slice(0, 200);
 }
 
 const LOCK_NOTICE_DETAILS_SEPARATOR = "\n__DETAILS__\n";
@@ -61,6 +68,7 @@ export function NotesPage() {
   const [notesSearch, setNotesSearch] = useState("");
   const [isLoadingNotes, setIsLoadingNotes] = useState(true);
   const [notesError, setNotesError] = useState<string | null>(null);
+  const [notePreviews, setNotePreviews] = useState<Record<string, string>>({});
 
   const [title, setTitle] = useState(createDefaultTitle());
   const [content, setContent] = useState(createTemplate("Quick Note"));
@@ -70,6 +78,7 @@ export function NotesPage() {
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [savedFeedback, setSavedFeedback] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isStreamingContent, setIsStreamingContent] = useState(false);
   const [summarizeElapsedSec, setSummarizeElapsedSec] = useState(0);
@@ -97,6 +106,21 @@ export function NotesPage() {
     setShowNoticeDetails(false);
   }, [editorNotice]);
 
+  const loadPreviews = useCallback(async (noteRows: NoteFileItem[]) => {
+    const results: Record<string, string> = {};
+    await Promise.all(
+      noteRows.map(async (note) => {
+        try {
+          const md = await notesFileService.readNote(note.path);
+          results[note.path] = extractPreview(md);
+        } catch {
+          results[note.path] = "";
+        }
+      }),
+    );
+    setNotePreviews(results);
+  }, []);
+
   const refreshNotes = async () => {
     setIsLoadingNotes(true);
     setNotesError(null);
@@ -107,6 +131,7 @@ export function NotesPage() {
       ]);
       setNotes(noteRows);
       setAppNotesPath(appFolder);
+      void loadPreviews(noteRows);
     } catch (error) {
       setNotesError(error instanceof Error ? error.message : "Failed to load notes");
       setNotes([]);
@@ -139,6 +164,17 @@ export function NotesPage() {
   const handleAddNote = () => {
     const nextTitle = createDefaultTitle("Note");
     openEditorForDraft(nextTitle, createTemplate(nextTitle));
+  };
+
+  const handleDeleteNote = async (note: NoteFileItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete "${stripMdSuffix(note.fileName)}"?`)) return;
+    try {
+      await tauriClient.deleteFile(note.path);
+      await refreshNotes();
+    } catch (error) {
+      setNotesError(error instanceof Error ? error.message : "Failed to delete note");
+    }
   };
 
   const handleSummarizeFromFiles = async () => {
@@ -281,7 +317,9 @@ export function NotesPage() {
           categoryName: options?.categoryName,
         });
       } catch { /* history logging failure is non-fatal */ }
-      setEditorNotice(`Saved note to ${savedPath}`);
+      setSavedFeedback(true);
+      setTimeout(() => setSavedFeedback(false), 2000);
+      setEditorNotice(`Saved to ${savedPath}`);
       await refreshNotes();
     } catch (error) {
       setEditorError(error instanceof Error ? error.message : "Failed to save note");
@@ -309,46 +347,73 @@ export function NotesPage() {
 
   if (view === "editor") {
     return (
-      <div className="flex h-full flex-col gap-0 overflow-hidden rounded-[18px] border border-border bg-card"
-        style={{ boxShadow: "var(--shadow-xs)" }}>
+      <div
+        className="flex h-full flex-col gap-0 overflow-hidden rounded-[18px] border border-border bg-card"
+        style={{ boxShadow: "var(--shadow-xs)" }}
+      >
         {/* Editor toolbar */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5 border-b border-border bg-card px-4 py-3">
+          {/* Back button */}
           <button
+            type="button"
             onClick={() => setView("list")}
-            className="flex items-center gap-1.5 rounded-[9px] border border-border px-3 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex shrink-0 items-center gap-1.5 rounded-[10px] border border-border px-3 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
+            <ChevronLeft className="h-3.5 w-3.5" />
             Back
           </button>
 
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Note title"
-            className="h-9 min-w-[220px] flex-1 rounded-[10px] border border-border bg-background px-3 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-          />
+          {/* Title input */}
+          <div
+            className="flex h-9 min-w-[220px] flex-1 items-center rounded-[12px] border border-border bg-card px-3"
+            style={{ boxShadow: "var(--shadow-xs)" }}
+          >
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Note title..."
+              className="w-full bg-transparent text-[13px] font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none"
+            />
+          </div>
 
+          {/* Save button */}
           <button
+            type="button"
             onClick={() => void handleSaveToAppFolder()}
             disabled={isSaving || isSummarizing}
-            className="rounded-[9px] px-3.5 py-1.5 text-[12.5px] font-bold text-white transition-colors disabled:opacity-50"
-            style={{ background: "var(--primary)" }}
+            className="flex shrink-0 items-center gap-1.5 rounded-[10px] px-4 py-1.5 text-[12.5px] font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+            style={{ background: "var(--primary)", boxShadow: "0 4px 12px var(--primary-glow)" }}
           >
-            {isSaving ? "Saving..." : "Save"}
+            {savedFeedback ? (
+              <>
+                <CheckCheck className="h-3.5 w-3.5" />
+                Saved ✓
+              </>
+            ) : isSaving ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save"
+            )}
           </button>
 
+          {/* Save to Folder */}
           <button
+            type="button"
             onClick={() => void handleSaveToPickedFolder()}
             disabled={isSaving || isSummarizing}
-            className="rounded-[9px] border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            className="shrink-0 rounded-[10px] border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
             Save to Folder
           </button>
 
+          {/* Category select */}
           <select
             value={selectedCategoryId}
             onChange={(e) => setSelectedCategoryId(e.target.value)}
-            className="h-9 min-w-[160px] rounded-[10px] border border-border bg-background px-3 text-[12.5px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="h-9 min-w-[150px] shrink-0 rounded-[10px] border border-border bg-card px-3 text-[12.5px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="">Select category</option>
             {categoryOptions.map((category) => (
@@ -356,10 +421,12 @@ export function NotesPage() {
             ))}
           </select>
 
+          {/* Save to Category */}
           <button
+            type="button"
             onClick={() => void handleSaveToCategory()}
             disabled={isSaving || isSummarizing || !selectedCategoryId}
-            className="rounded-[9px] border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            className="shrink-0 rounded-[10px] border border-border px-3.5 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
             Save to Category
           </button>
@@ -373,8 +440,10 @@ export function NotesPage() {
         )}
 
         {summarySourceFiles.length > 0 && (
-          <div className="shrink-0 border-b border-border px-4 py-2 text-[11px] text-primary"
-            style={{ background: "var(--primary-tint)" }}>
+          <div
+            className="shrink-0 border-b border-border px-4 py-2 text-[11px] text-primary"
+            style={{ background: "var(--primary-tint)" }}
+          >
             <div className="mb-0.5 flex items-center gap-1.5 font-bold uppercase tracking-wider">
               <Files className="h-3 w-3" />
               Summary source files
@@ -384,20 +453,27 @@ export function NotesPage() {
         )}
 
         {isSummarizing && (
-          <div className="shrink-0 border-b border-border px-4 py-2 text-[11px] text-primary"
-            style={{ background: "var(--primary-tint)" }}>
+          <div
+            className="shrink-0 border-b border-border px-4 py-2 text-[11px] text-primary"
+            style={{ background: "var(--primary-tint)" }}
+          >
             <div className="flex flex-wrap items-center gap-2">
               <Loader2 className="h-3 w-3 animate-spin" />
               <span>
                 {isStreamingContent ? "Writing summary" : "Preparing summary"}
                 <span className="ml-1 animate-pulse">|</span>
               </span>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                style={{ background: "var(--primary-soft)" }}>
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                style={{ background: "var(--primary-soft)" }}
+              >
                 {summarizeElapsedSec}s
               </span>
-              <button onClick={handleStopSummarize}
-                className="rounded-[7px] border border-border px-2 py-0.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-muted">
+              <button
+                type="button"
+                onClick={handleStopSummarize}
+                className="rounded-[7px] border border-border px-2 py-0.5 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-muted"
+              >
                 Stop
               </button>
             </div>
@@ -405,18 +481,22 @@ export function NotesPage() {
         )}
 
         {editorError && (
-          <div className="shrink-0 border-b border-destructive/20 px-4 py-2 text-[12px] text-destructive"
-            style={{ background: "var(--destructive-tint)" }}>
+          <div
+            className="shrink-0 border-b border-destructive/20 px-4 py-2 text-[12px] text-destructive"
+            style={{ background: "var(--destructive-tint)" }}
+          >
             {editorError}
           </div>
         )}
 
         {editorNotice && (
           <div
-            className={cn("shrink-0 border-b px-4 py-2 text-[12px]",
+            className={cn(
+              "shrink-0 border-b px-4 py-2 text-[12px]",
               isLockWarningNotice
                 ? "border-amber-500/30 text-amber-700"
-                : "border-primary/20 text-primary")}
+                : "border-primary/20 text-primary",
+            )}
             style={{ background: isLockWarningNotice ? "var(--warning-tint)" : "var(--primary-tint)" }}
           >
             <div className="flex items-start gap-2">
@@ -449,9 +529,16 @@ export function NotesPage() {
 
         {/* Split editor */}
         <div className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden">
+          {/* Write panel */}
           <div className="flex flex-col overflow-hidden border-r border-border">
-            <div className="shrink-0 border-b border-border px-4 py-2 text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">
-              Write (.md)
+            <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2">
+              <span
+                className="h-2 w-2 rounded-full shrink-0"
+                style={{ background: "var(--orange)" }}
+              />
+              <span className="text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                Write (.md)
+              </span>
             </div>
             <textarea
               value={content}
@@ -460,9 +547,17 @@ export function NotesPage() {
               placeholder="Write markdown content..."
             />
           </div>
+
+          {/* Preview panel */}
           <div className="flex flex-col overflow-hidden">
-            <div className="shrink-0 border-b border-border px-4 py-2 text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">
-              Preview
+            <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2">
+              <span
+                className="h-2 w-2 rounded-full shrink-0"
+                style={{ background: "var(--success)" }}
+              />
+              <span className="text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                Preview
+              </span>
             </div>
             <div data-color-mode="dark" className="flex-1 overflow-y-auto px-4 py-3">
               <MDEditor.Markdown source={content} style={{ backgroundColor: "transparent", color: "inherit" }} />
@@ -478,8 +573,13 @@ export function NotesPage() {
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3">
         <div className="flex-1">
-          <div className="text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">Documents</div>
-          <h1 className="mt-0.5 text-[21px] font-extrabold tracking-tight text-foreground" style={{ letterSpacing: "-0.4px" }}>
+          <div className="text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">
+            Documents
+          </div>
+          <h1
+            className="mt-0.5 text-[21px] font-extrabold tracking-tight text-foreground"
+            style={{ letterSpacing: "-0.4px" }}
+          >
             Notes
           </h1>
           {appNotesPath && (
@@ -500,20 +600,24 @@ export function NotesPage() {
             />
           </div>
           <button
+            type="button"
             onClick={handleAddNote}
             className="flex items-center gap-1.5 rounded-[12px] px-3.5 py-2 text-[12.5px] font-bold text-white transition-all hover:opacity-90"
-            style={{ background: "var(--primary)", boxShadow: "0 4px 14px var(--primary-border)" }}
+            style={{ background: "var(--primary)", boxShadow: "0 4px 14px var(--primary-glow)" }}
           >
             <Plus className="h-3.5 w-3.5" />
             Add Note
           </button>
           <button
+            type="button"
             onClick={() => void handleSummarizeFromFiles()}
             disabled={isSummarizing}
             className="flex items-center gap-1.5 rounded-[12px] border border-border bg-card px-3.5 py-2 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
             style={{ boxShadow: "var(--shadow-xs)" }}
           >
-            {isSummarizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {isSummarizing
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <Sparkles className="h-3.5 w-3.5" />}
             AI Summarize
           </button>
         </div>
@@ -521,8 +625,10 @@ export function NotesPage() {
 
       {/* Global notices */}
       {editorError && (
-        <div className="shrink-0 rounded-[12px] border border-destructive/20 px-4 py-3 text-[12px] text-destructive"
-          style={{ background: "var(--destructive-tint)" }}>
+        <div
+          className="shrink-0 rounded-[12px] border border-destructive/20 px-4 py-3 text-[12px] text-destructive"
+          style={{ background: "var(--destructive-tint)" }}
+        >
           {editorError}
         </div>
       )}
@@ -541,7 +647,7 @@ export function NotesPage() {
           <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-4 rounded-[18px] border border-border bg-card">
             <div
               className="flex h-14 w-14 items-center justify-center rounded-[16px]"
-              style={{ background: "var(--primary)", boxShadow: "0 6px 20px var(--primary-border)" }}
+              style={{ background: "var(--primary)", boxShadow: "0 6px 20px var(--primary-glow)" }}
             >
               <FileText className="h-6 w-6 text-white" />
             </div>
@@ -555,6 +661,7 @@ export function NotesPage() {
             </div>
             {!notesSearch && (
               <button
+                type="button"
                 onClick={handleAddNote}
                 className="flex items-center gap-1.5 rounded-[12px] px-4 py-2 text-[12.5px] font-bold text-white transition-all hover:opacity-90"
                 style={{ background: "var(--primary)" }}
@@ -566,41 +673,81 @@ export function NotesPage() {
           </div>
         ) : (
           <div style={{ columns: "3 220px", gap: "12px" }}>
-            {filteredNotes.map((note, i) => (
-              <div
-                key={note.path}
-                style={{ breakInside: "avoid", marginBottom: "12px" }}
-              >
-                <button
-                  type="button"
-                  onClick={() => void handleOpenNote(note)}
-                  className="w-full overflow-hidden rounded-[16px] border border-border bg-card text-left transition-all hover:shadow-md"
+            {filteredNotes.map((note) => (
+              <div key={note.path} style={{ breakInside: "avoid", marginBottom: "12px" }}>
+                <div
+                  className="group overflow-hidden rounded-[16px] border border-border bg-card transition-all hover:shadow-md"
                   style={{ boxShadow: "0 2px 10px var(--primary-tint)" }}
                 >
-                  {/* Gradient header strip */}
-                  <div
-                    className="flex h-[52px] items-center justify-between px-3.5"
-                    style={{ background: "var(--primary)" }}
+                  {/* Card header strip */}
+                  <button
+                    type="button"
+                    onClick={() => void handleOpenNote(note)}
+                    className="w-full text-left"
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-[8px]"
-                        style={{ background: "rgba(255,255,255,0.22)" }}>
-                        <FileText className="h-3.5 w-3.5 text-white" />
+                    <div
+                      className="flex h-[52px] items-center justify-between px-3.5"
+                      style={{ background: "var(--primary)" }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="flex h-7 w-7 items-center justify-center rounded-[8px]"
+                          style={{ background: "rgba(255,255,255,0.20)" }}
+                        >
+                          <FileText className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span className="text-[11px] font-bold text-white opacity-80">Note</span>
                       </div>
-                      <span className="text-[11px] font-bold text-white opacity-80">Note</span>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => void handleDeleteNote(note, e)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            void handleDeleteNote(note, e as unknown as React.MouseEvent);
+                          }
+                        }}
+                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-[8px] opacity-0 transition-opacity group-hover:opacity-100"
+                        style={{ background: "rgba(255,255,255,0.20)" }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-white" />
+                      </div>
                     </div>
-                  </div>
-                  {/* Card content */}
-                  <div className="px-3.5 py-3">
-                    <div className="truncate text-[13px] font-bold text-foreground">
+                  </button>
+
+                  {/* Card body */}
+                  <button
+                    type="button"
+                    onClick={() => void handleOpenNote(note)}
+                    className="w-full px-3.5 pb-3 pt-2.5 text-left"
+                  >
+                    <div className="truncate text-[13.5px] font-extrabold text-foreground">
                       {stripMdSuffix(note.fileName)}
                     </div>
-                    <div className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground">
-                      <div>{formatBytes(note.sizeBytes)}</div>
-                      <div>{formatDate(note.lastModifiedMs)}</div>
+                    {notePreviews[note.path] && (
+                      <p
+                        className="mt-1.5 text-[11.5px] leading-relaxed text-muted-foreground"
+                        style={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 4,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {notePreviews[note.path]}
+                      </p>
+                    )}
+                    <div className="mt-2.5 flex items-center justify-between">
+                      <span className="text-[10.5px] text-muted-foreground">
+                        {formatDate(note.lastModifiedMs)}
+                      </span>
+                      <span className="text-[10.5px] text-muted-foreground">
+                        {formatBytes(note.sizeBytes)}
+                      </span>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                </div>
               </div>
             ))}
           </div>

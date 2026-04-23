@@ -4,14 +4,13 @@ import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
 import type { HistoryEntry } from "@/types/history";
 import { historyApiService } from "@/services/history-api-service";
 import { fileSearchApiService } from "@/services/file-search-api-service";
+import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
-import { useAutomationStore } from "@/stores/use-automation-store";
 import type { FileSearchResultItem } from "@/types/domain";
 import {
   Sparkles, Folder, FileText, DollarSign, BookOpen, History,
-  FileEdit, CalendarDays, Settings, ScanSearch, Search, X, Zap,
+  Search, X, Zap,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const PRIMARY_BG = "var(--primary)";
 const SECONDARY_BG = "var(--secondary)";
@@ -49,13 +48,23 @@ export function DashboardPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchSubmitted, setSearchSubmitted] = useState(false);
   const [showDrop, setShowDrop] = useState(false);
-  const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+  const [activeCard, setActiveCard] = useState(0);
+  const [catFileCounts, setCatFileCounts] = useState<Record<string, number>>({});
   const searchRef = useRef<HTMLDivElement>(null);
 
   const categories = useCategoryManagementStore((state) => state.categories);
   const activeCategories = categories.filter((c) => c.enabled);
-  const watchedFolders = useAutomationStore((state) => state.watchedFolders);
-  const isAutomationRunning = useAutomationStore((state) => state.isRunning);
+
+  const loadCatCounts = useCallback(async () => {
+    const enabled = categories.filter((c) => c.enabled && c.folderPath.trim().length > 0);
+    const counts = await Promise.all(
+      enabled.map(async (cat) => {
+        const files = await tauriClient.readFolder({ folderPath: cat.folderPath }).catch(() => [] as string[]);
+        return [cat.id, files.length] as const;
+      }),
+    );
+    setCatFileCounts(Object.fromEntries(counts));
+  }, [categories]);
 
   const loadRecentHistory = useCallback(async () => {
     try {
@@ -71,10 +80,11 @@ export function DashboardPage() {
 
   useEffect(() => {
     void loadRecentHistory();
-    const onHistoryUpdated = () => { void loadRecentHistory(); };
+    void loadCatCounts();
+    const onHistoryUpdated = () => { void loadRecentHistory(); void loadCatCounts(); };
     window.addEventListener("klin:history-updated", onHistoryUpdated);
     return () => { window.removeEventListener("klin:history-updated", onHistoryUpdated); };
-  }, [loadRecentHistory]);
+  }, [loadRecentHistory, loadCatCounts]);
 
   // Close search dropdown on click outside
   useEffect(() => {
@@ -115,14 +125,6 @@ export function DashboardPage() {
   };
 
   const displayCats = activeCategories.slice(0, 4);
-
-  const quickActions = [
-    { lbl: "Scan", icon: ScanSearch, to: null },
-    { lbl: "History", icon: History, to: "/history" },
-    { lbl: "Notes", icon: FileEdit, to: "/notes" },
-    { lbl: "Calendar", icon: CalendarDays, to: "/calendar" },
-    { lbl: "Settings", icon: Settings, to: "/settings" },
-  ];
 
   return (
     <div className="flex h-full flex-col gap-5 overflow-hidden">
@@ -218,7 +220,7 @@ export function DashboardPage() {
         >
           {displayCats.map((cat, i) => {
             const IconComp = catIcons[i % catIcons.length];
-            const isActive = hoveredCard !== null ? hoveredCard === i : i === 0;
+            const isActive = activeCard === i;
             const bg = isActive ? PRIMARY_BG : PRIMARY_FG;
             const fg = isActive ? PRIMARY_FG : SECONDARY_FG;
             const iconBg = isActive ? "rgba(255,255,255,0.18)" : "var(--primary-soft)";
@@ -233,17 +235,17 @@ export function DashboardPage() {
                   boxShadow: isActive ? "0 4px 16px var(--primary-border)" : "0 2px 10px var(--primary-tint)",
                 }}
                 onClick={() => navigate("/settings")}
-                onMouseEnter={() => setHoveredCard(i)}
-                onMouseLeave={() => setHoveredCard(null)}
+                onMouseEnter={() => setActiveCard(i)}
               >
                 <div className="mb-3 flex h-[34px] w-[34px] items-center justify-center rounded-[10px]"
                   style={{ background: iconBg, transition: "background 0.2s ease" }}>
                   <IconComp className="h-4 w-4" style={{ color: fg }} />
                 </div>
                 <div className="text-[26px] font-extrabold leading-none" style={{ letterSpacing: "-1px" }}>
-                  {i + 1}
+                  {catFileCounts[cat.id] ?? "—"}
                 </div>
-                <div className="mt-1 truncate text-[11.5px] font-bold opacity-90">{cat.name}</div>
+                <div className="mt-0.5 text-[10px] font-semibold opacity-60">files</div>
+                <div className="mt-2 truncate text-[11.5px] font-bold opacity-90">{cat.name}</div>
                 <div className="mt-0.5 text-[10px] opacity-60">{cat.description || "AI organized"}</div>
               </div>
             );
@@ -274,18 +276,6 @@ export function DashboardPage() {
                   AI Active
                 </span>
               </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {quickActions.map((q) => (
-                <button
-                  key={q.lbl}
-                  onClick={() => { if (q.to) navigate(q.to); }}
-                  className="flex items-center gap-1.5 rounded-[9px] border border-border bg-muted/60 px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
-                >
-                  <q.icon className="h-3 w-3" />
-                  {q.lbl}
-                </button>
-              ))}
             </div>
           </div>
 

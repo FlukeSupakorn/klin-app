@@ -1,17 +1,21 @@
 import { ArrowRight, ChevronDown, Clock, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { findCategoryColor } from "@/lib/category-utils";
-import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import type { HistoryEntry } from "@/types/history";
 import { HistoryCalendarDetails } from "@/features/history/history-calendar-details";
 import { HistoryOrganizeDetails } from "@/features/history/history-organize-details";
 import { HistorySummaryDetails } from "@/features/history/history-summary-details";
 import { formatTime, getFolderTail } from "@/features/history/history-utils";
 
-const ENTRY_COLORS: Record<string, string> = {
+const ENTRY_BG: Record<string, string> = {
   organize: "var(--primary)",
-  summary: "var(--purple)",
-  calendar: "var(--success)",
+  summary: "var(--secondary)",
+  calendar: "var(--primary)",
+};
+
+const ENTRY_FG: Record<string, string> = {
+  organize: "var(--primary-foreground)",
+  summary: "var(--secondary-foreground)",
+  calendar: "var(--primary-foreground)",
 };
 
 function confColor(c: number): string {
@@ -33,16 +37,14 @@ export function HistoryEntryCard({
   onRequestEditMovedTo,
   onOpenSummary,
 }: HistoryEntryCardProps) {
-  const categories = useCategoryManagementStore((state) => state.categories);
-
   const organizeEntry = entry.type === "organize" ? entry : null;
   const calendarEntry = entry.type === "calendar" ? entry : null;
 
   const topCategoryName = organizeEntry?.scores[0]?.name ?? "";
   const topCategoryScore = Math.round((organizeEntry?.scores[0]?.score ?? 0) * 100);
-  const topCategoryColor = findCategoryColor(topCategoryName, categories);
 
-  const grad = topCategoryColor ?? ENTRY_COLORS[entry.type] ?? ENTRY_COLORS.organize;
+  const grad = ENTRY_BG[entry.type] ?? ENTRY_BG.organize;
+  const gradFg = ENTRY_FG[entry.type] ?? ENTRY_FG.organize;
 
   const fileName = organizeEntry?.oldName ?? (calendarEntry?.meetingTitle ?? entry.title);
   const fromFolder = organizeEntry ? getFolderTail(organizeEntry.fromPath) : null;
@@ -70,7 +72,7 @@ export function HistoryEntryCard({
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
               style={{ background: grad }}
             >
-              <FileText className="h-[17px] w-[17px] text-white" />
+              <FileText className="h-[17px] w-[17px]" style={{ color: gradFg }} />
             </div>
 
             {/* Main content */}
