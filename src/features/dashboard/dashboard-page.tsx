@@ -22,7 +22,7 @@ const searchResultGrads = [
   "var(--primary)",
   "var(--success)",
   "var(--warning)",
-  "#8b5cf6",
+  "var(--purple)",
 ];
 
 const catIcons = [Sparkles, BookOpen, DollarSign, Folder, FileText, FileEdit];

@@ -3,14 +3,14 @@ import { Link } from "react-router-dom";
 import type { HistoryEntry } from "@/types/history";
 import { formatTime, getFolderTail } from "@/features/history/history-utils";
 
-const ENTRY_GRADIENTS: Record<string, string> = {
-  organize: "linear-gradient(135deg,#4a7cf7,#7c3aed)",
-  summary: "linear-gradient(135deg,#8b5cf6,#6d28d9)",
-  calendar: "linear-gradient(135deg,#10b981,#0891b2)",
+const ENTRY_COLORS: Record<string, string> = {
+  organize: "var(--primary)",
+  summary: "var(--purple)",
+  calendar: "var(--success)",
 };
 
 function confColor(c: number): string {
-  return c >= 80 ? "#10b981" : c >= 65 ? "#d97706" : "#ef4444";
+  return c >= 80 ? "var(--success)" : c >= 65 ? "var(--warning)" : "var(--destructive)";
 }
 
 interface RecentMovementsSectionProps {
@@ -28,7 +28,7 @@ export function RecentMovementsSection({ recentEntries, onOpenEntry }: RecentMov
   return (
     <div
       className="overflow-hidden rounded-[18px] border border-border bg-card"
-      style={{ boxShadow: "0 2px 14px rgba(74,124,247,0.07)" }}
+      style={{ boxShadow: "var(--shadow-xs)" }}
     >
       <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
         <div>
@@ -50,7 +50,7 @@ export function RecentMovementsSection({ recentEntries, onOpenEntry }: RecentMov
           </div>
         ) : (
           recentEntries.map((entry) => {
-            const grad = ENTRY_GRADIENTS[entry.type] ?? ENTRY_GRADIENTS.organize;
+            const iconBg = ENTRY_COLORS[entry.type] ?? ENTRY_COLORS.organize;
             const organizeEntry = entry.type === "organize" ? entry : null;
             const conf = organizeEntry ? Math.round((organizeEntry.scores[0]?.score ?? 0) * 100) : 0;
             const fromFolder = organizeEntry ? getFolderTail(organizeEntry.fromPath) : null;
@@ -66,7 +66,7 @@ export function RecentMovementsSection({ recentEntries, onOpenEntry }: RecentMov
               >
                 <div
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
-                  style={{ background: grad }}
+                  style={{ background: iconBg }}
                 >
                   <FileText className="h-[15px] w-[15px] text-white" />
                 </div>
@@ -80,8 +80,8 @@ export function RecentMovementsSection({ recentEntries, onOpenEntry }: RecentMov
                       </span>
                       <ArrowRight className="h-2.5 w-2.5 shrink-0 text-primary" />
                       <span
-                        className="truncate text-[10.5px] font-bold"
-                        style={{ color: "#4a7cf7", maxWidth: 90 }}
+                        className="truncate text-[10.5px] font-bold text-primary"
+                        style={{ maxWidth: 90 }}
                       >
                         {topCat || toFolder}
                       </span>

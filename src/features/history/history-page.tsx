@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Search } from "lucide-react";
+import { History, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HistoryEntry, HistoryEntryType } from "@/types/history";
 import { tauriClient } from "@/services/tauri-client";
@@ -171,11 +171,17 @@ export function HistoryPage() {
     <div className="flex h-full flex-col gap-5">
       {/* Header row */}
       <div className="flex shrink-0 items-center gap-3">
-        <div className="flex-1">
-          <div className="text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">Activity</div>
-          <h1 className="mt-0.5 text-[21px] font-extrabold tracking-tight text-foreground" style={{ letterSpacing: "-0.4px" }}>
-            Activity History
-          </h1>
+        <div className="flex items-center gap-3 flex-1">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
+            style={{ background: "var(--primary)" }}>
+            <History className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <div className="text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">Activity</div>
+            <h1 className="text-[21px] font-extrabold tracking-tight text-foreground" style={{ letterSpacing: "-0.4px" }}>
+              Activity History
+            </h1>
+          </div>
         </div>
 
         {/* Search */}
@@ -205,10 +211,9 @@ export function HistoryPage() {
                 onClick={() => setTypeFilter(f.value)}
                 className={cn(
                   "rounded-[9px] px-3.5 py-1.5 text-[12.5px] font-bold transition-all",
-                  active
-                    ? "bg-primary text-white shadow-[0_3px_8px_rgba(74,124,247,0.25)]"
-                    : "text-muted-foreground hover:text-foreground",
+                  active ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground",
                 )}
+                style={active ? { boxShadow: "0 3px 8px var(--primary-glow)" } : {}}
               >
                 {f.label}
               </button>

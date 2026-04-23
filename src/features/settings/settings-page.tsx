@@ -572,7 +572,7 @@ export function SettingsPage() {
                 <div className="flex items-center gap-3">
                   <div
                     className="flex h-8 w-8 items-center justify-center rounded-[10px]"
-                    style={{ background: "#8b5cf6" }}
+                    style={{ background: "var(--purple)" }}
                   >
                     <ShieldCheck className="h-4 w-4 text-white" />
                   </div>
@@ -600,7 +600,7 @@ export function SettingsPage() {
               </div>
 
               <div className="flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold"
-                style={{ background: "rgba(139,92,246,0.10)", color: "#8b5cf6" }}>
+                style={{ background: "var(--purple-soft)", color: "var(--purple)" }}>
                 <ShieldCheck className="h-3.5 w-3.5" />
                 {lockedPaths.length} locked path{lockedPaths.length !== 1 ? "s" : ""} — blocked from AI
               </div>
@@ -617,7 +617,7 @@ export function SettingsPage() {
                   lockedPaths.map((p) => (
                     <div key={p}
                       className="flex items-center justify-between rounded-[10px] border border-border px-3 py-2.5 text-[12.5px]"
-                      style={{ background: "rgba(139,92,246,0.04)" }}>
+                      style={{ background: "var(--purple-tint)" }}>
                       <span className="min-w-0 truncate font-mono text-foreground" title={p}>{p}</span>
                       <button
                         type="button"

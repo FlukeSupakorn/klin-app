@@ -53,7 +53,7 @@ export function OrganizeFilesPanel() {
         >
           <Upload
             className="h-7 w-7"
-            style={{ color: workflow.isDraggingOver ? "#fff" : "var(--primary)" }}
+            style={{ color: workflow.isDraggingOver ? "var(--primary-foreground)" : "var(--primary)" }}
           />
         </div>
 

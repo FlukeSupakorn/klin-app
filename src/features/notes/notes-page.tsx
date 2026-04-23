@@ -52,14 +52,6 @@ function splitLockNotice(message: string): { summary: string; details: string[] 
   return { summary, details };
 }
 
-const noteGradients = [
-  "var(--primary)",
-  "var(--success)",
-  "var(--warning)",
-  "#8b5cf6",
-  "#f97316",
-  "#6366f1",
-];
 
 export function NotesPage() {
   const categories = useCategoryManagementStore((state) => state.categories);
@@ -425,7 +417,7 @@ export function NotesPage() {
               isLockWarningNotice
                 ? "border-amber-500/30 text-amber-700"
                 : "border-primary/20 text-primary")}
-            style={{ background: isLockWarningNotice ? "rgba(245,158,11,0.06)" : "var(--primary-tint)" }}
+            style={{ background: isLockWarningNotice ? "var(--warning-tint)" : "var(--primary-tint)" }}
           >
             <div className="flex items-start gap-2">
               {isLockWarningNotice && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
@@ -588,7 +580,7 @@ export function NotesPage() {
                   {/* Gradient header strip */}
                   <div
                     className="flex h-[52px] items-center justify-between px-3.5"
-                    style={{ background: noteGradients[i % noteGradients.length] }}
+                    style={{ background: "var(--primary)" }}
                   >
                     <div className="flex items-center gap-2">
                       <div className="flex h-7 w-7 items-center justify-center rounded-[8px]"

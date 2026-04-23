@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronDown, ChevronUp, Clock, FileText } from "lucide-react";
+import { ArrowRight, ChevronDown, Clock, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { findCategoryColor } from "@/lib/category-utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
@@ -10,7 +10,7 @@ import { formatTime, getFolderTail } from "@/features/history/history-utils";
 
 const ENTRY_COLORS: Record<string, string> = {
   organize: "var(--primary)",
-  summary: "#8b5cf6",
+  summary: "var(--purple)",
   calendar: "var(--success)",
 };
 

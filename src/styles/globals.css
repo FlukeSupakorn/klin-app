@@ -175,6 +175,15 @@
   /* Destructive tints */
   --destructive-tint: rgba(239, 68, 68, 0.06);
   --destructive-border: rgba(239, 68, 68, 0.20);
+  /* Status tints */
+  --success-tint: rgba(16, 185, 129, 0.08);
+  --warning-tint: rgba(245, 158, 11, 0.08);
+  /* Extended palette */
+  --purple: #8b5cf6;
+  --purple-tint: rgba(139, 92, 246, 0.08);
+  --purple-soft: rgba(139, 92, 246, 0.10);
+  --orange: #f97316;
+  --orange-tint: rgba(249, 115, 22, 0.08);
   --chart-1: #4a7cf7;
   --chart-2: #10b981;
   --chart-3: #f59e0b;
@@ -275,6 +284,8 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-purple: var(--purple);
+  --color-orange: var(--orange);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
