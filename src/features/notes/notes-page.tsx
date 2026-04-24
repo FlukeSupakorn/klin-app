@@ -87,6 +87,7 @@ export function NotesPage() {
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [showNoticeDetails, setShowNoticeDetails] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<NoteFileItem | null>(null);
 
   const filteredNotes = useMemo(() => {
     const q = notesSearch.trim().toLowerCase();
@@ -166,14 +167,20 @@ export function NotesPage() {
     openEditorForDraft(nextTitle, createTemplate(nextTitle));
   };
 
-  const handleDeleteNote = async (note: NoteFileItem, e: React.MouseEvent) => {
+  const handleDeleteNote = (note: NoteFileItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm(`Delete "${stripMdSuffix(note.fileName)}"?`)) return;
+    setDeleteTarget(note);
+  };
+
+  const confirmDeleteNote = async () => {
+    if (!deleteTarget) return;
     try {
-      await tauriClient.deleteFile(note.path);
+      await tauriClient.deleteFile(deleteTarget.path);
       await refreshNotes();
     } catch (error) {
       setNotesError(error instanceof Error ? error.message : "Failed to delete note");
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -569,7 +576,42 @@ export function NotesPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-5">
+    <>
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setDeleteTarget(null)} />
+          <div
+            className="relative w-[340px] overflow-hidden rounded-[20px] border border-border bg-card p-6"
+            style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}
+          >
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-[12px]"
+              style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+              <Trash2 className="h-5 w-5" style={{ color: "var(--destructive)" }} />
+            </div>
+            <div className="text-[15px] font-extrabold text-foreground">Delete note?</div>
+            <div className="mt-1 text-[12.5px] text-muted-foreground">
+              &ldquo;{stripMdSuffix(deleteTarget.fileName)}&rdquo; will be permanently removed.
+            </div>
+            <div className="mt-5 flex gap-2.5">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 rounded-[12px] border border-border bg-muted py-2.5 text-[13px] font-bold text-foreground transition-colors hover:bg-muted/70"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmDeleteNote()}
+                className="flex-1 rounded-[12px] py-2.5 text-[13px] font-bold text-white transition-opacity hover:opacity-90"
+                style={{ background: "var(--destructive)" }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="flex h-full flex-col gap-5">
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3">
         <div className="flex-1">
@@ -754,5 +796,6 @@ export function NotesPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
+import { DashboardPage } from "@/features/dashboard/dashboard-page";
+import { HistoryPage } from "@/features/history/history-page";
+import { CalendarPage } from "@/features/calendar/calendar-page";
+import { NotesPage } from "@/features/notes/notes-page";
+import { SettingsPage } from "@/features/settings/settings-page";
 import { listen } from "@tauri-apps/api/event";
 import {
   CalendarDays,
@@ -34,7 +39,29 @@ const mainNavItems = [
   { to: "/notes", label: "Notes", icon: FileText },
 ];
 
+const KEEP_ALIVE_PAGES = [
+  { path: "/", component: DashboardPage },
+  { path: "/history", component: HistoryPage },
+  { path: "/calendar", component: CalendarPage },
+  { path: "/notes", component: NotesPage },
+  { path: "/settings", component: SettingsPage },
+];
+
 export function AppShell() {
+  const location = useLocation();
+  const segments = location.pathname.split("/").filter(Boolean);
+  const currentPath = segments.length > 0 ? `/${segments[0]}` : "/";
+  const [mountedPaths, setMountedPaths] = useState(() => new Set([currentPath]));
+
+  useEffect(() => {
+    setMountedPaths((prev) => {
+      if (prev.has(currentPath)) return prev;
+      const next = new Set(prev);
+      next.add(currentPath);
+      return next;
+    });
+  }, [currentPath]);
+
   const initializeAuth = useAuthStore((state) => state.initialize);
   const profile = useAuthStore((state) => state.profile);
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
@@ -196,7 +223,7 @@ export function AppShell() {
             <span className="text-base font-extrabold tracking-tight text-foreground">KLIN</span>
           </div>
 
-          {/* Watcher gradient card */}
+          {/* Watcher card */}
           <div
             className="relative overflow-hidden rounded-[14px] p-3.5 text-white"
             style={{ background: "var(--primary)" }}
@@ -207,20 +234,16 @@ export function AppShell() {
             />
             <div className="text-[9.5px] font-extrabold uppercase tracking-widest opacity-80">Watcher</div>
             <div className="mt-0.5 text-xl font-extrabold leading-tight" style={{ letterSpacing: "-1px" }}>
-              {totalFiles} <span className="text-xs font-semibold opacity-80">files</span>
+              {watchedFolders.length} <span className="text-xs font-semibold opacity-80">folder{watchedFolders.length !== 1 ? "s" : ""}</span>
             </div>
-            <div className="mt-0.5 text-[10.5px] opacity-75">
-              {watchedFolders.length} folder{watchedFolders.length !== 1 ? "s" : ""} monitored
-            </div>
-            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.25)" }}>
+            <div className="mt-1.5 flex items-center gap-1.5">
               <div
-                className="h-full rounded-full"
-                style={{
-                  width: isAutomationRunning ? "70%" : "20%",
-                  background: "rgba(255,255,255,0.9)",
-                  transition: "width 0.4s ease",
-                }}
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: isAutomationRunning ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)" }}
               />
+              <div className="text-[10.5px] opacity-80">
+                Auto organize <span className="font-bold">{isAutomationRunning ? "on" : "off"}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -279,11 +302,7 @@ export function AppShell() {
           <div className="flex items-center gap-2.5">
             <div
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white"
-              style={{
-                background: profile?.picture
-                  ? undefined
-                  : "var(--primary)",
-              }}
+              style={{ background: profile?.picture ? undefined : "var(--primary)" }}
             >
               {profile?.picture ? (
                 <img
@@ -292,23 +311,34 @@ export function AppShell() {
                   referrerPolicy="no-referrer"
                   className="h-full w-full rounded-full object-cover"
                 />
-              ) : profileInitial}
+              ) : (
+                profile ? profileInitial : "K"
+              )}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[12px] font-bold text-foreground">
-                {profile?.name ?? "flukesupakorn"}
-              </div>
-              <div className="text-[10px] text-muted-foreground">
-                {isAutomationRunning ? "Watcher Active" : "Pro Plan"}
-              </div>
+              {profile ? (
+                <div className="truncate text-[12px] font-bold text-foreground">{profile.name}</div>
+              ) : (
+                <div className="truncate text-[12px] font-bold text-muted-foreground">Sign in</div>
+              )}
             </div>
           </div>
         </div>
       </aside>
 
-      {/* ─── Page content ─── */}
-      <main className="flex flex-1 flex-col overflow-hidden px-[26px] py-[26px] pb-[22px]">
-        <Outlet />
+      {/* ─── Page content — keep-alive: mount once, hide with display:none ─── */}
+      <main className="relative flex flex-1 overflow-hidden">
+        {KEEP_ALIVE_PAGES.map(({ path, component: Page }) =>
+          mountedPaths.has(path) ? (
+            <div
+              key={path}
+              className="flex h-full w-full flex-col overflow-hidden px-[26px] py-[26px] pb-[22px]"
+              style={{ display: currentPath === path ? "flex" : "none" }}
+            >
+              <Page />
+            </div>
+          ) : null,
+        )}
       </main>
 
       <GlobalOrganizeResumeBubble />

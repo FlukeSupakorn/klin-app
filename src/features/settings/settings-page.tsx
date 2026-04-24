@@ -30,7 +30,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
 import { BatchCategoryModal } from "@/features/categories/batch-category-modal";
 import {
   CATEGORY_ICON_OPTIONS,
@@ -1145,8 +1144,6 @@ export function SettingsPage() {
         />
       )}
 
-      {/* Keep SettingsManagementDialogs available for other uses (e.g. organize panel) */}
-      <SettingsManagementDialogs open={false} sections={[]} onClose={() => undefined} />
     </div>
   );
 }

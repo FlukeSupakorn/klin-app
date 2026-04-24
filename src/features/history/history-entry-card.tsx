@@ -8,13 +8,13 @@ import { formatTime, getFolderTail } from "@/features/history/history-utils";
 
 const ENTRY_BG: Record<string, string> = {
   organize: "var(--primary)",
-  summary: "var(--secondary)",
+  summary: "var(--secondary-foreground)",
   calendar: "var(--primary)",
 };
 
 const ENTRY_FG: Record<string, string> = {
   organize: "var(--primary-foreground)",
-  summary: "var(--secondary-foreground)",
+  summary: "#fff",
   calendar: "var(--primary-foreground)",
 };
 
@@ -149,7 +149,7 @@ export function HistoryEntryCard({
       {isExpanded && (
         <div
           className="border-t border-border px-5 py-4"
-          style={{ background: "var(--primary-tint)", animation: "klin-fade-in 0.2s ease" }}
+          style={{ background: "var(--card)", animation: "klin-fade-in 0.2s ease" }}
         >
           {entry.type === "organize" && (
             <HistoryOrganizeDetails entry={entry} onRequestEditMovedTo={onRequestEditMovedTo} />

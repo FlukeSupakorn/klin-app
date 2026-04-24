@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
 import type { HistoryEntry } from "@/types/history";
@@ -8,9 +8,9 @@ import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import type { FileSearchResultItem } from "@/types/domain";
 import {
-  Sparkles, Folder, FileText, DollarSign, BookOpen, History,
-  Search, X, Zap,
+  Folder, FileText, History, Search, X, Zap,
 } from "lucide-react";
+import { getCategoryIcon, withAlpha } from "@/features/categories/category-appearance";
 
 const PRIMARY_BG = "var(--primary)";
 const SECONDARY_BG = "var(--secondary)";
@@ -23,8 +23,6 @@ const searchResultGrads = [
   "var(--warning)",
   "var(--purple)",
 ];
-
-const catIcons = [Sparkles, BookOpen, DollarSign, Folder, FileText, Zap];
 
 function getHourGreeting() {
   const h = new Date().getHours();
@@ -48,23 +46,45 @@ export function DashboardPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchSubmitted, setSearchSubmitted] = useState(false);
   const [showDrop, setShowDrop] = useState(false);
-  const [activeCard, setActiveCard] = useState(0);
   const [catFileCounts, setCatFileCounts] = useState<Record<string, number>>({});
+  const [catPage, setCatPage] = useState(0);
+  const [hoverLeft, setHoverLeft] = useState(false);
+  const [hoverRight, setHoverRight] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   const categories = useCategoryManagementStore((state) => state.categories);
-  const activeCategories = categories.filter((c) => c.enabled);
+  const categoriesRef = useRef(categories);
+  categoriesRef.current = categories;
+
+  const enabledCats = useMemo(
+    () => categories.filter((c) => c.enabled && c.folderPath.trim().length > 0),
+    [categories],
+  );
 
   const loadCatCounts = useCallback(async () => {
-    const enabled = categories.filter((c) => c.enabled && c.folderPath.trim().length > 0);
-    const counts = await Promise.all(
+    const enabled = categoriesRef.current.filter((c) => c.enabled && c.folderPath.trim().length > 0);
+    if (enabled.length === 0) return;
+    const results = await Promise.all(
       enabled.map(async (cat) => {
         const files = await tauriClient.readFolder({ folderPath: cat.folderPath }).catch(() => [] as string[]);
         return [cat.id, files.length] as const;
       }),
     );
-    setCatFileCounts(Object.fromEntries(counts));
-  }, [categories]);
+    setCatFileCounts(Object.fromEntries(results));
+  }, []);
+
+  const sortedCats = useMemo(
+    () => [...enabledCats].sort((a, b) => (catFileCounts[b.id] ?? -1) - (catFileCounts[a.id] ?? -1)),
+    [enabledCats, catFileCounts],
+  );
+
+  const displayCats = useMemo(
+    () => sortedCats.slice(catPage * 4, catPage * 4 + 4),
+    [sortedCats, catPage],
+  );
+
+  const hasNextPage = (catPage + 1) * 4 < sortedCats.length;
+  const hasPrevPage = catPage > 0;
 
   const loadRecentHistory = useCallback(async () => {
     try {
@@ -123,8 +143,6 @@ export function DashboardPage() {
   const handleOpenRecentHistoryEntry = (entryId: string) => {
     navigate("/history", { state: { expandedEntryId: entryId } });
   };
-
-  const displayCats = activeCategories.slice(0, 4);
 
   return (
     <div className="flex h-full flex-col gap-5 overflow-hidden">
@@ -213,43 +231,106 @@ export function DashboardPage() {
       </div>
 
       {/* Category stat cards */}
-      {displayCats.length > 0 && (
-        <div
-          className="grid shrink-0 gap-3.5"
-          style={{ gridTemplateColumns: `repeat(${Math.min(displayCats.length, 4)}, 1fr)` }}
-        >
-          {displayCats.map((cat, i) => {
-            const IconComp = catIcons[i % catIcons.length];
-            const isActive = activeCard === i;
-            const bg = isActive ? PRIMARY_BG : PRIMARY_FG;
-            const fg = isActive ? PRIMARY_FG : SECONDARY_FG;
-            const iconBg = isActive ? "rgba(255,255,255,0.18)" : "var(--primary-soft)";
-            return (
-              <div
-                key={cat.id}
-                className="cursor-pointer rounded-[18px] px-5 py-[18px]"
+      {enabledCats.length > 0 && (
+        <div className="relative shrink-0">
+          {/* Cards grid — shifts inward only when hovering the edge zones */}
+          <div
+            className="grid gap-3.5 transition-[margin] duration-200"
+            style={{
+              gridTemplateColumns: `repeat(${Math.min(displayCats.length, 4)}, 1fr)`,
+              marginLeft: hoverLeft && hasPrevPage ? 44 : 0,
+              marginRight: hoverRight && hasNextPage ? 44 : 0,
+            }}
+          >
+            {displayCats.map((cat) => {
+              const CatIcon = getCategoryIcon(cat.icon);
+              return (
+                <div
+                  key={cat.id}
+                  className="group relative cursor-pointer overflow-hidden rounded-[18px] py-[18px] pl-[calc(5%+16px)] pr-5 transition-colors duration-150"
+                  style={{
+                    background: "var(--card)",
+                    border: "1.5px solid var(--border)",
+                    boxShadow: "var(--shadow-xs)",
+                  }}
+                  onClick={() => void tauriClient.openExternalUrl(cat.folderPath)}
+                >
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                    style={{ background: withAlpha(cat.color, "12"), borderRadius: "inherit" }}
+                  />
+                  <div
+                    className="absolute inset-y-0 left-0 w-[5%] rounded-l-[16px]"
+                    style={{ background: cat.color }}
+                  />
+                  <div
+                    className="mb-3 flex h-[36px] w-[36px] items-center justify-center rounded-[11px]"
+                    style={{
+                      background: withAlpha(cat.color, "18"),
+                      border: `1px solid ${withAlpha(cat.color, "30")}`,
+                    }}
+                  >
+                    <CatIcon className="h-4 w-4" style={{ color: cat.color }} />
+                  </div>
+                  {/* File count */}
+                  <div className="text-[28px] font-extrabold leading-none text-foreground" style={{ letterSpacing: "-1.5px" }}>
+                    {catFileCounts[cat.id] ?? "—"}
+                  </div>
+                  <div className="mt-0.5 text-[10px] font-semibold text-muted-foreground">files</div>
+                  {/* Name */}
+                  <div className="mt-3 truncate text-[13px] font-bold" style={{ color: cat.color }}>
+                    {cat.name}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Left edge hover zone + prev arrow */}
+          {hasPrevPage && (
+            <div
+              className="absolute inset-y-0 left-0 w-10 z-10"
+              onMouseEnter={() => setHoverLeft(true)}
+              onMouseLeave={() => setHoverLeft(false)}
+            >
+              <button
+                onClick={() => setCatPage((p) => p - 1)}
+                className="absolute left-0 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-[12px] transition-all duration-200"
                 style={{
-                  background: bg,
-                  color: fg,
-                  transition: "background 0.2s ease, color 0.2s ease",
-                  boxShadow: isActive ? "0 4px 16px var(--primary-border)" : "0 2px 10px var(--primary-tint)",
+                  opacity: hoverLeft ? 1 : 0,
+                  background: "var(--card)",
+                  border: "1.5px solid var(--border)",
+                  boxShadow: "var(--shadow-xs)",
+                  color: "var(--foreground)",
                 }}
-                onClick={() => navigate("/settings")}
-                onMouseEnter={() => setActiveCard(i)}
               >
-                <div className="mb-3 flex h-[34px] w-[34px] items-center justify-center rounded-[10px]"
-                  style={{ background: iconBg, transition: "background 0.2s ease" }}>
-                  <IconComp className="h-4 w-4" style={{ color: fg }} />
-                </div>
-                <div className="text-[26px] font-extrabold leading-none" style={{ letterSpacing: "-1px" }}>
-                  {catFileCounts[cat.id] ?? "—"}
-                </div>
-                <div className="mt-0.5 text-[10px] font-semibold opacity-60">files</div>
-                <div className="mt-2 truncate text-[11.5px] font-bold opacity-90">{cat.name}</div>
-                <div className="mt-0.5 text-[10px] opacity-60">{cat.description || "AI organized"}</div>
-              </div>
-            );
-          })}
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+          )}
+
+          {/* Right edge hover zone + next arrow */}
+          {hasNextPage && (
+            <div
+              className="absolute inset-y-0 right-0 w-10 z-10"
+              onMouseEnter={() => setHoverRight(true)}
+              onMouseLeave={() => setHoverRight(false)}
+            >
+              <button
+                onClick={() => setCatPage((p) => p + 1)}
+                className="absolute right-0 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-[12px] transition-all duration-200"
+                style={{
+                  opacity: hoverRight ? 1 : 0,
+                  background: "var(--card)",
+                  border: "1.5px solid var(--border)",
+                  boxShadow: "var(--shadow-xs)",
+                  color: "var(--foreground)",
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+          )}
         </div>
       )}
 

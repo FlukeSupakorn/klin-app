@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { AppSkeleton } from "@/components/layout/app-skeleton";
 
 const SKIP_ONBOARDING = import.meta.env.VITE_SKIP_ONBOARDING === "true";
 
@@ -61,11 +61,7 @@ export function OnboardingGuard() {
   }, []);
 
   if (status === "loading") {
-    return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <AppSkeleton />;
   }
 
   if (status === "onboarding") {
