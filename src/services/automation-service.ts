@@ -5,7 +5,7 @@ import { useCategoryManagementStore } from "@/stores/use-category-management-sto
 import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 import { normalizePath } from "@/lib/path-utils";
-import type { AutomationJob, AutomationLog } from "@/types/domain";
+import type { AutomationJob, AutomationLog, ManagedCategory } from "@/types/domain";
 
 export async function processAutomationJob(job: AutomationJob): Promise<void> {
   const start = performance.now();
@@ -49,7 +49,6 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
       };
 
       useHistoryStore.getState().appendLog(failedLog);
-      await tauriClient.writeHistory({ log: failedLog });
       return;
     }
 
@@ -59,6 +58,26 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
         sourcePath: analyzed.currentPath,
         destinationPath: analyzed.destinationPath,
       });
+
+      // Record the confirmed move in klin-worker so it appears in history as action="moved"
+      if (analyzed.workerFileId) {
+        const matchedCategory = enabledCategories.find(
+          (cat: ManagedCategory) => cat.name === analyzed.selectedCategory,
+        );
+        if (matchedCategory) {
+          await organizeApiService
+            .applyDecision({
+              fileId: analyzed.workerFileId,
+              selectedName: null,
+              selectedCategory: {
+                id: matchedCategory.id,
+                name: matchedCategory.name,
+                score: topScore.score,
+              },
+            })
+            .catch(() => undefined);
+        }
+      }
     }
 
     const log: AutomationLog = {
@@ -76,7 +95,6 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
     };
 
     useHistoryStore.getState().appendLog(log);
-    await tauriClient.writeHistory({ log });
     window.dispatchEvent(new Event("klin:history-updated"));
   } catch (error) {
     const processingTimeMs = Math.round(performance.now() - start);
@@ -96,6 +114,5 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
     };
 
     useHistoryStore.getState().appendLog(failedLog);
-    await tauriClient.writeHistory({ log: failedLog }).catch(() => undefined);
   }
 }
