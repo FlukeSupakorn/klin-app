@@ -214,6 +214,9 @@ export async function runStartupChecks(): Promise<StartupCheckResult> {
     }
 
     if (await probeSlotHealth(CHAT_SLOT_HEALTH_URL_CANDIDATES)) {
+      // HTTP /health is 200 — wait for the Tauri warmup command to finish too so
+      // the Rust phase is definitively Running before the user can trigger organize.
+      await warmupChatPromise.catch(() => undefined);
       chatHealthy = true;
       break;
     }

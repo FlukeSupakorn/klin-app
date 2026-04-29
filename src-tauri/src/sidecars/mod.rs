@@ -20,8 +20,8 @@ use tauri_plugin_shell::process::CommandChild;
 
 pub use klin_worker::spawn_klin_worker;
 pub use llama_server::{
-    ensure_slot_running, spawn_idle_timeout_task_for_slot, stop_slot, touch_slot_last_used,
-    LlamaSlotState, ModelSlot,
+    ensure_slot_running, prime_inference_engine, spawn_idle_timeout_task_for_slot, stop_slot,
+    touch_slot_last_used, LlamaSlotState, ModelSlot,
 };
 
 // ── Shared utilities ───────────────────────────────────────────────────

@@ -40,9 +40,32 @@ pub fn warmup_chat_model<R: tauri::Runtime>(
     let chat_slot = state.slot(crate::sidecars::ModelSlot::Chat);
     tracing::info!("[startup] warming up Chat model (this may take 30-60 seconds)...");
 
-    // Simply ensure Chat is running — blocks until warmup complete or fails
+    // Blocks until the HTTP /health endpoint returns 200.
     crate::sidecars::ensure_slot_running(&app, chat_slot)?;
-    tracing::info!("[startup] Chat model ready!");
+    tracing::info!("[startup] Chat model server ready — priming inference engine...");
 
+    // The first real /chat/completions call on a freshly-loaded model (especially
+    // VL models like Qwen2.5-VL) often fails because the inference context and
+    // KV-cache are not allocated until the first request hits them.  Send a
+    // minimal test completion here, with up to 3 attempts, so the user's first
+    // organize request is never the cold-start failure.
+    for attempt in 0..3u32 {
+        if crate::sidecars::prime_inference_engine(&chat_slot.slot) {
+            tracing::info!("[startup] Chat inference engine primed and ready.");
+            return Ok(());
+        }
+        if attempt < 2 {
+            tracing::info!(
+                "[startup] Inference prime attempt {} failed — retrying in 3s...",
+                attempt + 1
+            );
+            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
+    }
+
+    // Three attempts failed.  Log a warning but don't error — the Tauri
+    // health check passed so the server is up; the first user request may
+    // still succeed depending on the model/platform.
+    tracing::warn!("[startup] Inference engine priming failed after 3 attempts. First organize may fail.");
     Ok(())
 }

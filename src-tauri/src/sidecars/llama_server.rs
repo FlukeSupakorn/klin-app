@@ -174,6 +174,50 @@ fn tcp_probe_timeout() -> Duration {
     }
 }
 
+/// Send a minimal POST /v1/chat/completions to trigger the inference engine's
+/// first-time context initialization.  Returns true if the server responded
+/// with a 2xx, false on any error or non-2xx (including 503 "loading").
+///
+/// The very first inference call on llama-server (especially VL models) often
+/// fails because the KV-cache and inference context are not allocated until
+/// the first request. Calling this during warmup "sacrifices" the cold-start
+/// failure so the user never sees it.
+pub fn prime_inference_engine(slot: &ModelSlot) -> bool {
+    let addr = slot_socket_addr(slot);
+    let label = slot.label();
+    let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(500)) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!("[llama-server][{}][prime] connect failed: {}", label, e);
+            return false;
+        }
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(5)));
+    let body = r#"{"messages":[{"role":"user","content":"Hi"}],"max_tokens":1}"#;
+    let request = format!(
+        "POST /v1/chat/completions HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        addr,
+        body.len(),
+        body
+    );
+    if stream.write_all(request.as_bytes()).is_err() {
+        return false;
+    }
+    let mut response = String::new();
+    if stream.read_to_string(&mut response).is_err() {
+        return false;
+    }
+    let ok = response.starts_with("HTTP/1.1 2") || response.starts_with("HTTP/1.0 2");
+    if ok {
+        tracing::info!("[llama-server][{}][prime] inference engine ready", label);
+    } else {
+        let status = response.lines().next().unwrap_or("(no response)");
+        tracing::info!("[llama-server][{}][prime] attempt returned: {}", label, status);
+    }
+    ok
+}
+
 fn is_slot_ready(slot: &ModelSlot) -> bool {
     TcpStream::connect_timeout(&slot_socket_addr(slot), tcp_probe_timeout()).is_ok()
 }
