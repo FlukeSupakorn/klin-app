@@ -57,4 +57,8 @@ impl FileService {
     pub fn list_all_subdirectories(path: String) -> Result<Vec<String>, String> {
         fs_ops::list_all_subdirectories(PathBuf::from(path).as_path())
     }
+
+    pub fn ensure_category_folders(paths: Vec<String>) -> Result<(), String> {
+        fs_ops::ensure_category_folders(paths)
+    }
 }

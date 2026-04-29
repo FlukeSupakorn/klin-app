@@ -79,6 +79,29 @@ pub fn list_all_subdirectories(path: &Path) -> Result<Vec<String>, String> {
     Ok(result)
 }
 
+pub fn ensure_category_folders(paths: Vec<String>) -> Result<(), String> {
+    let mut created = 0u32;
+    for path in &paths {
+        let p = Path::new(path);
+        if p.exists() {
+            continue;
+        }
+        match std::fs::create_dir_all(p) {
+            Ok(()) => {
+                tracing::info!("[startup] created category folder: {}", path);
+                created += 1;
+            }
+            Err(e) => {
+                tracing::warn!("[startup] could not create category folder {}: {}", path, e);
+            }
+        }
+    }
+    if created > 0 {
+        tracing::info!("[startup] ensure_category_folders: {} folder(s) created", created);
+    }
+    Ok(())
+}
+
 fn collect_subdirs_recursive(dir: &Path, result: &mut Vec<String>) {
     if let Ok(entries) = std::fs::read_dir(dir) {
         let mut sorted: Vec<_> = entries.filter_map(Result::ok).collect();

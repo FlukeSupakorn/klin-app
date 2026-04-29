@@ -89,6 +89,12 @@ export function HistoryPage() {
   useEffect(() => { void loadHistoryPage(true); }, [debouncedSearch]);
 
   useEffect(() => {
+    const onHistoryUpdated = () => { void loadHistoryPage(true); };
+    window.addEventListener("klin:history-updated", onHistoryUpdated);
+    return () => { window.removeEventListener("klin:history-updated", onHistoryUpdated); };
+  }, [loadHistoryPage]);
+
+  useEffect(() => {
     const target = loadMoreRef.current;
     if (!target || !hasMore || isLoading || isLoadingMore) return;
     const observer = new IntersectionObserver(

@@ -5,6 +5,7 @@ import type { HistoryEntry } from "@/types/history";
 import { historyApiService } from "@/services/history-api-service";
 import { fileSearchApiService } from "@/services/file-search-api-service";
 import { tauriClient } from "@/services/tauri-client";
+import { normalizeOsPath } from "@/lib/path-utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import type { FileSearchResultItem } from "@/types/domain";
 import {
@@ -12,10 +13,16 @@ import {
 } from "lucide-react";
 import { getCategoryIcon, withAlpha } from "@/features/categories/category-appearance";
 
-const PRIMARY_BG = "var(--primary)";
-const SECONDARY_BG = "var(--secondary)";
-const PRIMARY_FG = "var(--primary-foreground)";
-const SECONDARY_FG = "var(--secondary-foreground)";
+const ENTRY_TYPE_BG: Record<string, string> = {
+  organize: "var(--primary)",
+  summary: "var(--purple)",
+  calendar: "var(--success)",
+};
+const ENTRY_TYPE_FG: Record<string, string> = {
+  organize: "var(--primary-foreground)",
+  summary: "#fff",
+  calendar: "#fff",
+};
 
 const searchResultGrads = [
   "var(--primary)",
@@ -253,7 +260,7 @@ export function DashboardPage() {
                     border: "1.5px solid var(--border)",
                     boxShadow: "var(--shadow-xs)",
                   }}
-                  onClick={() => void tauriClient.openExternalUrl(cat.folderPath)}
+                  onClick={() => void tauriClient.openExternalUrl(normalizeOsPath(cat.folderPath))}
                 >
                   <div
                     className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
@@ -392,8 +399,8 @@ export function DashboardPage() {
               </div>
             ) : (
               recentHistoryEntries.map((entry, i) => {
-                const iconBg = i % 2 === 0 ? PRIMARY_BG : SECONDARY_BG;
-                const iconFg = i % 2 === 0 ? PRIMARY_FG : SECONDARY_FG;
+                const iconBg = ENTRY_TYPE_BG[entry.type] ?? "var(--primary)";
+                const iconFg = ENTRY_TYPE_FG[entry.type] ?? "var(--primary-foreground)";
                 const name = entry.type === "organize" ? entry.oldName : entry.title;
                 const cat = entry.type === "organize" ? (entry.scores[0]?.name ?? "Unknown") : entry.type;
                 const conf = entry.type === "organize" ? Math.round((entry.scores[0]?.score ?? 0) * 100) : 0;

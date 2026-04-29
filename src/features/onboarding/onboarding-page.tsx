@@ -13,6 +13,7 @@ import { categoryManagementService } from "@/services/category-management-servic
 import { tauriClient } from "@/services/tauri-client";
 import { markOnboardingCompletedInSession } from "./onboarding-guard";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
+import { joinFolderPath } from "@/lib/path-utils";
 import type { ManagedCategory } from "@/types/domain";
 
 const STEP_ORDER: OnboardingStep[] = [
@@ -139,7 +140,7 @@ export function OnboardingPage() {
           continue;
         }
 
-        const folderPath = `${state.basePath.replace(/[\/]+$/, "")}/${normalizedName}`;
+        const folderPath = joinFolderPath(state.basePath, normalizedName);
         const existing = backendByName.get(normalizedName.toLowerCase());
 
         if (!existing) {

@@ -48,3 +48,18 @@ export function joinPath(folder: string, fileName: string): string {
   const normalizedFolder = folder.replace(/\\/g, "/").replace(/\/$/, "");
   return `${normalizedFolder}/${fileName}`;
 }
+
+// Join a base folder path with a sub-name using the OS-native separator
+// detected from the base path itself (Windows drive letter → backslash, else forward slash).
+export function joinFolderPath(basePath: string, name: string): string {
+  const base = basePath.trim().replace(/[/\\]+$/, "");
+  const sep = /^[A-Za-z]:/.test(base) ? "\\" : "/";
+  return base ? `${base}${sep}${name.trim()}` : name.trim();
+}
+
+// Normalize path separators to match the OS convention inferred from the path.
+// Windows absolute paths start with a drive letter (e.g. C:\); all others use forward slashes.
+export function normalizeOsPath(p: string): string {
+  if (/^[A-Za-z]:/.test(p)) return p.replace(/\//g, "\\");
+  return p.replace(/\\/g, "/");
+}

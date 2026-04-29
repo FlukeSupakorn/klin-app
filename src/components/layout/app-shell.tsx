@@ -30,6 +30,7 @@ import { tauriClient } from "@/services/tauri-client";
 import { appClient } from "@/services/app-client";
 import { CloseAppModal } from "@/components/dialogs/close-app-modal";
 import { useAutomationStore } from "@/stores/use-automation-store";
+import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import klinLogo from "@/assets/klin-logo.svg";
 
 const mainNavItems = [
@@ -113,12 +114,25 @@ export function AppShell() {
     })();
   }, [initializeAuth]);
 
+  const foldersEnsuredRef = useRef(false);
+
   useEffect(() => {
     let disposed = false;
     const syncCategoriesFromWorker = () => {
       void categoryManagementService
         .refreshCategoriesFromWorker()
-        .then(() => { categoryManagementService.syncToAutomationStores(); })
+        .then(() => {
+          categoryManagementService.syncToAutomationStores();
+          if (!foldersEnsuredRef.current) {
+            foldersEnsuredRef.current = true;
+            const paths = useCategoryManagementStore.getState().categories
+              .filter((c) => c.enabled && c.folderPath.trim().length > 0)
+              .map((c) => c.folderPath);
+            if (paths.length > 0) {
+              void tauriClient.ensureCategoryFolders(paths).catch(() => undefined);
+            }
+          }
+        })
         .catch(() => undefined);
     };
     syncCategoriesFromWorker();

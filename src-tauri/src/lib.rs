@@ -288,6 +288,7 @@ pub fn run() {
             commands::pick_folders_for_batch,
             commands::list_subdirectories,
             commands::list_all_subdirectories,
+            commands::ensure_category_folders,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

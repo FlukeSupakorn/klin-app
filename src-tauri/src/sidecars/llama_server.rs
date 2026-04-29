@@ -11,7 +11,7 @@ use tauri_plugin_shell::ShellExt;
 
 use crate::infrastructure::runtime_env;
 
-const DEFAULT_IDLE_TIMEOUT_SECS: u64 = 60;
+const DEFAULT_IDLE_TIMEOUT_SECS: u64 = 600;
 const IDLE_POLL_INTERVAL_SECS: u64 = 30;
 
 // ── Model slot ───────────────────────────────────────────────────────
@@ -490,7 +490,7 @@ pub fn ensure_slot_running<R: tauri::Runtime>(
 
                 *slot.child.lock() = Some(child);
 
-                match wait_for_slot_ready(Duration::from_secs(60), &slot.phase, &slot.slot) {
+                match wait_for_slot_ready(Duration::from_secs(180), &slot.phase, &slot.slot) {
                     Ok(()) => {
                         let mut p = slot.phase.lock();
                         *p = LaunchPhase::Running;

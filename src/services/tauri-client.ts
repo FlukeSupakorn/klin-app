@@ -117,6 +117,10 @@ class TauriCommandClient implements TauriClient {
   listAllSubdirectories(path: string): Promise<string[]> {
     return invoke("list_all_subdirectories", { path });
   }
+
+  ensureCategoryFolders(paths: string[]): Promise<void> {
+    return invoke("ensure_category_folders", { paths });
+  }
 }
 
 export const tauriClient: TauriClient = new TauriCommandClient();

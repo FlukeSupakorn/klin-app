@@ -77,6 +77,7 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
 
     useHistoryStore.getState().appendLog(log);
     await tauriClient.writeHistory({ log });
+    window.dispatchEvent(new Event("klin:history-updated"));
   } catch (error) {
     const processingTimeMs = Math.round(performance.now() - start);
     const failedLog: AutomationLog = {

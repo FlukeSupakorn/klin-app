@@ -47,6 +47,7 @@ import { useAutomationStore } from "@/stores/use-automation-store";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 import type { ManagedCategory } from "@/types/domain";
+import { joinFolderPath } from "@/lib/path-utils";
 import { useNavigate } from "react-router-dom";
 
 type SettingsTab = "account" | "config" | "automation" | "security" | "developer";
@@ -73,9 +74,7 @@ const emptyForm: CategoryFormState = {
 };
 
 function joinDefaultFolderPath(basePath: string, categoryName: string): string {
-  const normalizedBase = basePath.trim().replace(/[\\/]+$/, "");
-  const normalizedName = categoryName.trim();
-  return normalizedBase ? `${normalizedBase}/${normalizedName}` : normalizedName;
+  return joinFolderPath(basePath, categoryName);
 }
 
 function normalizeHexColor(value: string, fallback = "#6366f1"): string {

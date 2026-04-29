@@ -8,6 +8,7 @@ interface AutomationStoreState {
   concurrencyLimit: number;
   addWatchedFolder: (folder: string) => void;
   removeWatchedFolder: (folder: string) => void;
+  setWatchedFolders: (folders: string[]) => void;
   setRunning: (value: boolean) => void;
   setLastScanTime: (value: string) => void;
   setConcurrencyLimit: (value: number) => void;
@@ -30,6 +31,7 @@ export const useAutomationStore = create<AutomationStoreState>()(
         set((state) => ({
           watchedFolders: state.watchedFolders.filter((item) => item !== folder),
         })),
+      setWatchedFolders: (folders) => set({ watchedFolders: folders }),
       setRunning: (value) => set({ isRunning: value }),
       setLastScanTime: (value) => set({ lastScanTime: value }),
       setConcurrencyLimit: (value) => set({ concurrencyLimit: Math.max(1, value) }),

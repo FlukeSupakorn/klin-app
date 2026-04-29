@@ -69,4 +69,5 @@ export interface TauriClient {
   pickFoldersForBatch(): Promise<string[]>;
   listSubdirectories(path: string): Promise<SubdirEntry[]>;
   listAllSubdirectories(path: string): Promise<string[]>;
+  ensureCategoryFolders(paths: string[]): Promise<void>;
 }

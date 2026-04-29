@@ -61,3 +61,8 @@ pub fn list_subdirectories(path: String) -> Result<Vec<SubdirEntry>, String> {
 pub fn list_all_subdirectories(path: String) -> Result<Vec<String>, String> {
     FileService::list_all_subdirectories(path)
 }
+
+#[tauri::command]
+pub fn ensure_category_folders(paths: Vec<String>) -> Result<(), String> {
+    FileService::ensure_category_folders(paths)
+}
