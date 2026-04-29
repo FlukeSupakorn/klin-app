@@ -5,7 +5,7 @@ import { useCategoryManagementStore } from "@/stores/use-category-management-sto
 import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 import { normalizePath } from "@/lib/path-utils";
-import type { AutomationJob, AutomationLog, ManagedCategory } from "@/types/domain";
+import type { AutomationJob, AutomationLog } from "@/types/domain";
 
 export async function processAutomationJob(job: AutomationJob): Promise<void> {
   const start = performance.now();
@@ -59,23 +59,26 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
         destinationPath: analyzed.destinationPath,
       });
 
-      // Record the confirmed move in klin-worker so it appears in history as action="moved"
+      // Record the confirmed move in klin-worker so it appears in history as action="moved".
+      // Race against a timeout so a slow/hung response never blocks the queue.
       if (analyzed.workerFileId) {
         const matchedCategory = enabledCategories.find(
-          (cat: ManagedCategory) => cat.name === analyzed.selectedCategory,
+          (cat) => cat.name === analyzed.selectedCategory,
         );
         if (matchedCategory) {
-          await organizeApiService
-            .applyDecision({
-              fileId: analyzed.workerFileId,
-              selectedName: null,
-              selectedCategory: {
-                id: matchedCategory.id,
-                name: matchedCategory.name,
-                score: topScore.score,
-              },
-            })
-            .catch(() => undefined);
+          const applyPromise = organizeApiService.applyDecision({
+            fileId: analyzed.workerFileId,
+            selectedName: null,
+            selectedCategory: {
+              id: matchedCategory.id,
+              name: matchedCategory.name,
+              score: topScore.score,
+            },
+          });
+          const timeoutPromise = new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error("applyDecision timeout")), 8_000),
+          );
+          await Promise.race([applyPromise, timeoutPromise]).catch(() => undefined);
         }
       }
     }
