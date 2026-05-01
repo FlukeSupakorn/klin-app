@@ -128,6 +128,7 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
           }
         }
 
+        const workerFileId = "file_id" in entry ? String(entry.file_id ?? "") || null : null;
         return {
           id,
           type: "organize",
@@ -139,6 +140,7 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
           oldName,
           newName,
           scores,
+          workerFileId,
         } satisfies HistoryEntry;
       }
 

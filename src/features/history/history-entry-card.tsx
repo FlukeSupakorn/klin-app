@@ -1,6 +1,6 @@
-import { ArrowRight, ChevronDown, Clock, FileText } from "lucide-react";
+import { ArrowRight, ChevronDown, Clock, FileText, Redo2, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { HistoryEntry } from "@/types/history";
+import type { HistoryEntry, OrganizeHistoryEntry } from "@/types/history";
 import { HistoryCalendarDetails } from "@/features/history/history-calendar-details";
 import { HistoryOrganizeDetails } from "@/features/history/history-organize-details";
 import { HistorySummaryDetails } from "@/features/history/history-summary-details";
@@ -28,6 +28,10 @@ interface HistoryEntryCardProps {
   onToggleExpand: () => void;
   onRequestEditMovedTo: (entryId: string) => void;
   onOpenSummary: (path: string) => void;
+  onUndo?: (entry: OrganizeHistoryEntry) => void;
+  onRedo?: (entry: OrganizeHistoryEntry) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 export function HistoryEntryCard({
@@ -36,6 +40,10 @@ export function HistoryEntryCard({
   onToggleExpand,
   onRequestEditMovedTo,
   onOpenSummary,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }: HistoryEntryCardProps) {
   const organizeEntry = entry.type === "organize" ? entry : null;
   const calendarEntry = entry.type === "calendar" ? entry : null;
@@ -118,7 +126,7 @@ export function HistoryEntryCard({
               )}
             </div>
 
-            {/* Right: confidence + time + chevron */}
+            {/* Right: confidence + time + undo/redo + chevron */}
             <div className="flex shrink-0 flex-col items-end gap-1.5">
               {organizeEntry && topCategoryScore > 0 && (
                 <div className="flex items-center gap-2">
@@ -137,6 +145,32 @@ export function HistoryEntryCard({
                 <Clock className="h-2.5 w-2.5" />
                 {formatTime(entry.timestamp)}
               </div>
+              {organizeEntry && (canUndo || canRedo) && (
+                <div className="flex items-center gap-1">
+                  {canUndo && onUndo && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onUndo(organizeEntry); }}
+                      className="flex items-center gap-1 rounded-[7px] border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                      title="Undo this move"
+                    >
+                      <Undo2 className="h-3 w-3" />
+                      Undo
+                    </button>
+                  )}
+                  {canRedo && onRedo && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onRedo(organizeEntry); }}
+                      className="flex items-center gap-1 rounded-[7px] border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                      title="Redo this move"
+                    >
+                      <Redo2 className="h-3 w-3" />
+                      Redo
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className={cn("ml-1 shrink-0 transition-transform duration-200", isExpanded && "rotate-180")}>

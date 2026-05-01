@@ -12,6 +12,7 @@ import { useCallback, useRef } from "react";
 import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
 import { splitDestinationPath, normalizePath } from "@/lib/path-utils";
+import { useUndoRedoStore } from "@/stores/use-undo-redo-store";
 import type { OrganizePreviewItem } from "@/types/domain";
 
 export interface UseOrganizeFileOpsReturn {
@@ -114,6 +115,14 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
           : entry
       )));
 
+      useUndoRedoStore.getState().pushUndo({
+        workerFileId: item.workerFileId,
+        fromPath: item.destinationPath,
+        toPath: item.currentPath,
+        fileName: item.fileName,
+        category: selectedCategoryPayload,
+      });
+
       window.dispatchEvent(new Event("klin:history-updated"));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Move failed";
@@ -153,11 +162,30 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
 
       await tauriClient.moveFile({ sourcePath, destinationPath });
 
+      if (item.workerFileId) {
+        await organizeApiService.applyDecision({
+          fileId: item.workerFileId,
+          selectedName: null,
+          selectedCategory: null,
+        }).catch((e) => console.warn("[organize] undo applyDecision failed", e));
+      }
+
       console.info("[organize] undo completed", {
         itemId: item.id,
         sourcePath,
         destinationPath,
       });
+
+      const undoEntry = useUndoRedoStore.getState().popUndo();
+      if (undoEntry) {
+        useUndoRedoStore.getState().pushRedo({
+          workerFileId: item.workerFileId,
+          fromPath: destinationPath,
+          toPath: sourcePath,
+          fileName: item.fileName,
+          category: undoEntry.category,
+        });
+      }
 
       setItems((state) => state.map((entry) => (
         entry.id === item.id
@@ -169,6 +197,8 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
           }
           : entry
       )));
+
+      window.dispatchEvent(new Event("klin:history-updated"));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Undo failed";
       console.error("[organize] undo failed", {

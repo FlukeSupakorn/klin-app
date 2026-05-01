@@ -118,7 +118,7 @@ export function computeOrganizeWorkflowMetrics(
   const allReadyMoved = readyCount > 0 && readyToMoveCount === 0;
   const canUndoAll = readyCount > 0 && items.every((item) => item.analysisStatus !== "completed" || item.moveStatus === "completed");
   const unresolvedCount = items.filter((item) => item.moveStatus !== "completed").length;
-  const showResumeOrganizeBubble = !resumeDismissed && !modalOpen && items.length > 0 && (isAnalyzing || unresolvedCount > 0);
+  const showResumeOrganizeBubble = !resumeDismissed && !modalOpen && items.length > 0 && (isAnalyzing || unresolvedCount > 0 || movedCount > 0);
 
   return {
     queuedCount,

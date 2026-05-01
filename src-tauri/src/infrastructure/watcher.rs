@@ -176,7 +176,7 @@ fn emit_file_events<R: tauri::Runtime>(
             continue;
         }
 
-        tracing::info!(
+        tracing::debug!(
             "[watcher] detected file event: kind={:?}, file={} (queued for stability check)",
             event.kind,
             path_str

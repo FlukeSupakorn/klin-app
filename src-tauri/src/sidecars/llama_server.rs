@@ -388,11 +388,19 @@ fn spawn_slot<R: tauri::Runtime>(
                     );
                 }
                 CommandEvent::Stderr(line) => {
-                    tracing::info!(
-                        "[llama-server][{}][stderr] {}",
-                        log_label,
-                        String::from_utf8_lossy(&line)
-                    );
+                    let text = String::from_utf8_lossy(&line);
+                    let trimmed = text.trim_start();
+                    // Suppress high-frequency internal slot/server lines; keep request summaries.
+                    let is_verbose = text.contains("print_timing")
+                        || trimmed.starts_with("slot ")
+                        || (trimmed.starts_with("srv ") && !trimmed.contains("log_server_r"));
+                    if !is_verbose {
+                        tracing::info!(
+                            "[llama-server][{}][stderr] {}",
+                            log_label,
+                            text
+                        );
+                    }
                 }
                 CommandEvent::Terminated(payload) => {
                     tracing::info!(

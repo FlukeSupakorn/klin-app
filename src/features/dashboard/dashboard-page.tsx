@@ -155,7 +155,7 @@ export function DashboardPage() {
     <div className="flex h-full flex-col gap-5 overflow-hidden">
       {/* Header: greeting + semantic search */}
       <div className="flex shrink-0 items-center gap-3">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <div className="text-[13px] font-medium text-muted-foreground">{getHourGreeting()}</div>
           <h1 className="mt-0.5 text-[21px] font-extrabold tracking-tight text-foreground" style={{ letterSpacing: "-0.4px" }}>
             Your File Intelligence Hub
@@ -163,9 +163,9 @@ export function DashboardPage() {
         </div>
 
         {/* Semantic search */}
-        <div ref={searchRef} className="relative w-[240px]">
+        <div ref={searchRef} className="relative w-[240px] shrink-0">
           <div
-            className="flex items-center gap-2 rounded-[12px] border bg-card px-3 transition-all"
+            className="flex min-w-0 items-center gap-2 rounded-[12px] border bg-card px-3 transition-all"
             style={{
               borderColor: showDrop ? "var(--primary)" : "var(--border)",
               boxShadow: showDrop ? "0 0 0 3px var(--primary-soft)" : "var(--shadow-xs)",
@@ -191,7 +191,7 @@ export function DashboardPage() {
 
           {/* Search results dropdown */}
           {showDrop && (searchSubmitted || searchLoading || searchError) && (
-            <div className="klin-slide-up absolute left-0 top-[calc(100%+8px)] z-50 w-[400px] overflow-hidden rounded-[16px] border border-border bg-card"
+            <div className="klin-slide-up absolute right-0 top-[calc(100%+8px)] z-50 w-[400px] overflow-hidden rounded-[16px] border border-border bg-card"
               style={{ boxShadow: "0 12px 40px var(--primary-border)" }}>
               <div className="flex items-center gap-1.5 border-b border-border px-3.5 py-2.5"
                 style={{ background: "var(--muted)" }}>

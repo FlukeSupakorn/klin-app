@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { History, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { HistoryEntry, HistoryEntryType } from "@/types/history";
+import type { HistoryEntry, HistoryEntryType, OrganizeHistoryEntry } from "@/types/history";
 import { tauriClient } from "@/services/tauri-client";
 import { historyApiService } from "@/services/history-api-service";
 import { HistoryEntryCard } from "@/features/history/history-entry-card";
 import { getPathTail, joinPath } from "@/features/history/history-utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
+import { useUndoRedoStore } from "@/stores/use-undo-redo-store";
+import { normalizePath } from "@/lib/path-utils";
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -173,11 +175,59 @@ export function HistoryPage() {
     void tauriClient.openExternalUrl(path);
   }, []);
 
+  const undoStack = useUndoRedoStore((s) => s.undoStack);
+  const redoStack = useUndoRedoStore((s) => s.redoStack);
+
+  // Stack entry semantics: fromPath = current file location, toPath = destination after operation.
+  // Undo entry: fromPath=organizedPath, toPath=originalPath (mirrors organizeEntry's toPath/fromPath).
+  // Redo entry: fromPath=originalPath, toPath=organizedPath (same direction as original organizeEntry).
+  const handleUndoEntry = useCallback(async (entry: OrganizeHistoryEntry) => {
+    const stackEntry = useUndoRedoStore.getState().undoStack.find(
+      (e) => normalizePath(e.fromPath) === normalizePath(entry.toPath) && normalizePath(e.toPath) === normalizePath(entry.fromPath),
+    );
+    if (!stackEntry) return;
+    try {
+      await tauriClient.moveFile({ sourcePath: stackEntry.fromPath, destinationPath: stackEntry.toPath });
+      useUndoRedoStore.getState().removeFromUndo(stackEntry.fromPath, stackEntry.toPath);
+      useUndoRedoStore.getState().pushRedo({
+        workerFileId: stackEntry.workerFileId,
+        fromPath: stackEntry.toPath,
+        toPath: stackEntry.fromPath,
+        fileName: stackEntry.fileName,
+        category: stackEntry.category,
+      });
+      window.dispatchEvent(new Event("klin:history-updated"));
+    } catch (e) {
+      console.error("[history] undo failed", e);
+    }
+  }, []);
+
+  const handleRedoEntry = useCallback(async (entry: OrganizeHistoryEntry) => {
+    const stackEntry = useUndoRedoStore.getState().redoStack.find(
+      (e) => normalizePath(e.fromPath) === normalizePath(entry.fromPath) && normalizePath(e.toPath) === normalizePath(entry.toPath),
+    );
+    if (!stackEntry) return;
+    try {
+      await tauriClient.moveFile({ sourcePath: stackEntry.fromPath, destinationPath: stackEntry.toPath });
+      useUndoRedoStore.getState().removeFromRedo(stackEntry.fromPath, stackEntry.toPath);
+      useUndoRedoStore.getState().pushUndo({
+        workerFileId: stackEntry.workerFileId,
+        fromPath: stackEntry.toPath,
+        toPath: stackEntry.fromPath,
+        fileName: stackEntry.fileName,
+        category: stackEntry.category,
+      });
+      window.dispatchEvent(new Event("klin:history-updated"));
+    } catch (e) {
+      console.error("[history] redo failed", e);
+    }
+  }, []);
+
   return (
     <div className="flex h-full flex-col gap-5">
       {/* Header row */}
       <div className="flex shrink-0 items-center gap-3">
-        <div className="flex items-center gap-3 flex-1">
+        <div className="flex min-w-0 items-center gap-3 flex-1">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
             style={{ background: "var(--primary)" }}>
             <History className="h-4 w-4 text-white" />
@@ -192,7 +242,7 @@ export function HistoryPage() {
 
         {/* Search */}
         <div
-          className="flex w-[200px] items-center gap-2 rounded-[12px] border border-border bg-card px-3"
+          className="flex min-w-[160px] max-w-[240px] flex-shrink overflow-hidden items-center gap-2 rounded-[12px] border border-border bg-card px-3"
           style={{ boxShadow: "var(--shadow-xs)" }}
         >
           <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -252,6 +302,13 @@ export function HistoryPage() {
                 <div className="space-y-2">
                   {group.items.map((entry) => {
                     const isExpanded = expandedId === entry.id;
+                    const organizeEntry = entry.type === "organize" ? entry : null;
+                    const canUndo = organizeEntry
+                      ? undoStack.some((e) => normalizePath(e.fromPath) === normalizePath(organizeEntry.toPath) && normalizePath(e.toPath) === normalizePath(organizeEntry.fromPath))
+                      : false;
+                    const canRedo = organizeEntry
+                      ? redoStack.some((e) => normalizePath(e.fromPath) === normalizePath(organizeEntry.fromPath) && normalizePath(e.toPath) === normalizePath(organizeEntry.toPath))
+                      : false;
                     return (
                       <HistoryEntryCard
                         key={entry.id}
@@ -260,6 +317,10 @@ export function HistoryPage() {
                         onToggleExpand={() => setExpandedId(isExpanded ? null : entry.id)}
                         onRequestEditMovedTo={handleRequestEditMovedTo}
                         onOpenSummary={handleOpenSummary}
+                        onUndo={handleUndoEntry}
+                        onRedo={handleRedoEntry}
+                        canUndo={canUndo}
+                        canRedo={canRedo}
                       />
                     );
                   })}

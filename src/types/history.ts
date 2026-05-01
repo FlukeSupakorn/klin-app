@@ -17,6 +17,8 @@ export interface OrganizeHistoryEntry extends HistoryEntryBase {
   oldName: string;
   newName: string;
   scores: CategoryScore[];
+  workerFileId?: string | null;
+  isUndoAction?: boolean;
 }
 
 export interface SummaryHistoryEntry extends HistoryEntryBase {

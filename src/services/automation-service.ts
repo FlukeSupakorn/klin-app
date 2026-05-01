@@ -4,6 +4,7 @@ import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
+import { useUndoRedoStore } from "@/stores/use-undo-redo-store";
 import { normalizePath } from "@/lib/path-utils";
 import type { AutomationJob, AutomationLog } from "@/types/domain";
 
@@ -59,27 +60,36 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
         destinationPath: analyzed.destinationPath,
       });
 
-      // Record the confirmed move in klin-worker so it appears in history as action="moved".
-      // Race against a timeout so a slow/hung response never blocks the queue.
       if (analyzed.workerFileId) {
-        const matchedCategory = enabledCategories.find(
-          (cat) => cat.name === analyzed.selectedCategory,
+        // Prefer ID match; fall back to name match to handle minor label differences.
+        const matchedCategory =
+          enabledCategories.find((c) => c.id === topScore?.categoryId) ??
+          enabledCategories.find((c) => c.name === analyzed.selectedCategory);
+        const categoryPayload = matchedCategory
+          ? { id: matchedCategory.id, name: matchedCategory.name, score: topScore?.score ?? 0 }
+          : null;
+
+        // Record the confirmed move in klin-worker so it appears in history as action="moved".
+        // Race against a timeout so a slow/hung response never blocks the queue.
+        const applyPromise = organizeApiService.applyDecision({
+          fileId: analyzed.workerFileId,
+          selectedName: null,
+          selectedCategory: categoryPayload,
+        });
+        const timeoutPromise = new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error("applyDecision timeout")), 8_000),
         );
-        if (matchedCategory) {
-          const applyPromise = organizeApiService.applyDecision({
-            fileId: analyzed.workerFileId,
-            selectedName: null,
-            selectedCategory: {
-              id: matchedCategory.id,
-              name: matchedCategory.name,
-              score: topScore.score,
-            },
-          });
-          const timeoutPromise = new Promise<void>((_, reject) =>
-            setTimeout(() => reject(new Error("applyDecision timeout")), 8_000),
-          );
-          await Promise.race([applyPromise, timeoutPromise]).catch(() => undefined);
-        }
+        await Promise.race([applyPromise, timeoutPromise]).catch((e) =>
+          console.warn("[automation] applyDecision failed", e),
+        );
+
+        useUndoRedoStore.getState().pushUndo({
+          workerFileId: analyzed.workerFileId,
+          fromPath: analyzed.destinationPath,
+          toPath: analyzed.currentPath,
+          fileName: analyzed.fileName,
+          category: categoryPayload,
+        });
       }
     }
 

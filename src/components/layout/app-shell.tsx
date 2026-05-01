@@ -77,9 +77,13 @@ export function AppShell() {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [recentDetectedFiles, setRecentDetectedFiles] = useState<Array<{ path: string; at: number }>>([]);
   const [fallbackDownloadsFolder, setFallbackDownloadsFolder] = useState<string | null>(null);
-  const queueRef = useRef(new AsyncProcessingQueue(concurrencyLimit));
+  // Real-time watcher queue must be serial (1) — the local LLM handles one inference at a time.
+  // Concurrent requests while the model cold-starts cause all but the first to fail with 503.
+  const queueRef = useRef(new AsyncProcessingQueue(1));
   const recentEventByPathRef = useRef<Map<string, number>>(new Map());
   const knownFilesByFolderRef = useRef<Map<string, Set<string>>>(new Map());
+  // Tracks paths currently in the queue to prevent duplicate jobs from the poll+event combo.
+  const activeJobPathsRef = useRef<Set<string>>(new Set());
 
   const effectiveWatchedFolders = watchedFolders.length > 0
     ? watchedFolders
@@ -89,6 +93,7 @@ export function AppShell() {
 
   const handleDetectedFile = (pathFromEvent: string) => {
     if (!pathFromEvent) return;
+    if (activeJobPathsRef.current.has(pathFromEvent)) return;
     const now = Date.now();
     const lastSeen = recentEventByPathRef.current.get(pathFromEvent) ?? 0;
     if (now - lastSeen < 3000) return;
@@ -99,8 +104,13 @@ export function AppShell() {
       return next.slice(0, 6);
     });
     if (!useAutomationStore.getState().isRunning) return;
+    activeJobPathsRef.current.add(pathFromEvent);
     queueRef.current.enqueue(async () => {
-      await processAutomationJob({ filePath: pathFromEvent, fileName, contentPreview: "" });
+      try {
+        await processAutomationJob({ filePath: pathFromEvent, fileName, contentPreview: "" });
+      } finally {
+        activeJobPathsRef.current.delete(pathFromEvent);
+      }
     });
   };
 
@@ -154,7 +164,7 @@ export function AppShell() {
   }, []);
 
 
-  useEffect(() => { queueRef.current.setConcurrency(concurrencyLimit); }, [concurrencyLimit]);
+  // Intentionally not syncing concurrencyLimit to queueRef — watcher queue stays serial (1).
 
   useEffect(() => {
     if (!isAutomationRunning) { setFallbackDownloadsFolder(null); return; }

@@ -23,6 +23,7 @@ export function GlobalOrganizeResumeBubble() {
       processingCount={metrics.processingCount}
       queuedCount={metrics.queuedCount}
       unresolvedCount={metrics.unresolvedCount}
+      movedCount={metrics.movedCount}
       onOpen={() => {
         setModalOpen(true);
         void navigate("/");
