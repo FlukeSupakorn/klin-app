@@ -70,4 +70,6 @@ export interface TauriClient {
   listSubdirectories(path: string): Promise<SubdirEntry[]>;
   listAllSubdirectories(path: string): Promise<string[]>;
   ensureCategoryFolders(paths: string[]): Promise<void>;
+  writeTextFile(filePath: string, content: string): Promise<void>;
+  statFiles(filePaths: string[]): Promise<(NoteFileEntryDto | null)[]>;
 }

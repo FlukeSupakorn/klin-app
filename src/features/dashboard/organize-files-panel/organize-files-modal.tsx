@@ -425,7 +425,7 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [showWarningDetails, setShowWarningDetails] = useState(false);
-  const isLockWarning = Boolean(workflow.errorMessage?.startsWith("Skipped "));
+  const isLockWarning = Boolean(workflow.errorMessage?.includes("skipped — locked"));
   const parsedWarning = workflow.errorMessage ? splitLockNotice(workflow.errorMessage) : null;
 
   useEffect(() => { setShowWarningDetails(false); }, [workflow.errorMessage]);

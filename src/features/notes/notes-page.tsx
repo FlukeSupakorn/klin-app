@@ -100,7 +100,7 @@ export function NotesPage() {
     [categories],
   );
   const getLockMatch = usePrivacyStore((state) => state.getLockMatch);
-  const isLockWarningNotice = Boolean(editorNotice?.startsWith("Skipped "));
+  const isLockWarningNotice = Boolean(editorNotice?.includes("skipped — locked"));
   const parsedEditorNotice = editorNotice ? splitLockNotice(editorNotice) : null;
 
   useEffect(() => {
@@ -126,13 +126,17 @@ export function NotesPage() {
     setIsLoadingNotes(true);
     setNotesError(null);
     try {
-      const [noteRows, appFolder] = await Promise.all([
+      const [noteRows, appFolder, cachedRows] = await Promise.all([
         notesFileService.listAppNotes(),
         notesFileService.getAppNotesFolderPath(),
+        notesFileService.listCachedNotes(),
       ]);
-      setNotes(noteRows);
+      const appPaths = new Set(noteRows.map((n) => n.path));
+      const merged = [...noteRows, ...cachedRows.filter((n) => !appPaths.has(n.path))];
+      merged.sort((a, b) => b.lastModifiedMs - a.lastModifiedMs);
+      setNotes(merged);
       setAppNotesPath(appFolder);
-      void loadPreviews(noteRows);
+      void loadPreviews(merged);
     } catch (error) {
       setNotesError(error instanceof Error ? error.message : "Failed to load notes");
       setNotes([]);
@@ -218,11 +222,11 @@ export function NotesPage() {
           const previewNames = blocked.slice(0, 2).map((item) => item.fileName);
           const remaining = blocked.length - previewNames.length;
           const head = previewNames.join(", ");
-          const summary = `Skipped ${blocked.length} locked file(s): ${head}${remaining > 0 ? ` +${remaining} more` : ""}`;
+          const summary = `${blocked.length} file(s) skipped — locked: ${head}${remaining > 0 ? ` +${remaining} more` : ""}`;
           const detailLines = blocked.map((item) => (
             item.source === "folder"
-              ? `${item.fileName} - locked by folder ${item.lockedByName}`
-              : `${item.fileName} - locked file`
+              ? `${item.fileName} (locked by folder ${item.lockedByName})`
+              : `${item.fileName} (locked)`
           ));
           return `${summary}${LOCK_NOTICE_DETAILS_SEPARATOR}${detailLines.join("\n")}`;
         })()
@@ -316,6 +320,12 @@ export function NotesPage() {
     try {
       const savedPath = await notesFileService.saveToFolder(targetFolder, title, content);
       setActivePath(savedPath);
+      // Track external saves so they appear on the notes list
+      const normalizedSaved = savedPath.replace(/\\/g, "/");
+      const normalizedApp = appNotesPath.replace(/\\/g, "/");
+      if (appNotesPath && !normalizedSaved.startsWith(normalizedApp)) {
+        await notesFileService.appendToSavedPathsCache(savedPath);
+      }
       try {
         await notesApiService.logNoteHistory({
           fileName: getPathTail(savedPath),

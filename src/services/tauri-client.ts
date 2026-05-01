@@ -121,6 +121,14 @@ class TauriCommandClient implements TauriClient {
   ensureCategoryFolders(paths: string[]): Promise<void> {
     return invoke("ensure_category_folders", { paths });
   }
+
+  writeTextFile(filePath: string, content: string): Promise<void> {
+    return invoke("write_text_file", { filePath, content });
+  }
+
+  statFiles(filePaths: string[]): Promise<(NoteFileEntryDto | null)[]> {
+    return invoke("stat_files", { filePaths });
+  }
 }
 
 export const tauriClient: TauriClient = new TauriCommandClient();

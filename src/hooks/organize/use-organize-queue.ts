@@ -211,11 +211,11 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
       const previewNames = blocked.slice(0, 2).map((item) => item.fileName);
       const remaining = blocked.length - previewNames.length;
       const head = previewNames.join(", ");
-      const summary = `Skipped ${blocked.length} locked file(s): ${head}${remaining > 0 ? ` +${remaining} more` : ""}`;
+      const summary = `${blocked.length} file(s) skipped — locked: ${head}${remaining > 0 ? ` +${remaining} more` : ""}`;
       const detailLines = blocked.map((item) => (
         item.source === "folder"
-          ? `${item.fileName} - locked by folder ${item.lockedByName}`
-          : `${item.fileName} - locked file`
+          ? `${item.fileName} (locked by folder ${item.lockedByName})`
+          : `${item.fileName} (locked)`
       ));
       const withDetails = `${summary}${LOCK_NOTICE_DETAILS_SEPARATOR}${detailLines.join("\n")}`;
 

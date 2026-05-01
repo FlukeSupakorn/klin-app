@@ -229,9 +229,6 @@ export function DashboardPage() {
                   ))
                 )}
               </div>
-              <div className="border-t border-border py-2 text-center text-[11px] text-muted-foreground">
-                Powered by semantic AI search across your KlinFiles
-              </div>
             </div>
           )}
         </div>

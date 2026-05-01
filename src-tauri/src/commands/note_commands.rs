@@ -86,3 +86,38 @@ pub fn read_note_file(file_path: String) -> Result<String, String> {
 
     std::fs::read_to_string(file_path).map_err(|err| err.to_string())
 }
+
+#[tauri::command]
+pub fn write_text_file(file_path: String, content: String) -> Result<(), String> {
+    if file_path.trim().is_empty() {
+        return Err("File path is required".to_string());
+    }
+    let path = PathBuf::from(&file_path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn stat_files(file_paths: Vec<String>) -> Vec<Option<NoteFileEntryDto>> {
+    file_paths
+        .into_iter()
+        .map(|file_path| {
+            let path = PathBuf::from(&file_path);
+            let metadata = std::fs::metadata(&path).ok()?;
+            let modified = metadata.modified().ok()?;
+            let duration = modified.duration_since(std::time::UNIX_EPOCH).ok()?;
+            let file_name = path
+                .file_name()
+                .map(|v| v.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Untitled.md".to_string());
+            Some(NoteFileEntryDto {
+                path: file_path,
+                file_name,
+                size_bytes: metadata.len(),
+                last_modified_ms: duration.as_millis() as u64,
+            })
+        })
+        .collect()
+}
