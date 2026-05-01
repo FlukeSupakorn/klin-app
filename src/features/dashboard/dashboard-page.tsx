@@ -15,7 +15,7 @@ import { getCategoryIcon, withAlpha } from "@/features/categories/category-appea
 
 const ENTRY_TYPE_BG: Record<string, string> = {
   organize: "var(--primary)",
-  summary: "var(--purple)",
+  summary: "var(--secondary-foreground)",
   calendar: "var(--success)",
 };
 const ENTRY_TYPE_FG: Record<string, string> = {

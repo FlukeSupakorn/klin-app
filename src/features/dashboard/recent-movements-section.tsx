@@ -5,7 +5,7 @@ import { formatTime, getFolderTail } from "@/features/history/history-utils";
 
 const ENTRY_COLORS: Record<string, string> = {
   organize: "var(--primary)",
-  summary: "var(--purple)",
+  summary: "var(--secondary-foreground)",
   calendar: "var(--success)",
 };
 
