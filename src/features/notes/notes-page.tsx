@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import "@uiw/react-md-editor/markdown-editor.css";
-import { AlertTriangle, CheckCheck, ChevronLeft, Files, FileText, Loader2, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCheck, ChevronLeft, Files, FileText, Loader2, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { notesApiService } from "@/services/notes-api-service";
 import { notesFileService, type NoteFileItem } from "@/services/notes-file-service";
@@ -106,6 +106,12 @@ export function NotesPage() {
   useEffect(() => {
     setShowNoticeDetails(false);
   }, [editorNotice]);
+
+  useEffect(() => {
+    if (!editorNotice || isSummarizing) return;
+    const timer = setTimeout(() => setEditorNotice(null), 3500);
+    return () => clearTimeout(timer);
+  }, [editorNotice, isSummarizing]);
 
   const loadPreviews = useCallback(async (noteRows: NoteFileItem[]) => {
     const results: Record<string, string> = {};
@@ -518,7 +524,7 @@ export function NotesPage() {
           >
             <div className="flex items-start gap-2">
               {isLockWarningNotice && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
-              <div className="space-y-1">
+              <div className="flex-1 space-y-1">
                 <p>
                   {parsedEditorNotice?.summary ?? editorNotice}
                   {isLockWarningNotice && (parsedEditorNotice?.details.length ?? 0) > 0 && (
@@ -540,6 +546,13 @@ export function NotesPage() {
                   </ul>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => setEditorNotice(null)}
+                className="shrink-0 opacity-50 hover:opacity-100 transition-opacity"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
         )}
@@ -682,6 +695,29 @@ export function NotesPage() {
           style={{ background: "var(--destructive-tint)" }}
         >
           {editorError}
+        </div>
+      )}
+      {editorNotice && (
+        <div
+          className={cn(
+            "shrink-0 rounded-[12px] border px-4 py-3 text-[12px]",
+            isLockWarningNotice
+              ? "border-amber-500/30 text-amber-700"
+              : "border-primary/20 text-primary",
+          )}
+          style={{ background: isLockWarningNotice ? "var(--warning-tint)" : "var(--primary-tint)" }}
+        >
+          <div className="flex items-start gap-2">
+            {isLockWarningNotice && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+            <p className="flex-1">{parsedEditorNotice?.summary ?? editorNotice}</p>
+            <button
+              type="button"
+              onClick={() => setEditorNotice(null)}
+              className="shrink-0 opacity-50 hover:opacity-100 transition-opacity"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       )}
 
