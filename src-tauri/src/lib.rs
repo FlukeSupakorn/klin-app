@@ -214,6 +214,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let app_data_dir = infrastructure::app_paths::resolve_app_data_dir(app.handle())?;
+            infrastructure::runtime_env::set_app_data_dir(app_data_dir.clone());
             std::fs::create_dir_all(&app_data_dir)?;
 
             // ── Clean up orphaned processes ──────────────────────────
@@ -292,6 +293,13 @@ pub fn run() {
             commands::write_text_file,
             commands::stat_files,
             commands::log_frontend,
+            commands::download_model,
+            commands::cancel_model_download,
+            commands::get_model_dir,
+            commands::read_model_config,
+            commands::write_model_config,
+            commands::list_installed_models,
+            commands::get_system_specs,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

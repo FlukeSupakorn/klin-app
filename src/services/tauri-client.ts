@@ -2,11 +2,16 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AutomationConfigDto,
   FrontendLogPayload,
+  DownloadModelDto,
+  InstalledModelDto,
+  ModelConfigDto,
+  ModelDownloadSlot,
   ModelSlot,
   MoveFileDto,
   NoteFileEntryDto,
   ReadFolderDto,
   SaveRuleMappingDto,
+  SystemSpecsDto,
   SubdirEntry,
   TauriClient,
   WatchFolderDto,
@@ -133,6 +138,34 @@ class TauriCommandClient implements TauriClient {
 
   logFrontend(payload: FrontendLogPayload): Promise<void> {
     return invoke("log_frontend", { payload });
+  }
+
+  downloadModel(input: DownloadModelDto): Promise<void> {
+    return invoke("download_model", { ...input });
+  }
+
+  cancelModelDownload(slot: ModelDownloadSlot): Promise<void> {
+    return invoke("cancel_model_download", { slot });
+  }
+
+  getModelDir(): Promise<string> {
+    return invoke("get_model_dir");
+  }
+
+  readModelConfig(): Promise<ModelConfigDto> {
+    return invoke("read_model_config");
+  }
+
+  writeModelConfig(slot: ModelDownloadSlot, filename: string, sha256: string): Promise<ModelConfigDto> {
+    return invoke("write_model_config", { slot, filename, sha256 });
+  }
+
+  listInstalledModels(): Promise<InstalledModelDto[]> {
+    return invoke("list_installed_models");
+  }
+
+  getSystemSpecs(): Promise<SystemSpecsDto> {
+    return invoke("get_system_specs");
   }
 }
 

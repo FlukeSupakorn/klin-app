@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import { StepProgress } from "./step-progress";
 import { WelcomeStep } from "./step/welcome-step";
 import { DefaultFolderStep } from "./step/default-folder-step";
@@ -257,6 +258,7 @@ export function OnboardingPage() {
           )}
         </div>
       </div>
+      <CloseAppController mode="quit-immediately" />
     </div>
   );
 }

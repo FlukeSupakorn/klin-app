@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 static APP_ENV: OnceLock<HashMap<String, String>> = OnceLock::new();
+static APP_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 fn app_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -68,11 +69,43 @@ fn models_dir() -> PathBuf {
     app_root().join("models")
 }
 
-fn find_model_path<F>(predicate: F) -> Option<String>
+fn app_data_models_dir() -> Option<PathBuf> {
+    APP_DATA_DIR.get().map(|dir| dir.join("models"))
+}
+
+fn slot_for_env_name(name: &str) -> Option<&'static str> {
+    match name {
+        "KLIN_CHAT_MODEL_PATH" => Some("chat"),
+        "KLIN_EMBED_MODEL_PATH" => Some("embed"),
+        "KLIN_MMPROJ_PATH" => Some("mmproj"),
+        _ => None,
+    }
+}
+
+fn configured_app_data_model_path(name: &str) -> Option<String> {
+    let slot = slot_for_env_name(name)?;
+    let app_data_dir = APP_DATA_DIR.get()?;
+    let config_path = app_data_dir.join("model_config.json");
+    let contents = fs::read_to_string(config_path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&contents).ok()?;
+    let filename = json
+        .get("models")?
+        .get(slot)?
+        .get("filename")?
+        .as_str()?
+        .trim();
+    if filename.is_empty() {
+        return None;
+    }
+
+    let path = app_data_dir.join("models").join(filename);
+    path.exists().then(|| path.display().to_string())
+}
+
+fn find_model_path_in_dir<F>(dir: PathBuf, predicate: F) -> Option<String>
 where
     F: Fn(&str) -> bool,
 {
-    let dir = models_dir();
     let entries = fs::read_dir(dir).ok()?;
     for entry in entries.flatten() {
         let path = entry.path();
@@ -84,22 +117,80 @@ where
     None
 }
 
+fn find_app_data_model_path<F>(predicate: F) -> Option<String>
+where
+    F: Fn(&str) -> bool,
+{
+    find_model_path_in_dir(app_data_models_dir()?, predicate)
+}
+
+fn find_bundled_model_path<F>(predicate: F) -> Option<String>
+where
+    F: Fn(&str) -> bool,
+{
+    find_model_path_in_dir(models_dir(), predicate)
+}
+
 fn fallback_model_path(name: &str) -> Option<String> {
+    if cfg!(debug_assertions) {
+        return match name {
+            "KLIN_EMBED_MODEL_PATH" => find_bundled_model_path(|f| {
+                let l = f.to_ascii_lowercase();
+                l.ends_with(".gguf") && l.contains("embed")
+            }),
+            "KLIN_CHAT_MODEL_PATH" => find_bundled_model_path(|f| {
+                let l = f.to_ascii_lowercase();
+                l.ends_with(".gguf") && !l.contains("embed") && !l.contains("mmproj")
+            }),
+            "KLIN_MMPROJ_PATH" => find_bundled_model_path(|f| {
+                let l = f.to_ascii_lowercase();
+                l.ends_with(".gguf") && l.contains("mmproj")
+            }),
+            _ => None,
+        };
+    }
+
+    if let Some(path) = configured_app_data_model_path(name) {
+        return Some(path);
+    }
+
     match name {
-        "KLIN_EMBED_MODEL_PATH" => find_model_path(|f| {
+        "KLIN_EMBED_MODEL_PATH" => find_app_data_model_path(|f| {
             let l = f.to_ascii_lowercase();
             l.ends_with(".gguf") && l.contains("embed")
+        })
+        .or_else(|| {
+            find_bundled_model_path(|f| {
+                let l = f.to_ascii_lowercase();
+                l.ends_with(".gguf") && l.contains("embed")
+            })
         }),
-        "KLIN_CHAT_MODEL_PATH" => find_model_path(|f| {
+        "KLIN_CHAT_MODEL_PATH" => find_app_data_model_path(|f| {
             let l = f.to_ascii_lowercase();
             l.ends_with(".gguf") && !l.contains("embed") && !l.contains("mmproj")
+        })
+        .or_else(|| {
+            find_bundled_model_path(|f| {
+                let l = f.to_ascii_lowercase();
+                l.ends_with(".gguf") && !l.contains("embed") && !l.contains("mmproj")
+            })
         }),
-        "KLIN_MMPROJ_PATH" => find_model_path(|f| {
+        "KLIN_MMPROJ_PATH" => find_app_data_model_path(|f| {
             let l = f.to_ascii_lowercase();
             l.ends_with(".gguf") && l.contains("mmproj")
+        })
+        .or_else(|| {
+            find_bundled_model_path(|f| {
+                let l = f.to_ascii_lowercase();
+                l.ends_with(".gguf") && l.contains("mmproj")
+            })
         }),
         _ => None,
     }
+}
+
+pub fn set_app_data_dir(path: PathBuf) {
+    let _ = APP_DATA_DIR.set(path);
 }
 
 pub fn app_env_path_string() -> String {

@@ -10,6 +10,8 @@ import { RouteErrorPage } from "@/app/route-error-page";
 import { ApiLogsPage } from "@/features/settings/api-logs-page";
 import { OnboardingPage } from "@/features/onboarding/onboarding-page";
 import { OnboardingGuard } from "@/features/onboarding/onboarding-guard";
+import { ModelDownloadGuard } from "@/features/model-download/model-download-guard";
+import { ModelDownloadPage } from "@/features/model-download/model-download-page";
 
 export const router = createBrowserRouter([
   {
@@ -19,13 +21,18 @@ export const router = createBrowserRouter([
   },
   {
     path: "/onboarding",
-    element: <OnboardingPage />,
+    element: <ModelDownloadGuard><OnboardingPage /></ModelDownloadGuard>,
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    path: "/model-download",
+    element: <ModelDownloadPage />,
     errorElement: <RouteErrorPage />,
   },
   {
     path: "/",
     // This already wraps the entire app in a guard that checks onboarding status, AppShell already inside.
-    element: <OnboardingGuard />,
+    element: <ModelDownloadGuard><OnboardingGuard /></ModelDownloadGuard>,
     errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <DashboardPage /> },

@@ -27,8 +27,7 @@ import { SettingsManagementDialogs } from "@/features/settings/settings-manageme
 import { AsyncProcessingQueue } from "@/services/automation-queue";
 import { processAutomationJob } from "@/services/automation-service";
 import { tauriClient } from "@/services/tauri-client";
-import { appClient } from "@/services/app-client";
-import { CloseAppModal } from "@/components/dialogs/close-app-modal";
+import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import klinLogo from "@/assets/klin-logo.svg";
@@ -74,7 +73,6 @@ export function AppShell() {
   const [healthIssues, setHealthIssues] = useState<FailedService[]>([]);
   const [defaultPathSet, setDefaultPathSet] = useState<{ path: string } | null>(null);
   const [showDefaultFolderSettings, setShowDefaultFolderSettings] = useState(false);
-  const [showCloseModal, setShowCloseModal] = useState(false);
   const [recentDetectedFiles, setRecentDetectedFiles] = useState<Array<{ path: string; at: number }>>([]);
   const [fallbackDownloadsFolder, setFallbackDownloadsFolder] = useState<string | null>(null);
   // Real-time watcher queue must be serial (1) — the local LLM handles one inference at a time.
@@ -215,14 +213,6 @@ export function AppShell() {
     const timer = window.setInterval(() => { void syncFolderState(); }, 5000);
     return () => { disposed = true; window.clearInterval(timer); };
   }, [isAutomationRunning, effectiveWatchedFolders]);
-
-  useEffect(() => {
-    let unlistener: (() => void) | null = null;
-    void (async () => {
-      unlistener = await listen("window://close-requested", () => { setShowCloseModal(true); });
-    })();
-    return () => { unlistener?.(); };
-  }, []);
 
   const profileInitial = (profile?.name?.trim()?.charAt(0) || "K").toUpperCase();
   const totalFiles = watchedFolders.length;
@@ -417,12 +407,7 @@ export function AppShell() {
         onClose={() => setShowDefaultFolderSettings(false)}
       />
 
-      <CloseAppModal
-        open={showCloseModal}
-        onMinimize={async () => { await appClient.minimizeToTray(); setShowCloseModal(false); }}
-        onQuit={async () => { await appClient.exitApp(); }}
-        onCancel={() => { setShowCloseModal(false); }}
-      />
+      <CloseAppController />
     </div>
   );
 }

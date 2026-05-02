@@ -41,6 +41,42 @@ export interface SubdirEntry {
 }
 
 export type ModelSlot = 'chat' | 'embed';
+export type ModelDownloadSlot = 'chat' | 'embed' | 'mmproj';
+
+export interface ModelConfigEntryDto {
+  filename: string;
+  sha256: string;
+}
+
+export interface ModelConfigDto {
+  models: Partial<Record<ModelDownloadSlot, ModelConfigEntryDto>>;
+}
+
+export interface InstalledModelDto {
+  filename: string;
+  path: string;
+  sizeBytes: number;
+}
+
+export interface DownloadModelDto {
+  url: string;
+  destFilename: string;
+  slot: ModelDownloadSlot;
+  expectedSha256: string;
+  expectedSize: number;
+}
+
+export interface ModelDownloadProgressPayload {
+  slot: ModelDownloadSlot;
+  downloaded: number;
+  total: number;
+}
+
+export interface SystemSpecsDto {
+  ramTotalBytes: number;
+  ramAvailableBytes: number;
+  vramBytes?: number | null;
+}
 
 export type FrontendLogLevel = "debug" | "info" | "warn" | "error";
 
@@ -81,4 +117,11 @@ export interface TauriClient {
   writeTextFile(filePath: string, content: string): Promise<void>;
   statFiles(filePaths: string[]): Promise<(NoteFileEntryDto | null)[]>;
   logFrontend(payload: FrontendLogPayload): Promise<void>;
+  downloadModel(input: DownloadModelDto): Promise<void>;
+  cancelModelDownload(slot: ModelDownloadSlot): Promise<void>;
+  getModelDir(): Promise<string>;
+  readModelConfig(): Promise<ModelConfigDto>;
+  writeModelConfig(slot: ModelDownloadSlot, filename: string, sha256: string): Promise<ModelConfigDto>;
+  listInstalledModels(): Promise<InstalledModelDto[]>;
+  getSystemSpecs(): Promise<SystemSpecsDto>;
 }
