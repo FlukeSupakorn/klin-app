@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { router } from "@/app/router";
 import "@/styles/globals.css";
+import { logger } from "@/lib/logger";
 
 const isTauri = "__TAURI__" in window;
 const hash = window.location.hash;
@@ -11,6 +12,25 @@ const pathname = window.location.pathname;
 if (!isTauri && pathname !== "/oauth-callback" && hash.includes("access_token=")) {
   window.location.replace(`/oauth-callback${hash}`);
 }
+
+window.onerror = (message, source, lineno, colno, error) => {
+  logger.error("[global] unhandled error", {
+    message: String(message),
+    source,
+    lineno,
+    colno,
+    stack: error instanceof Error ? error.stack : undefined,
+  });
+  return false;
+};
+
+window.onunhandledrejection = (event: PromiseRejectionEvent) => {
+  const r = event.reason;
+  logger.error("[global] unhandled promise rejection", {
+    message: r instanceof Error ? r.message : String(r),
+    stack: r instanceof Error ? r.stack : undefined,
+  });
+};
 
 if (import.meta.env.DEV) {
   const originalFetch = window.fetch;

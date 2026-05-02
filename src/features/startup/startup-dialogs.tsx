@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, FolderOpen, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
+import { logger } from "@/lib/logger";
 
 const HEALTH_URL_CANDIDATES = [
   "http://127.0.0.1:8000/health",
@@ -142,8 +143,8 @@ async function ensureDefaultPathIfMissing(): Promise<{ path: string } | null> {
       useCategoryManagementStore.getState().categories,
     );
     return { path: suggestedPath };
-  } catch {
-    // Silently skip — bootstrap will handle the default path later
+  } catch (e) {
+    logger.warn("[startup] default path setup failed, bootstrap will retry", e);
     return null;
   }
 }
@@ -237,6 +238,7 @@ export async function runStartupChecks(): Promise<StartupCheckResult> {
     await tauriClient.ensureLlamaServer("embed");
   } catch (err) {
     embedEnsureError = err;
+    logger.error("[startup] embed model server failed to start", err);
   }
 
   const embedHealthy = await waitForSlotHealth(EMBED_SLOT_HEALTH_URL_CANDIDATES, EMBED_READY_TIMEOUT_MS);

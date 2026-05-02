@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 const NOTES_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/summary",
   "http://localhost:8000/api/summary",
@@ -77,6 +79,7 @@ function normalizeResponse(payload: unknown): NotesSummarizeResult {
 
 export const notesApiService = {
   async summarizeFromFiles(filePaths: string[]): Promise<NotesSummarizeResult> {
+    logger.info("[notes] summarize started", { fileCount: filePaths.length });
     const fallbackTitle = buildSuggestedTitleFromPaths(filePaths);
     return withLlama(['chat'], async () => {
       let lastError: unknown = null;
@@ -108,6 +111,7 @@ export const notesApiService = {
         }
       }
 
+      logger.error("[notes] summarize failed", lastError);
       throw lastError ?? new Error("Notes API unavailable");
     });
   },
@@ -219,6 +223,7 @@ export const notesApiService = {
             }
           }
 
+          logger.info("[notes] stream done", { processingTimeMs });
           return {
             summary,
             suggestedTitle,

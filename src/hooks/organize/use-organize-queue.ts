@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
+import { logger } from "@/lib/logger";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { isAbortError } from "@/lib/error-utils";
@@ -96,7 +97,7 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
             controller,
           };
 
-          console.info("[organize] analysis queued -> processing", {
+          logger.info("[organize] analysis queued -> processing", {
             itemId: nextQueuedItem.id,
             currentPath: nextQueuedItem.currentPath,
           });
@@ -109,7 +110,7 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
             controller.signal,
           );
 
-          console.info("[organize] analysis completed", {
+          logger.info("[organize] analysis completed", {
             itemId: nextQueuedItem.id,
             currentPath: nextQueuedItem.currentPath,
             status: analyzedItem.analysisStatus,
@@ -140,7 +141,7 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
         } catch (error) {
           const aborted = isAbortError(error);
           if (aborted) {
-            console.info("[organize] analysis aborted", {
+            logger.info("[organize] analysis aborted", {
               itemId: nextQueuedItem.id,
               currentPath: nextQueuedItem.currentPath,
             });
@@ -150,7 +151,7 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
 
           hasFailures = true;
           const reason = error instanceof Error ? error.message : "Unknown analysis error";
-          console.error("[organize] analysis failed", {
+          logger.error("[organize] analysis failed", {
             itemId: nextQueuedItem.id,
             currentPath: nextQueuedItem.currentPath,
             reason,

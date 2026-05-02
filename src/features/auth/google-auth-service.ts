@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 const GOOGLE_IDENTITY_SCRIPT_URL = "https://accounts.google.com/gsi/client";
 
 export const GOOGLE_CALENDAR_SCOPES = [
@@ -104,10 +106,10 @@ class GoogleAuthService {
         client_id: clientId,
         scope: GOOGLE_CALENDAR_SCOPES.join(" "),
         callback: (response: GoogleTokenResponse) => {
-          console.log("Google Auth Callback (default)", response);
+          logger.info("[auth] google token callback received");
         },
         error_callback: (err: unknown) => {
-          console.error("Google Auth Error", err);
+          logger.error("[auth] google auth error", err);
           this.activeErrorHandler?.(err);
         }
       });
@@ -163,7 +165,7 @@ class GoogleAuthService {
 
       tokenClient.callback = (response) => {
         clearTimeout(timeout);
-        console.log("Google Auth Response received", response);
+        logger.info("[auth] google auth response received");
         
         if (response.error) {
           settleReject(new Error(response.error_description ?? response.error ?? "Google sign-in failed"));
@@ -179,11 +181,11 @@ class GoogleAuthService {
       };
 
       try {
-        console.log("Opening Google Auth popup...");
+        logger.info("[auth] opening Google auth popup");
         tokenClient.requestAccessToken({ prompt });
       } catch (error) {
         clearTimeout(timeout);
-        console.error("Failed to trigger Google Auth popup", error);
+        logger.error("[auth] failed to trigger Google auth popup", error);
         settleReject(error instanceof Error ? error : new Error("Failed to request access token"));
       }
     });

@@ -10,6 +10,7 @@ import { getPathTail, joinPath } from "@/features/history/history-utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useUndoRedoStore } from "@/stores/use-undo-redo-store";
 import { normalizePath } from "@/lib/path-utils";
+import { logger } from "@/lib/logger";
 
 const HISTORY_PAGE_SIZE = 20;
 
@@ -198,7 +199,7 @@ export function HistoryPage() {
       });
       window.dispatchEvent(new Event("klin:history-updated"));
     } catch (e) {
-      console.error("[history] undo failed", e);
+      logger.error("[history] undo failed", e);
     }
   }, []);
 
@@ -219,7 +220,7 @@ export function HistoryPage() {
       });
       window.dispatchEvent(new Event("klin:history-updated"));
     } catch (e) {
-      console.error("[history] redo failed", e);
+      logger.error("[history] redo failed", e);
     }
   }, []);
 

@@ -6,6 +6,7 @@ import {
 } from "@/features/auth/google-auth-service";
 import { tauriClient } from "@/services/tauri-client";
 import { listen } from "@tauri-apps/api/event";
+import { logger } from "@/lib/logger";
 
 let deepLinkListenerReady = false;
 let deepLinkListenerPromise: Promise<void> | null = null;
@@ -19,7 +20,7 @@ async function ensureDeepLinkListener(handler: (url: string) => Promise<void>): 
   if (!deepLinkListenerPromise) {
     deepLinkListenerPromise = (async () => {
       await listen<string>("deep-link://oauth-callback", (event) => {
-        console.log("Deep link OAuth callback received:", event.payload);
+        logger.info("[auth] deep link OAuth callback received", { url: event.payload });
         void handler(event.payload);
       });
       deepLinkListenerReady = true;
@@ -71,7 +72,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
       try {
         await ensureDeepLinkListener((url) => get().handleDeepLinkCallback(url));
       } catch (error) {
-        console.error("Failed to set up deep link listener:", error);
+        logger.error("[auth] failed to set up deep link listener", error);
       }
 
       const restoredToken = get().accessToken;
@@ -290,7 +291,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   },
 
   handleDeepLinkCallback: async (url: string) => {
-    console.log("Processing deep link callback...", url);
+    logger.info("[auth] processing deep link callback", { url });
 
     const callbackData = googleAuthService.parseTokenFromUrl(url);
     if (!callbackData) {
@@ -312,7 +313,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
         profile,
         error: null,
       });
-      console.log("Successfully authenticated via deep link!");
+      logger.info("[auth] successfully authenticated via deep link");
     } catch (error) {
       set({
         status: "error",

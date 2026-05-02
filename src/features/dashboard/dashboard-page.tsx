@@ -12,6 +12,7 @@ import {
   Folder, FileText, History, Search, X, Zap,
 } from "lucide-react";
 import { getCategoryIcon, withAlpha } from "@/features/categories/category-appearance";
+import { logger } from "@/lib/logger";
 
 const ENTRY_TYPE_BG: Record<string, string> = {
   organize: "var(--primary)",
@@ -100,7 +101,8 @@ export function DashboardPage() {
         .sort((l, r) => new Date(r.timestamp).getTime() - new Date(l.timestamp).getTime())
         .slice(0, 5);
       setRecentHistoryEntries(rows);
-    } catch {
+    } catch (e) {
+      logger.warn("[dashboard] failed to load recent history", e);
       setRecentHistoryEntries([]);
     }
   }, []);

@@ -37,6 +37,7 @@ import {
   withAlpha,
 } from "@/features/categories/category-appearance";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 import { googleAuthService } from "@/features/auth/google-auth-service";
 import { useAuthStore } from "@/hooks/auth/use-auth-store";
 import { categoryManagementService } from "@/services/category-management-service";
@@ -452,7 +453,7 @@ export function SettingsPage() {
   ];
   const handleStartSlot = async (slot: "chat" | "embed") => {
     setStartingSlot(slot);
-    try { await tauriClient.ensureLlamaServer(slot); } catch (e) { console.error(e); }
+    try { await tauriClient.ensureLlamaServer(slot); } catch (e) { logger.error("[settings] ensureLlamaServer failed", e); }
     finally { setStartingSlot(null); void checkFastApiHealth(); }
   };
   const checkSlotHealth = async (slot: string, port: number) => {

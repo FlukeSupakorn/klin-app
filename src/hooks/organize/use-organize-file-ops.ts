@@ -13,6 +13,7 @@ import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
 import { splitDestinationPath, normalizePath } from "@/lib/path-utils";
 import { useUndoRedoStore } from "@/stores/use-undo-redo-store";
+import { logger } from "@/lib/logger";
 import type { OrganizePreviewItem } from "@/types/domain";
 
 export interface UseOrganizeFileOpsReturn {
@@ -61,7 +62,7 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
     setErrorMessage(null);
 
     try {
-      console.info("[organize] move started", {
+      logger.info("[organize] move started", {
         itemId: item.id,
         currentPath: item.currentPath,
         destinationPath: item.destinationPath,
@@ -98,7 +99,7 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
 
       await tauriClient.moveFile({ sourcePath: item.currentPath, destinationPath: item.destinationPath });
 
-      console.info("[organize] move completed", {
+      logger.info("[organize] move completed", {
         itemId: item.id,
         sourcePath: item.currentPath,
         destinationPath: item.destinationPath,
@@ -126,7 +127,7 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
       window.dispatchEvent(new Event("klin:history-updated"));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Move failed";
-      console.error("[organize] move failed", {
+      logger.error("[organize] move failed", {
         itemId: item.id,
         sourcePath: item.currentPath,
         destinationPath: item.destinationPath,
@@ -154,7 +155,7 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
     setErrorMessage(null);
 
     try {
-      console.info("[organize] undo started", {
+      logger.info("[organize] undo started", {
         itemId: item.id,
         sourcePath,
         destinationPath,
@@ -167,10 +168,10 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
           fileId: item.workerFileId,
           selectedName: null,
           selectedCategory: null,
-        }).catch((e) => console.warn("[organize] undo applyDecision failed", e));
+        }).catch((e) => logger.warn("[organize] undo applyDecision failed", e));
       }
 
-      console.info("[organize] undo completed", {
+      logger.info("[organize] undo completed", {
         itemId: item.id,
         sourcePath,
         destinationPath,
@@ -201,7 +202,7 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
       window.dispatchEvent(new Event("klin:history-updated"));
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Undo failed";
-      console.error("[organize] undo failed", {
+      logger.error("[organize] undo failed", {
         itemId: item.id,
         sourcePath,
         destinationPath,

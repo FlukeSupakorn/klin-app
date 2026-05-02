@@ -42,6 +42,14 @@ export interface SubdirEntry {
 
 export type ModelSlot = 'chat' | 'embed';
 
+export type FrontendLogLevel = "debug" | "info" | "warn" | "error";
+
+export interface FrontendLogPayload {
+  level: FrontendLogLevel;
+  message: string;
+  context?: string;
+}
+
 export interface TauriClient {
   moveFile(input: MoveFileDto): Promise<void>;
   readFolder(input: ReadFolderDto): Promise<string[]>;
@@ -72,4 +80,5 @@ export interface TauriClient {
   ensureCategoryFolders(paths: string[]): Promise<void>;
   writeTextFile(filePath: string, content: string): Promise<void>;
   statFiles(filePaths: string[]): Promise<(NoteFileEntryDto | null)[]>;
+  logFrontend(payload: FrontendLogPayload): Promise<void>;
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { DragEvent as ReactDragEvent } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { logger } from "@/lib/logger";
 
 interface UseOrganizeDragDropParams {
   openWithPaths: (paths: string[]) => Promise<void>;
@@ -28,8 +29,7 @@ export function useOrganizeDragDrop({
     let unlistenLegacyCancelled: (() => void) | undefined;
 
     const registerError = (label: string, error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[drag-drop] ${label}: ${message}`);
+      logger.error(`[drag-drop] ${label}`, error);
     };
 
     void appWindow

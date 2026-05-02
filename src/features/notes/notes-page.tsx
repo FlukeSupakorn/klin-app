@@ -8,6 +8,7 @@ import { notesFileService, type NoteFileItem } from "@/services/notes-file-servi
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
+import { logger } from "@/lib/logger";
 
 type NotesView = "list" | "editor";
 
@@ -291,6 +292,7 @@ export function NotesPage() {
       if (error instanceof DOMException && error.name === "AbortError") {
         setEditorNotice("Summary canceled.");
       } else {
+        logger.error("[notes] summarize UI failed", error);
         setEditorError(error instanceof Error ? error.message : "Failed to summarize selected files");
       }
     } finally {

@@ -6,10 +6,12 @@ import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 import { useUndoRedoStore } from "@/stores/use-undo-redo-store";
 import { normalizePath } from "@/lib/path-utils";
+import { logger } from "@/lib/logger";
 import type { AutomationJob, AutomationLog } from "@/types/domain";
 
 export async function processAutomationJob(job: AutomationJob): Promise<void> {
   const start = performance.now();
+  logger.info("[automation] job started", { fileName: job.fileName, filePath: job.filePath });
 
   try {
     const privacyStore = usePrivacyStore.getState();
@@ -80,7 +82,7 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
           setTimeout(() => reject(new Error("applyDecision timeout")), 8_000),
         );
         await Promise.race([applyPromise, timeoutPromise]).catch((e) =>
-          console.warn("[automation] applyDecision failed", e),
+          logger.warn("[automation] applyDecision failed", e),
         );
 
         useUndoRedoStore.getState().pushUndo({
@@ -107,6 +109,7 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
       status: "completed",
     };
 
+    logger.info("[automation] job completed", { fileName: job.fileName, moved: shouldMove, category: analyzed.selectedCategory });
     useHistoryStore.getState().appendLog(log);
     window.dispatchEvent(new Event("klin:history-updated"));
   } catch (error) {
@@ -126,6 +129,7 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
       errorMessage: error instanceof Error ? error.message : "Automation job failed",
     };
 
+    logger.error("[automation] job failed", error);
     useHistoryStore.getState().appendLog(failedLog);
   }
 }

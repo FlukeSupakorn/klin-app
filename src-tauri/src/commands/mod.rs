@@ -1,4 +1,5 @@
 pub mod app_commands;
+pub mod logging_commands;
 pub mod automation_commands;
 pub mod file_commands;
 pub mod history_commands;
@@ -9,6 +10,7 @@ pub mod path_commands;
 pub mod rule_commands;
 
 pub use app_commands::*;
+pub use logging_commands::*;
 pub use automation_commands::*;
 pub use file_commands::*;
 pub use history_commands::*;

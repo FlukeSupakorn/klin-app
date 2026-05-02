@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AutomationConfigDto,
+  FrontendLogPayload,
   ModelSlot,
   MoveFileDto,
   NoteFileEntryDto,
@@ -128,6 +129,10 @@ class TauriCommandClient implements TauriClient {
 
   statFiles(filePaths: string[]): Promise<(NoteFileEntryDto | null)[]> {
     return invoke("stat_files", { filePaths });
+  }
+
+  logFrontend(payload: FrontendLogPayload): Promise<void> {
+    return invoke("log_frontend", { payload });
   }
 }
 
