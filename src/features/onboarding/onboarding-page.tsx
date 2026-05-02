@@ -69,7 +69,7 @@ export function OnboardingPage() {
         const nextBasePath = prev.basePath || downloadsFolder;
         const hasDownloadsWatcher = prev.watcherFolders.some((folder) => folder.path === downloadsFolder);
         const nextWatchers = downloadsFolder && !hasDownloadsWatcher
-          ? [{ id: `watcher-${Date.now()}`, path: downloadsFolder, recursive: true }, ...prev.watcherFolders]
+          ? [{ id: `watcher-${Date.now()}`, path: downloadsFolder }, ...prev.watcherFolders]
           : prev.watcherFolders;
 
         return {

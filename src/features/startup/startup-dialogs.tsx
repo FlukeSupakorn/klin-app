@@ -9,20 +9,9 @@ const HEALTH_URL_CANDIDATES = [
   "http://localhost:8000/health",
 ];
 
-const CHAT_SLOT_HEALTH_URL_CANDIDATES = [
-  "http://127.0.0.1:8080/health",
-  "http://localhost:8080/health",
-];
-
-const EMBED_SLOT_HEALTH_URL_CANDIDATES = [
-  "http://127.0.0.1:8081/health",
-  "http://localhost:8081/health",
-];
-
 const STARTUP_POLL_INTERVAL_MS = 1200;
 const WORKER_READY_TIMEOUT_MS = 20_000;
 const CHAT_READY_TIMEOUT_MS = 75_000;
-const EMBED_READY_TIMEOUT_MS = 45_000;
 const HTTP_REQUEST_TIMEOUT_MS = 2500;
 
 const DEFAULT_PATH_URL_CANDIDATES = [
@@ -69,18 +58,6 @@ async function fetchWorkerHealthOnce(): Promise<WorkerHealthResponse> {
   return fetchFirstSuccess(HEALTH_URL_CANDIDATES, async (url) => fetchJsonWithTimeout<WorkerHealthResponse>(url));
 }
 
-async function probeSlotHealth(candidates: string[]): Promise<boolean> {
-  try {
-    await fetchFirstSuccess(candidates, async (url) => {
-      await fetchJsonWithTimeout<Record<string, unknown>>(url);
-      return true;
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function waitForWorkerHealth(timeoutMs: number): Promise<WorkerHealthResponse | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -92,19 +69,6 @@ async function waitForWorkerHealth(timeoutMs: number): Promise<WorkerHealthRespo
   }
 
   return null;
-}
-
-async function waitForSlotHealth(candidates: string[], timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const ok = await probeSlotHealth(candidates);
-    if (ok) {
-      return true;
-    }
-    await sleep(STARTUP_POLL_INTERVAL_MS);
-  }
-
-  return false;
 }
 
 async function ensureDefaultPathIfMissing(): Promise<{ path: string } | null> {
@@ -197,35 +161,18 @@ export async function runStartupChecks(): Promise<StartupCheckResult> {
   }
 
   let chatWarmupError: unknown = null;
-  let chatWarmupDone = false;
-  void warmupChatPromise
-    .then(() => {
-      chatWarmupDone = true;
-    })
-    .catch((err: unknown) => {
-      chatWarmupError = err;
-    });
-
-  const chatDeadline = Date.now() + CHAT_READY_TIMEOUT_MS;
-  let chatHealthy = false;
-  while (Date.now() < chatDeadline) {
-    if (chatWarmupDone) {
-      chatHealthy = true;
-      break;
-    }
-
-    if (await probeSlotHealth(CHAT_SLOT_HEALTH_URL_CANDIDATES)) {
-      // HTTP /health is 200 — wait for the Tauri warmup command to finish too so
-      // the Rust phase is definitively Running before the user can trigger organize.
-      await warmupChatPromise.catch(() => undefined);
-      chatHealthy = true;
-      break;
-    }
-
-    await sleep(STARTUP_POLL_INTERVAL_MS);
+  try {
+    await Promise.race([
+      warmupChatPromise,
+      new Promise<never>((_, reject) =>
+        window.setTimeout(() => reject(new Error("chat warmup timeout")), CHAT_READY_TIMEOUT_MS),
+      ),
+    ]);
+  } catch (err) {
+    chatWarmupError = err;
   }
 
-  if (!chatHealthy) {
+  if (chatWarmupError) {
     const reason = chatWarmupError instanceof Error ? chatWarmupError.message : "chat slot is not healthy";
     healthIssues.push({
       name: "LLM Chat",
@@ -241,8 +188,7 @@ export async function runStartupChecks(): Promise<StartupCheckResult> {
     logger.error("[startup] embed model server failed to start", err);
   }
 
-  const embedHealthy = await waitForSlotHealth(EMBED_SLOT_HEALTH_URL_CANDIDATES, EMBED_READY_TIMEOUT_MS);
-  if (!embedHealthy) {
+  if (embedEnsureError) {
     const reason = embedEnsureError instanceof Error ? embedEnsureError.message : "embed slot is not healthy";
     healthIssues.push({
       name: "LLM Embedding",

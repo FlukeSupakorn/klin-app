@@ -9,10 +9,6 @@ import {
   FolderInput,
   FolderOpen,
   Info,
-  Plus,
-  RefreshCw,
-  ToggleLeft,
-  ToggleRight,
   Trash2,
 } from "lucide-react";
 
@@ -32,7 +28,6 @@ export function WatcherStep({
   onBack,
 }: WatcherStepProps) {
   const [newPath, setNewPath] = useState("");
-  const [newRecursive, setNewRecursive] = useState(true);
   const [error, setError] = useState("");
 
   const addFolder = (pathOverride?: string) => {
@@ -48,10 +43,9 @@ export function WatcherStep({
     setError("");
     onFoldersChange([
       ...folders,
-      { id: `watcher-${Date.now()}`, path: trimmed, recursive: newRecursive },
+      { id: `watcher-${Date.now()}`, path: trimmed },
     ]);
     setNewPath("");
-    setNewRecursive(true);
   };
 
   const handleBrowse = async () => {
@@ -62,7 +56,7 @@ export function WatcherStep({
         setError("");
         onFoldersChange([
           ...folders,
-          { id: `watcher-${Date.now()}`, path: trimmed, recursive: newRecursive },
+          { id: `watcher-${Date.now()}`, path: trimmed },
         ]);
       }
     }
@@ -70,14 +64,6 @@ export function WatcherStep({
 
   const removeFolder = (id: string) => {
     onFoldersChange(folders.filter((f) => f.id !== id));
-  };
-
-  const toggleRecursive = (id: string) => {
-    onFoldersChange(
-      folders.map((f) =>
-        f.id === id ? { ...f, recursive: !f.recursive } : f
-      )
-    );
   };
 
 
@@ -142,24 +128,6 @@ export function WatcherStep({
             {error}
           </div>
         )}
-
-        {/* Recursive toggle */}
-        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/30 px-3 py-2.5">
-          <button
-            onClick={() => setNewRecursive(!newRecursive)}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {newRecursive ? (
-              <ToggleRight className="h-5 w-5 text-primary" />
-            ) : (
-              <ToggleLeft className="w-5 h-5" />
-            )}
-            <span>
-              <strong className="text-foreground">Recursive</strong> — also
-              watch subdirectories
-            </span>
-          </button>
-        </div>
       </div>
 
       {/* Folder list */}
@@ -183,18 +151,8 @@ export function WatcherStep({
                   <p className="text-xs font-mono text-foreground truncate">
                     {folder.path}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {folder.recursive ? "Watching recursively" : "Top-level only"}
-                  </p>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => toggleRecursive(folder.id)}
-                    title={folder.recursive ? "Disable recursive" : "Enable recursive"}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                  </button>
                   <button
                     onClick={() => removeFolder(folder.id)}
                     className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"

@@ -17,7 +17,6 @@ export interface Category {
 export interface WatcherFolder {
   id: string;
   path: string;
-  recursive: boolean;
 }
 
 export interface OnboardingState {
