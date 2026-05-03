@@ -12,7 +12,6 @@ interface DefaultFolderStepProps {
   value: string;
   onChange: (val: string) => void;
   onNext: () => void;
-  onBack: () => void;
 }
 
 const SUGGESTED_PATHS = [
@@ -26,7 +25,6 @@ export function DefaultFolderStep({
   value,
   onChange,
   onNext,
-  onBack,
 }: DefaultFolderStepProps) {
   const [isBrowsing, setIsBrowsing] = useState(false);
 
@@ -57,7 +55,7 @@ export function DefaultFolderStep({
       <div className="space-y-1.5">
         <div className="mb-1 flex items-center gap-2 text-primary">
           <FolderOpen className="w-4 h-4" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-primary">Step 2 of 4</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-primary">Step 1 of 4</span>
         </div>
         <h2 className="font-syne text-2xl font-black uppercase tracking-tight text-foreground">Default Folder</h2>
         <p className="text-sm text-muted-foreground leading-relaxed text-pretty">
@@ -126,15 +124,8 @@ export function DefaultFolderStep({
       {/* Actions */}
       <div className="flex items-center gap-3">
         <Button
-          variant="ghost"
-          onClick={onBack}
-          className="flex-1 border border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          Back
-        </Button>
-        <Button
           onClick={handleNext}
-          className="flex-2 font-semibold"
+          className="flex-1 font-semibold"
           disabled={isBrowsing || !value.trim()}
         >
           {isBrowsing ? "Opening..." : "Continue"}

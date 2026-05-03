@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import { StepProgress } from "./step-progress";
-import { WelcomeStep } from "./step/welcome-step";
 import { DefaultFolderStep } from "./step/default-folder-step";
 import { CategoriesStep } from "./step/categories-step";
 import { WatcherStep } from "./step/watcher-step";
@@ -18,7 +17,6 @@ import { joinFolderPath } from "@/lib/path-utils";
 import type { ManagedCategory } from "@/types/domain";
 
 const STEP_ORDER: OnboardingStep[] = [
-  "welcome",
   "base-path",
   "categories",
   "watcher",
@@ -46,7 +44,7 @@ export function OnboardingPage() {
   const navigate = useNavigate();
 
   const [state, setState] = useState<OnboardingState>({
-    step: "welcome",
+    step: "base-path",
     basePath: "",
     categories: [],
     watcherFolders: [],
@@ -188,7 +186,7 @@ export function OnboardingPage() {
     }
   };
 
-  const showProgress = state.step !== "welcome" && state.step !== "complete";
+  const showProgress = state.step !== "complete";
 
   return (
     <div className="min-h-screen bg-background px-4 py-8 md:py-10">
@@ -212,8 +210,6 @@ export function OnboardingPage() {
           )}
           style={{ transitionDuration: "220ms" }}
         >
-          {state.step === "welcome" && <WelcomeStep onNext={goNext} />}
-
           {state.step === "base-path" && (
             <DefaultFolderStep
               value={state.basePath}
@@ -221,7 +217,6 @@ export function OnboardingPage() {
                 setState((prev) => ({ ...prev, basePath: val }))
               }
               onNext={goNext}
-              onBack={goBack}
             />
           )}
 

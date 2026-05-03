@@ -12,6 +12,8 @@ import { OnboardingPage } from "@/features/onboarding/onboarding-page";
 import { OnboardingGuard } from "@/features/onboarding/onboarding-guard";
 import { ModelDownloadGuard } from "@/features/model-download/model-download-guard";
 import { ModelDownloadPage } from "@/features/model-download/model-download-page";
+import { WelcomeGuard } from "@/features/welcome/welcome-guard";
+import { WelcomePage } from "@/features/welcome/welcome-page";
 
 export const router = createBrowserRouter([
   {
@@ -20,19 +22,24 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
   },
   {
+    path: "/welcome",
+    element: <WelcomePage />,
+    errorElement: <RouteErrorPage />,
+  },
+  {
     path: "/onboarding",
-    element: <ModelDownloadGuard><OnboardingPage /></ModelDownloadGuard>,
+    element: <WelcomeGuard><ModelDownloadGuard><OnboardingPage /></ModelDownloadGuard></WelcomeGuard>,
     errorElement: <RouteErrorPage />,
   },
   {
     path: "/model-download",
-    element: <ModelDownloadPage />,
+    element: <WelcomeGuard><ModelDownloadPage /></WelcomeGuard>,
     errorElement: <RouteErrorPage />,
   },
   {
     path: "/",
-    // This already wraps the entire app in a guard that checks onboarding status, AppShell already inside.
-    element: <ModelDownloadGuard><OnboardingGuard /></ModelDownloadGuard>,
+    // First-run chain: Welcome → ModelDownload → Onboarding → AppShell. Each guard handles its own concern.
+    element: <WelcomeGuard><ModelDownloadGuard><OnboardingGuard /></ModelDownloadGuard></WelcomeGuard>,
     errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <DashboardPage /> },

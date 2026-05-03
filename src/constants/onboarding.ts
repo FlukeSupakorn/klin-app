@@ -84,7 +84,6 @@ export const DEFAULT_CATEGORIES: Category[] = [
 ];
 
 export const STEPS: { id: OnboardingStep; label: string; shortLabel: string }[] = [
-  { id: "welcome", label: "Welcome", shortLabel: "Welcome" },
   { id: "base-path", label: "Base Path", shortLabel: "Base Path" },
   { id: "categories", label: "Categories", shortLabel: "Categories" },
   { id: "watcher", label: "Watcher", shortLabel: "Watcher" },

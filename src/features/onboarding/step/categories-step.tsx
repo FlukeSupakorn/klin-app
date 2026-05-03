@@ -73,7 +73,7 @@ export function CategoriesStep({
         <div className="mb-1 flex items-center gap-2 text-primary">
           <Sparkles className="w-4 h-4" />
           <span className="text-[10px] font-black uppercase tracking-widest">
-            Step 3 of 4
+            Step 2 of 4
           </span>
         </div>
         <div className="flex items-start justify-between gap-4">

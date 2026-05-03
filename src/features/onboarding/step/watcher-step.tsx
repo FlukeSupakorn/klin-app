@@ -74,7 +74,7 @@ export function WatcherStep({
         <div className="mb-1 flex items-center gap-2 text-primary">
           <Eye className="w-4 h-4" />
           <span className="text-[10px] font-black uppercase tracking-widest">
-            Step 4 of 4
+            Step 3 of 4
           </span>
         </div>
         <h2 className="font-syne text-2xl font-black uppercase tracking-tight text-foreground">Watcher Folders</h2>

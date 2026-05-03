@@ -303,10 +303,10 @@ export function CalendarPage() {
                   </div>
                   <div className="min-w-0 flex-1 pb-1">
                     <div className="text-[13px] font-bold text-foreground">{ev.title}</div>
-                    {ev.time && (
+                    {!ev.isAllDay && (
                       <div className="mt-1 flex items-center gap-1.5">
                         <Clock className="h-2.5 w-2.5 text-muted-foreground" />
-                        <span className="text-[11.5px] text-muted-foreground">{ev.time}</span>
+                        <span className="text-[11.5px] text-muted-foreground">{ev.start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                     )}
                   </div>

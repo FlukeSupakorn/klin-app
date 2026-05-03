@@ -202,12 +202,6 @@ export function ModelDownloadPage() {
     <div className="min-h-screen bg-background px-4 py-8 md:py-10">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
         <div className="space-y-1.5">
-          <div className="mb-1 flex items-center gap-2 text-primary">
-            <Bot className="w-4 h-4" />
-            <span className="text-[10px] font-black uppercase tracking-widest">
-              First run
-            </span>
-          </div>
           <h2 className="font-syne text-2xl font-black uppercase tracking-tight text-foreground">Download AI Models</h2>
           <p className="text-sm text-muted-foreground leading-relaxed text-pretty">
             KLIN needs local AI models before setup can continue. Downloads are saved to your app data folder and reused on future launches.
