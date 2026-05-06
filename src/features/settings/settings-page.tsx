@@ -3,6 +3,7 @@ import {
   Activity,
   CheckCircle2,
   ChevronDown,
+  Cpu,
   Eye,
   FileText,
   FileX2,
@@ -50,8 +51,9 @@ import { usePrivacyStore } from "@/stores/use-privacy-store";
 import type { ManagedCategory } from "@/types/domain";
 import { joinFolderPath } from "@/lib/path-utils";
 import { useNavigate } from "react-router-dom";
+import { ModelSettingsTab } from "./model-settings-tab";
 
-type SettingsTab = "account" | "config" | "automation" | "security" | "developer";
+type SettingsTab = "account" | "config" | "automation" | "security" | "model" | "developer";
 type CategoryEditorMode = "add" | "edit";
 
 interface CategoryFormState {
@@ -87,6 +89,7 @@ const MAIN_TABS: Array<{ id: SettingsTab; label: string; icon: React.ElementType
   { id: "account", label: "Account", icon: UserCircle2 },
   { id: "config", label: "Configuration", icon: SlidersHorizontal },
   { id: "automation", label: "Automation", icon: Zap },
+  { id: "model", label: "Model", icon: Cpu },
   { id: "security", label: "Security", icon: ShieldCheck },
 ];
 
@@ -1045,6 +1048,9 @@ export function SettingsPage() {
               </div>
             </div>
           )}
+
+          {/* ── Model ── */}
+          {activeTab === "model" && <ModelSettingsTab />}
 
           {/* ── Developer (DEV only) ── */}
           {activeTab === "developer" && import.meta.env.DEV && (
