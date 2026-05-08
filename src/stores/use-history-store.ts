@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { AutomationLog, LogFilter, PaginationState } from "@/types/domain";
 
+const MAX_LOGS = 500;
+
 interface HistoryStoreState {
   logs: AutomationLog[];
   filters: LogFilter;
@@ -28,8 +30,9 @@ export const useHistoryStore = create<HistoryStoreState>()(
         page: 1,
         pageSize: 10,
       },
-      setLogs: (logs) => set({ logs }),
-      appendLog: (log) => set((state) => ({ logs: [log, ...state.logs] })),
+      setLogs: (logs) => set({ logs: logs.slice(0, MAX_LOGS) }),
+      appendLog: (log) =>
+        set((state) => ({ logs: [log, ...state.logs].slice(0, MAX_LOGS) })),
       setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters } })),
       setPage: (page) => set((state) => ({ pagination: { ...state.pagination, page } })),
       setPageSize: (pageSize) =>
@@ -55,6 +58,11 @@ export const useHistoryStore = create<HistoryStoreState>()(
     }),
     {
       name: "klin-history-store",
+      onRehydrateStorage: () => (state) => {
+        if (state && state.logs.length > MAX_LOGS) {
+          setTimeout(() => state.setLogs(state.logs), 0);
+        }
+      },
     },
   ),
 );

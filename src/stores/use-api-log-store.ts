@@ -21,7 +21,7 @@ interface ApiLogStoreState {
 }
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_LOGS = 1000;
+const MAX_LOGS = 200;
 
 export const useApiLogStore = create<ApiLogStoreState>()(
   persist(
@@ -51,6 +51,9 @@ export const useApiLogStore = create<ApiLogStoreState>()(
     }),
     {
       name: "klin-api-log-store",
+      partialize: (state) => ({
+        logs: state.logs.map(({ requestBody: _rb, responseBody: _rs, ...rest }) => rest),
+      }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           // Cleanup old logs right after the store is rehydrated from localStorage

@@ -314,10 +314,13 @@ export async function createGoogleCalendarEvent(
     body.description = input.description.trim();
   }
   if (input.attendees && input.attendees.length > 0) {
-    body.attendees = input.attendees
+    const emailAttendees = input.attendees
       .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0)
-      .map((entry) => (entry.includes("@") ? { email: entry } : { displayName: entry }));
+      .filter((entry) => entry.length > 0 && entry.includes("@"))
+      .map((entry) => ({ email: entry }));
+    if (emailAttendees.length > 0) {
+      body.attendees = emailAttendees;
+    }
   }
 
   const response = await fetch(
