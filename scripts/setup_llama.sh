@@ -245,6 +245,7 @@ configure_windows_with_generators() {
     local -a extra_flags=("$@")
     for gen in "${WINDOWS_GENERATORS[@]}"; do
         log "Trying CMake generator: ${gen}"
+        rm -rf "${TMP_DIR}/build"
         if cmake -G "$gen" -A x64 -B "${TMP_DIR}/build" -S "$TMP_DIR" \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLAMA_BUILD_SERVER=ON \

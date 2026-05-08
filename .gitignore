@@ -36,6 +36,7 @@ src-tauri/target/
 src-tauri/.tauri/
 src-tauri/gen/
 src-tauri/bundle/
+/src-tauri/binaries/
 
 # macOS app bundle
 *.app
@@ -100,4 +101,4 @@ test-results/
 models/
 
 Notes/
-/src-tauri/binaries
+
