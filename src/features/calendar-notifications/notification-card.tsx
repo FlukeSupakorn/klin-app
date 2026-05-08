@@ -47,7 +47,7 @@ export function NotificationCard({ event, onOpen, disabled = false }: Notificati
     >
       <div
         className="absolute inset-y-0 left-0 w-[3px]"
-        style={{ background: "var(--purple)" }}
+        style={{ background: "var(--secondary)" }}
       />
 
       <button
@@ -59,11 +59,11 @@ export function NotificationCard({ event, onOpen, disabled = false }: Notificati
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
           style={{
-            background: "color-mix(in oklab, var(--purple) 18%, transparent)",
-            border: "1px solid color-mix(in oklab, var(--purple) 30%, transparent)",
+            background: "color-mix(in oklab, var(--secondary) 18%, transparent)",
+            border: "1px solid color-mix(in oklab, var(--secondary) 30%, transparent)",
           }}
         >
-          <CalendarPlus className="h-4 w-4" style={{ color: "var(--purple)" }} />
+          <CalendarPlus className="h-4 w-4" style={{ color: "var(--secondary)" }} />
         </div>
 
         <div className="min-w-0 flex-1">

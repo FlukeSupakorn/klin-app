@@ -20,13 +20,11 @@ import { useCalendarNotificationsStore } from "@/stores/use-calendar-notificatio
 
 const ENTRY_TYPE_BG: Record<string, string> = {
   organize: "var(--primary)",
-  summary: "var(--secondary-foreground)",
-  calendar: "var(--success)",
+  calendar: "var(--secondary)",
 };
 const ENTRY_TYPE_FG: Record<string, string> = {
   organize: "var(--primary-foreground)",
-  summary: "#fff",
-  calendar: "#fff",
+  calendar: "var(--secondary-foreground)",
 };
 
 const searchResultGrads = [

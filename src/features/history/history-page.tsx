@@ -17,7 +17,6 @@ const HISTORY_PAGE_SIZE = 20;
 const TYPE_FILTERS: Array<{ label: string; value: "all" | HistoryEntryType }> = [
   { label: "All", value: "all" },
   { label: "Organize", value: "organize" },
-  { label: "Note", value: "summary" },
   { label: "Calendar", value: "calendar" },
 ];
 

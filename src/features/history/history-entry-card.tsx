@@ -8,14 +8,12 @@ import { formatTime, getFolderTail } from "@/features/history/history-utils";
 
 const ENTRY_BG: Record<string, string> = {
   organize: "var(--primary)",
-  summary: "var(--secondary-foreground)",
-  calendar: "var(--primary)",
+  calendar: "var(--secondary)",
 };
 
 const ENTRY_FG: Record<string, string> = {
   organize: "var(--primary-foreground)",
-  summary: "#fff",
-  calendar: "var(--primary-foreground)",
+  calendar: "var(--secondary-foreground)",
 };
 
 function confColor(c: number): string {

@@ -46,8 +46,8 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
         className="flex items-center gap-2 border-b border-border px-3.5 py-2.5"
         style={{ background: "var(--muted)" }}
       >
-        <CalendarPlus className="h-3.5 w-3.5" style={{ color: "var(--purple)" }} />
-        <span className="text-[10.5px] font-extrabold uppercase tracking-widest" style={{ color: "var(--purple)" }}>
+        <CalendarPlus className="h-3.5 w-3.5" style={{ color: "var(--secondary-foreground)" }} />
+        <span className="text-[10.5px] font-extrabold uppercase tracking-widest" style={{ color: "var(--secondary-foreground)" }}>
           Calendar events detected
         </span>
         <span className="ml-auto text-[10.5px] text-muted-foreground">

@@ -10,22 +10,22 @@ export function HistoryCalendarDetails({ entry }: HistoryCalendarDetailsProps) {
       <div className="grid gap-3 md:grid-cols-2">
         <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
           <p className="text-xs text-muted-foreground">Source File</p>
-          <p className="font-medium">{entry.sourceFileName}</p>
+          <p className="font-medium">{entry.sourceFileName || "-"}</p>
         </div>
         <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
           <p className="text-xs text-muted-foreground">Meeting Title</p>
-          <p className="font-medium">{entry.meetingTitle}</p>
+          <p className="font-medium">{entry.meetingTitle || "-"}</p>
         </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
           <p className="text-xs text-muted-foreground">Meeting Time</p>
-          <p className="font-medium">{entry.meetingTime}</p>
+          <p className="font-medium">{entry.meetingTime || "-"}</p>
         </div>
         <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
           <p className="text-xs text-muted-foreground">Meeting Location</p>
-          <p className="font-medium">{entry.meetingLocation}</p>
+          <p className="font-medium">{entry.meetingLocation || "-"}</p>
         </div>
       </div>
 
@@ -40,15 +40,9 @@ export function HistoryCalendarDetails({ entry }: HistoryCalendarDetailsProps) {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
-          <p className="text-xs text-muted-foreground">Status</p>
-          <p className="font-medium">{entry.status || "-"}</p>
-        </div>
-        <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
-          <p className="text-xs text-muted-foreground">Calendar</p>
-          <p className="font-medium">{entry.calendarId || "-"}</p>
-        </div>
+      <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
+        <p className="text-xs text-muted-foreground">Status</p>
+        <p className="font-medium">{entry.status || "-"}</p>
       </div>
 
       <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
@@ -74,12 +68,12 @@ export function HistoryCalendarDetails({ entry }: HistoryCalendarDetailsProps) {
 
       <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-sm">
         <p className="text-xs text-muted-foreground">Action</p>
-        <p className="font-medium">{entry.actionLabel}</p>
+        <p className="font-medium">{entry.actionLabel || "-"}</p>
       </div>
 
       <div className="rounded-xl border border-border/60 bg-background p-3 text-sm">
         <p className="text-xs text-muted-foreground">Details</p>
-        <p className="font-medium">{entry.details}</p>
+        <p className="font-medium">{entry.details || "-"}</p>
       </div>
     </div>
   );

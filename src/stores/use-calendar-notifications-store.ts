@@ -137,6 +137,8 @@ export const useCalendarNotificationsStore = create<CalendarNotificationsState>(
         modalEventId: state.modalEventId === id ? null : state.modalEventId,
       }));
 
+      window.dispatchEvent(new Event("klin:history-updated"));
+
       const eventTitle = event.event.title || "Untitled event";
       toast.custom(
         (toastId) =>
@@ -174,6 +176,7 @@ export const useCalendarNotificationsStore = create<CalendarNotificationsState>(
         events: state.events.filter((e) => e.id !== id),
         modalEventId: state.modalEventId === id ? null : state.modalEventId,
       }));
+      window.dispatchEvent(new Event("klin:history-updated"));
     } catch (error) {
       logger.error("[calendar-notifications] reject failed", error);
       showErrorToast("Calendar Error", "Failed to dismiss event.");

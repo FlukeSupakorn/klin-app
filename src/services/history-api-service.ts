@@ -57,6 +57,8 @@ function normalizeEntries(payload: unknown): HistoryEntry[] {
         ? "organize"
         : action === "note"
           ? "summary"
+        : action === "calendar_event_approved" || action === "calendar_event_rejected"
+          ? "calendar"
         : "";
       const type = "type" in entry ? String(entry.type ?? inferredType) : inferredType;
       const timestamp =
