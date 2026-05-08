@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -7,9 +8,16 @@ static APP_ENV: OnceLock<HashMap<String, String>> = OnceLock::new();
 static APP_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 fn app_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .map(Path::to_path_buf)
+    if cfg!(debug_assertions) {
+        return PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."));
+    }
+
+    env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(Path::to_path_buf))
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
@@ -30,7 +38,27 @@ fn parse_env_value(raw: &str) -> String {
     trimmed.to_string()
 }
 
+fn should_load_env_file() -> bool {
+    if cfg!(debug_assertions) {
+        return true;
+    }
+
+    matches!(
+        env::var("KLIN_LOAD_ENV")
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase()
+            .as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
 fn load_env_map() -> HashMap<String, String> {
+    if !should_load_env_file() {
+        tracing::info!("[startup] env file loading disabled (set KLIN_LOAD_ENV=1 to enable)");
+        return HashMap::new();
+    }
+
     let path = app_env_path();
     let Ok(contents) = fs::read_to_string(&path) else {
         tracing::info!("[startup] env file not found: {}", path.display());
