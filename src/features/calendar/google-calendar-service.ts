@@ -253,6 +253,105 @@ class GoogleCalendarService {
   }
 }
 
+export interface CalendarEventCreateInput {
+  title: string;
+  startIso: string; // local-naive ISO (e.g. 2026-04-12T14:00:00) or date-only when allDay
+  endIso?: string;
+  allDay: boolean;
+  location?: string;
+  attendees?: string[];
+  description?: string;
+  timeZone: string; // IANA, attached at create time
+}
+
+export interface CreatedCalendarEvent {
+  id: string;
+  htmlLink?: string;
+}
+
+function pickEventDate(input: CalendarEventCreateInput, isStart: boolean): GoogleCalendarEventDateTime {
+  if (input.allDay) {
+    const raw = isStart ? input.startIso : (input.endIso || input.startIso);
+    const datePart = raw.includes("T") ? raw.split("T")[0] : raw;
+    return { date: datePart };
+  }
+
+  const value = isStart ? input.startIso : input.endIso;
+  if (value && value.length > 0) {
+    return { dateTime: value, timeZone: input.timeZone } as GoogleCalendarEventDateTime & { timeZone: string };
+  }
+
+  // Fallback for missing end: +1 hour from start, naive concatenation.
+  if (!isStart) {
+    const start = new Date(input.startIso);
+    if (!Number.isNaN(start.getTime())) {
+      const end = new Date(start.getTime() + 60 * 60 * 1000);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const local =
+        `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}` +
+        `T${pad(end.getHours())}:${pad(end.getMinutes())}:${pad(end.getSeconds())}`;
+      return { dateTime: local, timeZone: input.timeZone } as GoogleCalendarEventDateTime & { timeZone: string };
+    }
+  }
+
+  return { dateTime: input.startIso, timeZone: input.timeZone } as GoogleCalendarEventDateTime & { timeZone: string };
+}
+
+export async function createGoogleCalendarEvent(
+  accessToken: string,
+  input: CalendarEventCreateInput,
+): Promise<CreatedCalendarEvent> {
+  const body: Record<string, unknown> = {
+    summary: input.title,
+    start: pickEventDate(input, true),
+    end: pickEventDate(input, false),
+  };
+
+  if (input.location && input.location.trim()) {
+    body.location = input.location.trim();
+  }
+  if (input.description && input.description.trim()) {
+    body.description = input.description.trim();
+  }
+  if (input.attendees && input.attendees.length > 0) {
+    body.attendees = input.attendees
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0)
+      .map((entry) => (entry.includes("@") ? { email: entry } : { displayName: entry }));
+  }
+
+  const response = await fetch(
+    "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+  if (response.status === 401) {
+    throw new CalendarTokenExpiredError();
+  }
+
+  if (!response.ok) {
+    let payload: GoogleApiErrorPayload | null = null;
+    try {
+      payload = (await response.json()) as GoogleApiErrorPayload;
+    } catch {
+      payload = null;
+    }
+    const apiMessage = payload?.error?.message ?? `Calendar API error (${response.status})`;
+    const apiReason = payload?.error?.errors?.[0]?.reason ?? null;
+    throw new CalendarApiError(response.status, apiMessage, apiReason);
+  }
+
+  const data = (await response.json()) as { id: string; htmlLink?: string };
+  return { id: data.id, htmlLink: data.htmlLink };
+}
+
 export function getMonthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }

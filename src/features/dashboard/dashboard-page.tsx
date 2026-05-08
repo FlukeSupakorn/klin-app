@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 import { getCategoryIcon, withAlpha } from "@/features/categories/category-appearance";
 import { logger } from "@/lib/logger";
+import { NotificationBellButton } from "@/features/calendar-notifications/notification-bell-button";
+import { NotificationPanel } from "@/features/calendar-notifications/notification-panel";
+import { EventDetailModal } from "@/features/calendar-notifications/event-detail-modal";
+import { useCalendarNotificationsStore } from "@/stores/use-calendar-notifications-store";
 
 const ENTRY_TYPE_BG: Record<string, string> = {
   organize: "var(--primary)",
@@ -59,6 +63,11 @@ export function DashboardPage() {
   const [hoverLeft, setHoverLeft] = useState(false);
   const [hoverRight, setHoverRight] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  const isNotificationPanelOpen = useCalendarNotificationsStore((s) => s.isPanelOpen);
+  const toggleNotificationPanel = useCalendarNotificationsStore((s) => s.togglePanel);
+  const closeNotificationPanel = useCalendarNotificationsStore((s) => s.closePanel);
+  const refreshNotifications = useCalendarNotificationsStore((s) => s.refresh);
 
   const categories = useCategoryManagementStore((state) => state.categories);
   const categoriesRef = useRef(categories);
@@ -110,10 +119,14 @@ export function DashboardPage() {
   useEffect(() => {
     void loadRecentHistory();
     void loadCatCounts();
-    const onHistoryUpdated = () => { void loadRecentHistory(); void loadCatCounts(); };
+    const onHistoryUpdated = () => {
+      void loadRecentHistory();
+      void loadCatCounts();
+      void refreshNotifications();
+    };
     window.addEventListener("klin:history-updated", onHistoryUpdated);
     return () => { window.removeEventListener("klin:history-updated", onHistoryUpdated); };
-  }, [loadRecentHistory, loadCatCounts]);
+  }, [loadRecentHistory, loadCatCounts, refreshNotifications]);
 
   // Close search dropdown on click outside
   useEffect(() => {
@@ -155,6 +168,7 @@ export function DashboardPage() {
 
   return (
     <div className="flex h-full flex-col gap-5 overflow-hidden">
+      <EventDetailModal />
       {/* Header: greeting + semantic search */}
       <div className="flex shrink-0 items-center gap-3">
         <div className="min-w-0 flex-1">
@@ -162,6 +176,12 @@ export function DashboardPage() {
           <h1 className="mt-0.5 text-[21px] font-extrabold tracking-tight text-foreground" style={{ letterSpacing: "-0.4px" }}>
             Your File Intelligence Hub
           </h1>
+        </div>
+
+        {/* Calendar notification bell */}
+        <div className="relative shrink-0">
+          <NotificationBellButton onClick={toggleNotificationPanel} open={isNotificationPanelOpen} />
+          <NotificationPanel open={isNotificationPanelOpen} onClose={closeNotificationPanel} />
         </div>
 
         {/* Semantic search */}
