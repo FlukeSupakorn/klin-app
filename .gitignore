@@ -100,4 +100,4 @@ test-results/
 models/
 
 Notes/
-src-tauri/binaries/klin-worker.exe
+/src-tauri/binaries
