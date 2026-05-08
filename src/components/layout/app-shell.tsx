@@ -13,7 +13,6 @@ import {
   History,
   LayoutGrid,
   Settings,
-  Folder,
   X,
   Zap,
 } from "lucide-react";
@@ -65,6 +64,7 @@ export function AppShell() {
 
   const initializeAuth = useAuthStore((state) => state.initialize);
   const profile = useAuthStore((state) => state.profile);
+  const login = useAuthStore((state) => state.login);
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
   const isAutomationRunning = useAutomationStore((state) => state.isRunning);
   const concurrencyLimit = useAutomationStore((state) => state.concurrencyLimit);
@@ -229,12 +229,11 @@ export function AppShell() {
         <div className="shrink-0 border-b border-border p-4">
           {/* Logo */}
           <div className="mb-4 flex items-center gap-2.5">
-            <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
-              style={{ background: "var(--primary)" }}
-            >
-              <Folder className="h-4 w-4 text-white" />
-            </div>
+            <img
+              src={klinLogo}
+              alt="KLIN"
+              className="h-8 w-8 shrink-0 object-contain"
+            />
             <span className="text-base font-extrabold tracking-tight text-foreground">KLIN</span>
           </div>
 
@@ -314,22 +313,36 @@ export function AppShell() {
 
         {/* User footer */}
         <div className="shrink-0 border-t border-border p-3">
-          <div className="flex items-center gap-2.5">
-            <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white"
-              style={{ background: profile?.picture ? undefined : "var(--primary)" }}
-            >
-              {profile?.picture ? (
+          <button
+            type="button"
+            onClick={() => { if (!profile) void login(); }}
+            disabled={!!profile}
+            aria-label={profile ? profile.name ?? "Profile" : "Sign in"}
+            className="flex w-full items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none disabled:cursor-default disabled:hover:bg-transparent"
+          >
+            {profile?.picture ? (
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white">
                 <img
                   src={profile.picture}
                   alt={profile.name ?? "Profile"}
                   referrerPolicy="no-referrer"
                   className="h-full w-full rounded-full object-cover"
                 />
-              ) : (
-                profile ? profileInitial : "K"
-              )}
-            </div>
+              </div>
+            ) : profile ? (
+              <div
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white"
+                style={{ background: "var(--primary)" }}
+              >
+                {profileInitial}
+              </div>
+            ) : (
+              <img
+                src={klinLogo}
+                alt="KLIN"
+                className="h-8 w-8 shrink-0 object-contain"
+              />
+            )}
             <div className="min-w-0">
               {profile ? (
                 <div className="truncate text-[12px] font-bold text-foreground">{profile.name}</div>
@@ -337,7 +350,7 @@ export function AppShell() {
                 <div className="truncate text-[12px] font-bold text-muted-foreground">Sign in</div>
               )}
             </div>
-          </div>
+          </button>
         </div>
       </aside>
 

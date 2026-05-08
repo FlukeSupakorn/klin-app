@@ -1,7 +1,9 @@
 import { create } from "zustand";
+import { createElement } from "react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { calendarEventsApiService } from "@/services/calendar-events-api-service";
+import { EventAddedToast, CalendarErrorToast } from "@/features/calendar/event-added-toast";
 import {
   CalendarTokenExpiredError,
   createGoogleCalendarEvent,
@@ -25,6 +27,18 @@ interface CalendarNotificationsState {
   closeModal: () => void;
   approve: (id: string) => Promise<void>;
   reject: (id: string) => Promise<void>;
+}
+
+function showErrorToast(eyebrow: string, message: string): void {
+  toast.custom(
+    (toastId) =>
+      createElement(CalendarErrorToast, {
+        eyebrow,
+        message,
+        onDismiss: () => toast.dismiss(toastId),
+      }),
+    { duration: 6000 },
+  );
 }
 
 function getUserTimeZone(): string {
@@ -99,7 +113,7 @@ export const useCalendarNotificationsStore = create<CalendarNotificationsState>(
 
     const token = await useAuthStore.getState().ensureValidToken();
     if (!token) {
-      toast.error("Sign in to Google first to add events.");
+      showErrorToast("Sign-in Required", "Sign in to Google first to add events.");
       return;
     }
 
@@ -123,24 +137,23 @@ export const useCalendarNotificationsStore = create<CalendarNotificationsState>(
         modalEventId: state.modalEventId === id ? null : state.modalEventId,
       }));
 
-      if (created.htmlLink) {
-        toast.success("Added to Google Calendar", {
-          action: {
-            label: "Open",
-            onClick: () => {
-              window.open(created.htmlLink, "_blank", "noopener,noreferrer");
-            },
-          },
-        });
-      } else {
-        toast.success("Added to Google Calendar");
-      }
+      const eventTitle = event.event.title || "Untitled event";
+      toast.custom(
+        (toastId) =>
+          createElement(EventAddedToast, {
+            title: eventTitle,
+            htmlLink: created.htmlLink ?? null,
+            onDismiss: () => toast.dismiss(toastId),
+          }),
+        { duration: 6000 },
+      );
     } catch (error) {
       if (error instanceof CalendarTokenExpiredError) {
-        toast.error("Google session expired. Please reconnect.");
+        showErrorToast("Session Expired", "Google session expired. Please reconnect.");
       } else {
         logger.error("[calendar-notifications] approve failed", error);
-        toast.error(
+        showErrorToast(
+          "Calendar Error",
           error instanceof Error ? error.message : "Failed to add event to Google Calendar",
         );
       }
@@ -163,7 +176,7 @@ export const useCalendarNotificationsStore = create<CalendarNotificationsState>(
       }));
     } catch (error) {
       logger.error("[calendar-notifications] reject failed", error);
-      toast.error("Failed to dismiss event.");
+      showErrorToast("Calendar Error", "Failed to dismiss event.");
     } finally {
       setActionPending(set, id, false);
     }

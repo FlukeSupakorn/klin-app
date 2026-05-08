@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, CalendarDays, WifiOff, AlertCircle, LogIn, Clock, ExternalLink } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { ChevronLeft, ChevronRight, CalendarDays, WifiOff, AlertCircle, LogIn, Clock, ExternalLink, RefreshCw } from "lucide-react";
 import { CalendarEventModal } from "@/features/calendar/event-modal";
 import { useCalendarStore } from "@/hooks/calendar/use-calendar-store";
 import { useAuthStore } from "@/hooks/auth/use-auth-store";
@@ -25,12 +25,33 @@ export function CalendarPage() {
   const authStatus = useAuthStore((state) => state.status);
   const isGoogleConnected = authInitialized && authStatus === "authenticated";
   const wasConnectedRef = useRef(false);
+  const location = useLocation();
+  const prevPathRef = useRef<string>(location.pathname);
+  const lastAutoRefreshAtRef = useRef<number>(0);
 
   useEffect(() => {
     if (!isGoogleConnected) { wasConnectedRef.current = false; return; }
     if (!wasConnectedRef.current) { wasConnectedRef.current = true; void initializeMonths(); }
     else { void loadVisibleMonth(visibleMonth); }
   }, [isGoogleConnected, visibleMonth, initializeMonths, loadVisibleMonth]);
+
+  useEffect(() => {
+    const isOnCalendar = location.pathname === "/calendar";
+    const wasOnCalendar = prevPathRef.current === "/calendar";
+    prevPathRef.current = location.pathname;
+    if (!isOnCalendar || wasOnCalendar) return;
+    if (!isGoogleConnected) return;
+    const now = Date.now();
+    if (now - lastAutoRefreshAtRef.current < 15_000) return;
+    lastAutoRefreshAtRef.current = now;
+    void loadVisibleMonth(visibleMonth, true);
+  }, [location.pathname, isGoogleConnected, visibleMonth, loadVisibleMonth]);
+
+  const handleManualRefresh = () => {
+    if (!isGoogleConnected || isLoadingMonth) return;
+    lastAutoRefreshAtRef.current = Date.now();
+    void loadVisibleMonth(visibleMonth, true);
+  };
 
   const calendarDays = useMemo(() => {
     const year = visibleMonth.getFullYear();
@@ -150,6 +171,17 @@ export function CalendarPage() {
               </div>
             </div>
             <div className="flex gap-1.5">
+              {isGoogleConnected && (
+                <button
+                  onClick={handleManualRefresh}
+                  disabled={isLoadingMonth}
+                  className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-border transition-colors hover:bg-muted disabled:opacity-50"
+                  aria-label="Refresh calendar"
+                  title="Refresh calendar"
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", isLoadingMonth && "animate-spin")} />
+                </button>
+              )}
               <button
                 onClick={goToPrevMonth}
                 className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-border transition-colors hover:bg-muted"

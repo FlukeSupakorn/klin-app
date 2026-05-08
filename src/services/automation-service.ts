@@ -5,9 +5,20 @@ import { useCategoryManagementStore } from "@/stores/use-category-management-sto
 import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 import { useUndoRedoStore } from "@/stores/use-undo-redo-store";
+import { useCalendarNotificationsStore } from "@/stores/use-calendar-notifications-store";
 import { normalizePath } from "@/lib/path-utils";
 import { logger } from "@/lib/logger";
 import type { AutomationJob, AutomationLog } from "@/types/domain";
+
+let calendarRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleCalendarRefresh(): void {
+  if (calendarRefreshTimer) clearTimeout(calendarRefreshTimer);
+  calendarRefreshTimer = setTimeout(() => {
+    calendarRefreshTimer = null;
+    void useCalendarNotificationsStore.getState().refresh();
+  }, 1500);
+}
 
 export async function processAutomationJob(job: AutomationJob): Promise<void> {
   const start = performance.now();
@@ -112,6 +123,7 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
     logger.info("[automation] job completed", { fileName: job.fileName, moved: shouldMove, category: analyzed.selectedCategory });
     useHistoryStore.getState().appendLog(log);
     window.dispatchEvent(new Event("klin:history-updated"));
+    scheduleCalendarRefresh();
   } catch (error) {
     const processingTimeMs = Math.round(performance.now() - start);
     const failedLog: AutomationLog = {
