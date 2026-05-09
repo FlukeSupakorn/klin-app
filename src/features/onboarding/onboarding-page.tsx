@@ -96,7 +96,6 @@ export function OnboardingPage() {
   const handleLaunch = async () => {
     setIsLaunching(true);
     try {
-      const activeCategories = state.categories.filter((category) => category.enabled !== false);
       await categoryManagementService.saveDefaultFolder(state.basePath);
 
       await categoryManagementService.refreshCategoriesFromWorker();
@@ -105,7 +104,7 @@ export function OnboardingPage() {
         backendCategories.map((category: ManagedCategory) => [category.name.trim().toLowerCase(), category]),
       );
       const localByName = new Map(
-        activeCategories.map((category) => [category.name.trim().toLowerCase(), category]),
+        state.categories.map((category) => [category.name.trim().toLowerCase(), category]),
       );
 
       for (const backendCategory of backendCategories) {
@@ -114,7 +113,7 @@ export function OnboardingPage() {
         }
       }
 
-      for (const localCategory of activeCategories) {
+      for (const localCategory of state.categories) {
         const normalizedName = localCategory.name.trim();
         const normalizedDescription = localCategory.description.trim();
         if (!normalizedName || !normalizedDescription) {
@@ -123,6 +122,7 @@ export function OnboardingPage() {
 
         const folderPath = joinFolderPath(state.basePath, normalizedName);
         const existing = backendByName.get(normalizedName.toLowerCase());
+        const desiredEnabled = localCategory.enabled !== false;
 
         if (!existing) {
           await categoryManagementService.addCategoryToWorker({
@@ -131,7 +131,7 @@ export function OnboardingPage() {
             folderPath,
             color: localCategory.color,
             icon: localCategory.icon,
-            enabled: true,
+            enabled: desiredEnabled,
             aiLearned: false,
             isAutoDescription: false,
           }).catch(() => undefined);
@@ -144,6 +144,7 @@ export function OnboardingPage() {
         if (existing.color !== localCategory.color) updates.color = localCategory.color;
         if (existing.icon !== localCategory.icon) updates.icon = localCategory.icon;
         if (existing.folderPath !== folderPath) updates.folderPath = folderPath;
+        if (existing.enabled !== desiredEnabled) updates.enabled = desiredEnabled;
 
         if (Object.keys(updates).length > 0) {
           await categoryManagementService.updateCategoryInWorker(existing.id, updates).catch(() => undefined);
