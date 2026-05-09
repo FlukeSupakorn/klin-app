@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { pushAppNotification } from "@/stores/use-app-notifications";
 import {
   BrainCircuit,
   CheckCircle2,
@@ -22,6 +22,7 @@ import {
 } from "@/features/model-download/available-models";
 import { assessCompatibility } from "@/features/model-download/compatibility";
 import { useModelDownload } from "@/features/model-download/use-model-download";
+import { useDownloadQueueStore } from "@/stores/use-download-queue-store";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -39,6 +40,8 @@ interface ModelCardProps {
   isSwitching: boolean;
   isDownloading: boolean;
   downloadProgress: number;
+  /** 1-based queue position, 0 if not queued. */
+  queuePosition: number;
   compatLabel: string;
   onUse: () => void;
   onDownload: () => void;
@@ -51,10 +54,12 @@ function ModelCard({
   isSwitching,
   isDownloading,
   downloadProgress,
+  queuePosition,
   compatLabel,
   onUse,
   onDownload,
 }: ModelCardProps) {
+  const isQueued = queuePosition > 0;
   return (
     <div
       className={cn(
@@ -124,7 +129,7 @@ function ModelCard({
 
       {/* Action button */}
       <div className="mt-3 flex justify-end">
-        {!isInstalled && !isDownloading && (
+        {!isInstalled && !isDownloading && !isQueued && (
           <Button
             size="sm"
             variant="outline"
@@ -135,7 +140,7 @@ function ModelCard({
             Download
           </Button>
         )}
-        {isInstalled && !isActive && !isDownloading && (
+        {isInstalled && !isActive && !isDownloading && !isQueued && (
           <Button
             size="sm"
             className="h-7 gap-1.5 px-3 text-[12px] font-bold"
@@ -156,6 +161,14 @@ function ModelCard({
             Downloading…
           </span>
         )}
+        {isQueued && !isDownloading && (
+          <span
+            className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+            style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}
+          >
+            Queued — #{queuePosition}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -167,9 +180,11 @@ export function ModelSettingsTab() {
   const [installed, setInstalled] = useState<InstalledModelDto[]>([]);
   const [specs, setSpecs] = useState<SystemSpecsDto | null>(null);
   const [switchingId, setSwitchingId] = useState<string | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const { rows, downloadQueue } = useModelDownload();
+  const { downloadQueue } = useModelDownload();
+  const queueModels = useDownloadQueueStore((s) => s.queue);
+  const currentDownload = useDownloadQueueStore((s) => s.current);
+  const currentProgress = useDownloadQueueStore((s) => s.progress);
 
   useEffect(() => {
     let cancelled = false;
@@ -230,11 +245,20 @@ export function ModelSettingsTab() {
             },
           };
         });
-        toast.success(`Switched to ${model.label}`);
+        pushAppNotification({
+          tone: "success",
+          title: "Model switched",
+          message: model.label,
+          autoDismissMs: 3500,
+        });
       } catch (err) {
         console.error("[settings] switch model failed", err);
         const message = err instanceof Error ? err.message : String(err);
-        toast.error(`Failed to switch model: ${message}`);
+        pushAppNotification({
+          tone: "error",
+          title: "Switch failed",
+          message,
+        });
         throw err;
       } finally {
         setSwitchingId(null);
@@ -245,7 +269,6 @@ export function ModelSettingsTab() {
 
   const handleDownload = useCallback(
     async (model: ModelEntry) => {
-      setDownloadingId(model.id);
       try {
         await downloadQueue([model]);
         const updated = await tauriClient.listInstalledModels();
@@ -254,9 +277,11 @@ export function ModelSettingsTab() {
       } catch (err) {
         console.error("[settings] download/switch failed", err);
         const message = err instanceof Error ? err.message : String(err);
-        toast.error(`Download failed for ${model.label}: ${message}`);
-      } finally {
-        setDownloadingId(null);
+        pushAppNotification({
+          tone: "error",
+          title: `Download failed for ${model.label}`,
+          message,
+        });
       }
     },
     [downloadQueue, handleUseModel]
@@ -324,8 +349,9 @@ export function ModelSettingsTab() {
         {CHAT_MODELS.map((model) => {
           const installed = installedFilenames.has(model.filename);
           const active = model.filename === activeChatFilename;
-          const chatRow = rows.chat;
-          const isThisDownloading = downloadingId === model.id;
+          const isThisDownloading = currentDownload?.id === model.id;
+          const queueIdx = queueModels.findIndex((m) => m.id === model.id);
+          const queuePosition = queueIdx < 0 ? 0 : queueIdx + 1;
           const compatLabel = assessCompatibility(model, specs);
 
           return (
@@ -336,7 +362,8 @@ export function ModelSettingsTab() {
               isActive={active}
               isSwitching={switchingId === model.id}
               isDownloading={isThisDownloading}
-              downloadProgress={isThisDownloading ? chatRow.progress : 0}
+              downloadProgress={isThisDownloading ? currentProgress : 0}
+              queuePosition={queuePosition}
               compatLabel={compatLabel}
               onUse={() => void handleUseModel(model)}
               onDownload={() => void handleDownload(model)}

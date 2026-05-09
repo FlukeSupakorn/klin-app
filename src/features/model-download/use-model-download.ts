@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { tauriClient } from "@/services/tauri-client";
-import { logger } from "@/lib/logger";
+import { useCallback, useMemo, useState } from "react";
+import { useDownloadQueueStore } from "@/stores/use-download-queue-store";
 import type { ModelEntry } from "./available-models";
-import type { ModelDownloadProgressPayload, ModelDownloadSlot } from "@/types/ipc";
+import type { ModelDownloadSlot } from "@/types/ipc";
 
 type RowStatus = "pending" | "downloading" | "verified" | "done" | "error";
 
@@ -14,116 +12,99 @@ export interface ModelDownloadRowState {
 
 type StateBySlot = Record<ModelDownloadSlot, ModelDownloadRowState>;
 
-const initialState: StateBySlot = {
+const initialRows: StateBySlot = {
   chat: { status: "pending", progress: 0 },
   embed: { status: "pending", progress: 0 },
   mmproj: { status: "pending", progress: 0 },
 };
 
+/**
+ * Thin wrapper around the global download queue store that preserves the
+ * legacy `rows` / `downloadQueue` / `error` / `retry` API used by the
+ * onboarding ModelDownloadPage. Settings should subscribe to the store
+ * directly (see useDownloadQueueStore) for richer per-model state.
+ */
 export function useModelDownload() {
-  const [rows, setRows] = useState<StateBySlot>(initialState);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [error, setError] = useState("");
+  const queue = useDownloadQueueStore((s) => s.queue);
+  const current = useDownloadQueueStore((s) => s.current);
+  const progress = useDownloadQueueStore((s) => s.progress);
+  const errors = useDownloadQueueStore((s) => s.errors);
+  const completedIds = useDownloadQueueStore((s) => s.completedIds);
+  const enqueue = useDownloadQueueStore((s) => s.enqueue);
+  const resetMarkers = useDownloadQueueStore((s) => s.resetMarkers);
 
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
+  // Track which model ids were enqueued through THIS hook so we can map
+  // queue/current/completed back to per-slot state for the onboarding page.
+  const [tracked, setTracked] = useState<ModelEntry[]>([]);
 
-    void listen<ModelDownloadProgressPayload>("model-download://progress", (event) => {
-      const { slot, downloaded, total } = event.payload;
-      const progress = total > 0 ? Math.min(100, Math.round((downloaded / total) * 100)) : 0;
-      setRows((prev) => ({
-        ...prev,
-        [slot]: { status: "downloading", progress },
-      }));
-    })
-      .then((fn) => {
-        unlisten = fn;
-      })
-      .catch((listenError) => {
-        logger.error("[model-download] listen(model-download://progress)", listenError);
-      });
-
-    return () => {
-      unlisten?.();
+  const rows = useMemo<StateBySlot>(() => {
+    const next: StateBySlot = {
+      chat: { ...initialRows.chat },
+      embed: { ...initialRows.embed },
+      mmproj: { ...initialRows.mmproj },
     };
-  }, []);
+    for (const m of tracked) {
+      const slot = m.slot;
+      if (current?.id === m.id) {
+        next[slot] = { status: "downloading", progress };
+        continue;
+      }
+      if (queue.some((q) => q.id === m.id)) {
+        next[slot] = { status: "pending", progress: 0 };
+        continue;
+      }
+      if (errors[m.id]) {
+        next[slot] = { status: "error", progress: 0 };
+        continue;
+      }
+      if (completedIds.has(m.id)) {
+        next[slot] = { status: "done", progress: 100 };
+        continue;
+      }
+    }
+    return next;
+  }, [tracked, current, progress, queue, errors, completedIds]);
 
-  const reset = useCallback(() => {
-    setRows(initialState);
-    setError("");
-  }, []);
+  const isDownloading = useMemo(
+    () => Boolean(current) && tracked.some((m) => m.id === current?.id || queue.some((q) => q.id === m.id)),
+    [current, tracked, queue],
+  );
+
+  const error = useMemo(() => {
+    for (const m of tracked) {
+      const msg = errors[m.id];
+      if (msg) return msg;
+    }
+    return "";
+  }, [tracked, errors]);
+
+  const downloadQueue = useCallback(
+    async (models: ModelEntry[]) => {
+      setTracked((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const merged = [...prev];
+        for (const m of models) if (!seen.has(m.id)) merged.push(m);
+        return merged;
+      });
+      await enqueue(models);
+    },
+    [enqueue],
+  );
 
   const cancel = useCallback(async (slot: ModelDownloadSlot) => {
-    await tauriClient.cancelModelDownload(slot);
-  }, []);
-
-  const downloadQueue = useCallback(async (models: ModelEntry[]) => {
-    setIsDownloading(true);
-    setError("");
-
-    try {
-      const modelDir = await tauriClient.getModelDir();
-      for (const model of models) {
-        setRows((prev) => ({
-          ...prev,
-          [model.slot]: { status: "downloading", progress: 0 },
-        }));
-
-        const dest = `${modelDir}\\${model.filename}`;
-        logger.info(`[frontend] download ${model.slot} model from ${model.url} to ${dest}`);
-
-        let expectedSha256 = model.sha256;
-        let expectedSize = model.sizeBytes;
-        if (model.url.startsWith("https://huggingface.co/")) {
-          try {
-            const meta = await tauriClient.resolveHfModelMetadata(model.url);
-            expectedSha256 = meta.sha256;
-            expectedSize = meta.size;
-            logger.info(
-              `[frontend] resolved HF metadata for ${model.slot}: sha256=${expectedSha256} size=${expectedSize}`
-            );
-          } catch (metaError) {
-            logger.warn(
-              "[frontend] HF metadata lookup failed; falling back to bundled sha256",
-              metaError
-            );
-          }
-        }
-
-        await tauriClient.downloadModel({
-          url: model.url,
-          destFilename: model.filename,
-          slot: model.slot,
-          expectedSha256,
-          expectedSize,
-        });
-
-        setRows((prev) => ({
-          ...prev,
-          [model.slot]: { status: "verified", progress: 100 },
-        }));
-        await tauriClient.writeModelConfig(model.slot, model.filename, expectedSha256);
-        setRows((prev) => ({
-          ...prev,
-          [model.slot]: { status: "done", progress: 100 },
-        }));
-      }
-    } catch (downloadError) {
-      const message = downloadError instanceof Error ? downloadError.message : String(downloadError);
-      setError(message);
-      logger.error("[model-download] download failed", downloadError);
-      throw downloadError;
-    } finally {
-      setIsDownloading(false);
+    const { current: cur, queue: q } = useDownloadQueueStore.getState();
+    if (cur?.slot === slot) {
+      await useDownloadQueueStore.getState().cancel(cur.id);
+      return;
     }
+    const queued = q.find((m) => m.slot === slot);
+    if (queued) await useDownloadQueueStore.getState().cancel(queued.id);
   }, []);
 
-  return {
-    rows,
-    isDownloading,
-    error,
-    downloadQueue,
-    cancel,
-    retry: reset,
-  };
+  const retry = useCallback(() => {
+    setTracked([]);
+    resetMarkers();
+  }, [resetMarkers]);
+
+  return { rows, isDownloading, error, downloadQueue, cancel, retry };
 }

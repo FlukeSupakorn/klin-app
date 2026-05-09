@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
+import { NotificationStack } from "@/components/ui/notification-stack";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { HistoryPage } from "@/features/history/history-page";
 import { CalendarPage } from "@/features/calendar/calendar-page";
@@ -461,6 +462,7 @@ export function AppShell() {
       <CloseAppController />
 
       <Toaster />
+      <NotificationStack />
     </div>
   );
 }
