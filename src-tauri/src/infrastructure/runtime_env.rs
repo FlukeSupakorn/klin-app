@@ -230,7 +230,20 @@ pub fn preload_process_env() -> bool {
     !env.is_empty()
 }
 
+fn is_model_path_key(name: &str) -> bool {
+    matches!(
+        name,
+        "KLIN_CHAT_MODEL_PATH" | "KLIN_EMBED_MODEL_PATH" | "KLIN_MMPROJ_PATH"
+    )
+}
+
 pub fn get(name: &str) -> Option<String> {
+    if !cfg!(debug_assertions) && is_model_path_key(name) {
+        if let Some(path) = configured_app_data_model_path(name) {
+            return Some(path);
+        }
+    }
+
     std::env::var(name)
         .ok()
         .filter(|v| !v.trim().is_empty())

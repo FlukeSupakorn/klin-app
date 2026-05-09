@@ -40,7 +40,6 @@ interface ModelCardProps {
   isDownloading: boolean;
   downloadProgress: number;
   compatLabel: string;
-  isDev: boolean;
   onUse: () => void;
   onDownload: () => void;
 }
@@ -53,7 +52,6 @@ function ModelCard({
   isDownloading,
   downloadProgress,
   compatLabel,
-  isDev,
   onUse,
   onDownload,
 }: ModelCardProps) {
@@ -141,13 +139,8 @@ function ModelCard({
           <Button
             size="sm"
             className="h-7 gap-1.5 px-3 text-[12px] font-bold"
-            disabled={isDev || isSwitching}
+            disabled={isSwitching}
             onClick={onUse}
-            title={
-              isDev
-                ? "Model switching is disabled in development mode"
-                : undefined
-            }
           >
             {isSwitching ? "Switching…" : "Use this model"}
           </Button>
@@ -238,8 +231,11 @@ export function ModelSettingsTab() {
           };
         });
         toast.success(`Switched to ${model.label}`);
-      } catch {
-        toast.error("Failed to switch model. Please try again.");
+      } catch (err) {
+        console.error("[settings] switch model failed", err);
+        const message = err instanceof Error ? err.message : String(err);
+        toast.error(`Failed to switch model: ${message}`);
+        throw err;
       } finally {
         setSwitchingId(null);
       }
@@ -255,8 +251,10 @@ export function ModelSettingsTab() {
         const updated = await tauriClient.listInstalledModels();
         setInstalled(updated);
         await handleUseModel(model);
-      } catch {
-        toast.error(`Download failed for ${model.label}`);
+      } catch (err) {
+        console.error("[settings] download/switch failed", err);
+        const message = err instanceof Error ? err.message : String(err);
+        toast.error(`Download failed for ${model.label}: ${message}`);
       } finally {
         setDownloadingId(null);
       }
@@ -308,9 +306,10 @@ export function ModelSettingsTab() {
           <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-400" />
           <p className="text-[12px] leading-relaxed text-muted-foreground">
             <span className="font-bold text-foreground">Development mode:</span>{" "}
-            The active model is set via the{" "}
-            <code className="font-mono">KLIN_CHAT_MODEL_PATH</code> environment
-            variable. Model switching is disabled. Downloads are still allowed.
+            Downloads are mocked and the live llama-server still uses the model
+            set by <code className="font-mono">KLIN_CHAT_MODEL_PATH</code>.
+            Switching here updates the saved config so prod builds will pick it
+            up, but won&apos;t change the running model in dev.
           </p>
         </div>
       )}
@@ -339,7 +338,6 @@ export function ModelSettingsTab() {
               isDownloading={isThisDownloading}
               downloadProgress={isThisDownloading ? chatRow.progress : 0}
               compatLabel={compatLabel}
-              isDev={isDev}
               onUse={() => void handleUseModel(model)}
               onDownload={() => void handleDownload(model)}
             />

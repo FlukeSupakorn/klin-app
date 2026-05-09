@@ -145,6 +145,10 @@ class TauriCommandClient implements TauriClient {
     return invoke("download_model", { ...input });
   }
 
+  resolveHfModelMetadata(url: string): Promise<{ sha256: string; size: number }> {
+    return invoke("resolve_hf_model_metadata", { url });
+  }
+
   cancelModelDownload(slot: ModelDownloadSlot): Promise<void> {
     return invoke("cancel_model_download", { slot });
   }

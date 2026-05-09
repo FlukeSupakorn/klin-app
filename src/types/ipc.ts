@@ -136,6 +136,7 @@ export interface TauriClient {
   statFiles(filePaths: string[]): Promise<(NoteFileEntryDto | null)[]>;
   logFrontend(payload: FrontendLogPayload): Promise<void>;
   downloadModel(input: DownloadModelDto): Promise<void>;
+  resolveHfModelMetadata(url: string): Promise<{ sha256: string; size: number }>;
   cancelModelDownload(slot: ModelDownloadSlot): Promise<void>;
   getModelDir(): Promise<string>;
   readModelConfig(): Promise<ModelConfigDto>;

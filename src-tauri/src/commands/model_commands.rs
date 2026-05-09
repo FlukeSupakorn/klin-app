@@ -47,6 +47,13 @@ pub struct ModelDownloadProgress {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct HfModelMetadata {
+    pub sha256: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SystemSpecs {
     pub ram_total_bytes: u64,
     pub ram_available_bytes: u64,
@@ -151,6 +158,10 @@ async fn real_download<R: tauri::Runtime>(
     if part_path.exists() {
         fs::remove_file(&part_path).map_err(|error| error.to_string())?;
     }
+    let bad_path = dest_path.with_extension("gguf.bad");
+    if bad_path.exists() {
+        let _ = fs::remove_file(&bad_path);
+    }
 
     let response = reqwest::get(&url).await.map_err(|error| error.to_string())?;
     if !response.status().is_success() {
@@ -179,11 +190,27 @@ async fn real_download<R: tauri::Runtime>(
     }
 
     file.flush().map_err(|error| error.to_string())?;
+    drop(file);
 
     let actual_sha256 = format!("{:x}", hasher.finalize());
-    if actual_sha256 != expected_sha256.to_ascii_lowercase() {
-        let _ = fs::remove_file(&part_path);
-        return Err(format!("SHA-256 mismatch for {slot}"));
+    let expected_lc = expected_sha256.to_ascii_lowercase();
+    if actual_sha256 != expected_lc {
+        if let Err(rename_err) = fs::rename(&part_path, &bad_path) {
+            tracing::warn!(
+                "[model-download] could not rename {} -> {}: {}",
+                part_path.display(),
+                bad_path.display(),
+                rename_err
+            );
+            let _ = fs::remove_file(&part_path);
+            return Err(format!(
+                "SHA-256 mismatch for {slot}: expected {expected_lc}, got {actual_sha256}"
+            ));
+        }
+        return Err(format!(
+            "SHA-256 mismatch for {slot}: expected {expected_lc}, got {actual_sha256}. Saved bad copy at {}",
+            bad_path.display()
+        ));
     }
 
     fs::rename(&part_path, &dest_path).map_err(|error| error.to_string())?;
@@ -285,6 +312,67 @@ pub fn list_installed_models(
 
     entries.sort_by(|a, b| a.filename.cmp(&b.filename));
     Ok(entries)
+}
+
+/// Parse "https://huggingface.co/<owner>/<repo>/resolve/<rev>/<path...>"
+/// into ("<owner>/<repo>", "<path...>").
+fn parse_hf_resolve_url(url: &str) -> Result<(String, String), String> {
+    let prefix = "https://huggingface.co/";
+    let rest = url
+        .strip_prefix(prefix)
+        .ok_or_else(|| format!("not a huggingface.co URL: {url}"))?;
+    let (repo_part, rest) = rest
+        .split_once("/resolve/")
+        .ok_or_else(|| format!("missing /resolve/ in URL: {url}"))?;
+    let (_revision, file_path) = rest
+        .split_once('/')
+        .ok_or_else(|| format!("missing file path after revision in URL: {url}"))?;
+    Ok((repo_part.to_string(), file_path.to_string()))
+}
+
+#[tauri::command]
+pub async fn resolve_hf_model_metadata(url: String) -> Result<HfModelMetadata, String> {
+    let (repo, file_path) = parse_hf_resolve_url(&url)?;
+    let api_url = format!("https://huggingface.co/api/models/{repo}/tree/main");
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response = client
+        .get(&api_url)
+        .send()
+        .await
+        .map_err(|e| format!("HF API request failed: {e}"))?;
+    if !response.status().is_success() {
+        return Err(format!("HF API HTTP {} for {api_url}", response.status()));
+    }
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("HF API read failed: {e}"))?;
+    let entries: Vec<serde_json::Value> = serde_json::from_str(&body)
+        .map_err(|e| format!("HF API JSON parse failed: {e}"))?;
+
+    let entry = entries
+        .iter()
+        .find(|e| e.get("path").and_then(|v| v.as_str()) == Some(file_path.as_str()))
+        .ok_or_else(|| format!("file {file_path} not found in repo {repo}"))?;
+
+    let lfs = entry
+        .get("lfs")
+        .ok_or_else(|| format!("file {file_path} has no LFS metadata (not an LFS file?)"))?;
+    let sha256 = lfs
+        .get("oid")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "missing lfs.oid in HF API response".to_string())?
+        .to_ascii_lowercase();
+    let size = lfs
+        .get("size")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| "missing lfs.size in HF API response".to_string())?;
+
+    Ok(HfModelMetadata { sha256, size })
 }
 
 #[tauri::command]

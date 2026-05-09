@@ -71,19 +71,38 @@ export function useModelDownload() {
 
         const dest = `${modelDir}\\${model.filename}`;
         logger.info(`[frontend] download ${model.slot} model from ${model.url} to ${dest}`);
+
+        let expectedSha256 = model.sha256;
+        let expectedSize = model.sizeBytes;
+        if (model.url.startsWith("https://huggingface.co/")) {
+          try {
+            const meta = await tauriClient.resolveHfModelMetadata(model.url);
+            expectedSha256 = meta.sha256;
+            expectedSize = meta.size;
+            logger.info(
+              `[frontend] resolved HF metadata for ${model.slot}: sha256=${expectedSha256} size=${expectedSize}`
+            );
+          } catch (metaError) {
+            logger.warn(
+              "[frontend] HF metadata lookup failed; falling back to bundled sha256",
+              metaError
+            );
+          }
+        }
+
         await tauriClient.downloadModel({
           url: model.url,
           destFilename: model.filename,
           slot: model.slot,
-          expectedSha256: model.sha256,
-          expectedSize: model.sizeBytes,
+          expectedSha256,
+          expectedSize,
         });
 
         setRows((prev) => ({
           ...prev,
           [model.slot]: { status: "verified", progress: 100 },
         }));
-        await tauriClient.writeModelConfig(model.slot, model.filename, model.sha256);
+        await tauriClient.writeModelConfig(model.slot, model.filename, expectedSha256);
         setRows((prev) => ({
           ...prev,
           [model.slot]: { status: "done", progress: 100 },

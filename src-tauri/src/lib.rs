@@ -298,6 +298,7 @@ pub fn run() {
             commands::stat_files,
             commands::log_frontend,
             commands::download_model,
+            commands::resolve_hf_model_metadata,
             commands::cancel_model_download,
             commands::get_model_dir,
             commands::read_model_config,
