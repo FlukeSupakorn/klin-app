@@ -25,8 +25,16 @@ export interface ImageModelEntry {
   compatibilityHint?: string;
 }
 
-const QWEN25_VL_3B_IMAGE_MODEL: ImageModelEntry = {
+const QWEN35_08B_IMAGE_MODEL: ImageModelEntry = {
   filename: "mmproj-F16.gguf",
+  url: "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/mmproj-F16.gguf",
+  sizeBytes: 204_987_232,
+  sha256: "56e4c6cfe73b0c82e3e82bc518d7591997e61d81f723fc41a586f4fa69ea2453",
+  compatibilityHint: "Optional",
+};
+
+const QWEN25_VL_3B_IMAGE_MODEL: ImageModelEntry = {
+  filename: "mmproj-Qwen2.5-VL-3B-F16.gguf",
   url: "https://huggingface.co/unsloth/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-F16.gguf",
   sizeBytes: 1_338_428_256,
   sha256: "4c1240f514de94c81b70709b0f9a80c7e3297598ea7c83f39dc00b18ee5be60c",
@@ -35,16 +43,28 @@ const QWEN25_VL_3B_IMAGE_MODEL: ImageModelEntry = {
 
 export const AVAILABLE_MODELS: ModelEntry[] = [
   {
+    id: "qwen35-08b-iq4-xs",
+    slot: "chat",
+    label: "Default - lightweight & fast",
+    filename: "Qwen3.5-0.8B-IQ4_XS.gguf",
+    url: "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-IQ4_XS.gguf",
+    sizeBytes: 492_605_696,
+    sha256: "619917ae92f61eb6515a7070e944a0a7c2b198a2cf6536386f475485188a36ff",
+    description: "Compact local chat model tuned for fast organizing on everyday PCs.",
+    compatibilityHint: "Recommended",
+    isDefault: true,
+    imageModel: QWEN35_08B_IMAGE_MODEL,
+  },
+  {
     id: "qwen25-vl-3b-iq4-xs",
     slot: "chat",
-    label: "Default - recommended for most PCs",
+    label: "Balanced - 3B vision model",
     filename: "Qwen2.5-VL-3B-Instruct-iq4_xs.gguf",
     url: "https://huggingface.co/unsloth/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/Qwen2.5-VL-3B-Instruct-IQ4_XS.gguf",
     sizeBytes: 1_739_093_344,
     sha256: "9bbd14f46702382da6ac9522a0958c5b3c56def696050c3b15b0421398d80ef9",
-    description: "Balanced local chat model for organizing and reasoning over files.",
-    compatibilityHint: "Recommended",
-    isDefault: true,
+    description: "Balanced 3B chat + vision model for organizing and reasoning over files.",
+    compatibilityHint: "Mid-range PCs",
     imageModel: QWEN25_VL_3B_IMAGE_MODEL,
   },
   {
@@ -126,25 +146,25 @@ export const AVAILABLE_MODELS: ModelEntry[] = [
     },
   },
   {
-    id: "nomic-embed-text-v15-q8",
+    id: "qwen3-embedding-06b-q8",
     slot: "embed",
-    label: "Nomic Embed Text v1.5",
-    filename: "nomic-embed-text-v1.5.Q8_0.gguf",
-    url: "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q8_0.gguf",
-    sizeBytes: 146_146_432,
-    sha256: "3e24342164b3d94991ba9692fdc0dd08e3fd7362e0aacc396a9a5c54a544c3b7",
+    label: "Qwen3 Embedding 0.6B",
+    filename: "Qwen3-Embedding-0.6B-Q8_0.gguf",
+    url: "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf",
+    sizeBytes: 639_150_592,
+    sha256: "06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439",
     description: "Required search and similarity model for notes and organization.",
     compatibilityHint: "Runs on most PCs",
     locked: true,
   },
   {
-    id: "qwen25-vl-mmproj-f16",
+    id: "qwen35-mmproj-f16",
     slot: "mmproj",
     label: "Image understanding model",
     filename: "mmproj-F16.gguf",
-    url: "https://huggingface.co/unsloth/Qwen2.5-VL-3B-Instruct-GGUF/resolve/main/mmproj-F16.gguf",
-    sizeBytes: 1_338_428_256,
-    sha256: "4c1240f514de94c81b70709b0f9a80c7e3297598ea7c83f39dc00b18ee5be60c",
+    url: "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/mmproj-F16.gguf",
+    sizeBytes: 204_987_232,
+    sha256: "56e4c6cfe73b0c82e3e82bc518d7591997e61d81f723fc41a586f4fa69ea2453",
     description: "Download this if you want KLIN to organize image files.",
     compatibilityHint: "Optional",
   },
@@ -161,7 +181,7 @@ export const MMPROJ_MODEL = AVAILABLE_MODELS.find((model) => model.slot === "mmp
 export const CHAT_MODELS = AVAILABLE_MODELS.filter((model) => model.slot === "chat");
 
 export function getImageModelForChat(chatModel: ModelEntry): ModelEntry {
-  const imageModel = chatModel.imageModel ?? QWEN25_VL_3B_IMAGE_MODEL;
+  const imageModel = chatModel.imageModel ?? QWEN35_08B_IMAGE_MODEL;
   return {
     ...MMPROJ_MODEL,
     filename: imageModel.filename,
