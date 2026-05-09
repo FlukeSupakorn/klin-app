@@ -142,6 +142,7 @@ export interface TauriClient {
   readModelConfig(): Promise<ModelConfigDto>;
   writeModelConfig(slot: ModelDownloadSlot, filename: string, sha256: string): Promise<ModelConfigDto>;
   listInstalledModels(): Promise<InstalledModelDto[]>;
+  deleteInstalledModel(filename: string): Promise<void>;
   getSystemSpecs(): Promise<SystemSpecsDto>;
   getFolderStatsCached(folderPath: string): Promise<FolderStats | null>;
   startFolderStatsScan(folderPath: string): Promise<void>;

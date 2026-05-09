@@ -10,7 +10,6 @@ import {
   Layers,
   Plus,
   Sparkles,
-  Trash2,
   X,
 } from "lucide-react";
 
@@ -491,11 +490,7 @@ export function CategoriesStep({
                 }}
                 aria-label="Remove category"
               >
-                {cat.isDefault ? (
-                  <X className="h-3 w-3" style={{ color: "#a8b4cc" }} />
-                ) : (
-                  <Trash2 className="h-3 w-3" style={{ color: "#a8b4cc" }} />
-                )}
+                <X className="h-3 w-3" style={{ color: "#a8b4cc" }} />
               </button>
             </div>
           );

@@ -169,6 +169,10 @@ class TauriCommandClient implements TauriClient {
     return invoke("list_installed_models");
   }
 
+  deleteInstalledModel(filename: string): Promise<void> {
+    return invoke("delete_installed_model", { filename });
+  }
+
   getSystemSpecs(): Promise<SystemSpecsDto> {
     return invoke("get_system_specs");
   }

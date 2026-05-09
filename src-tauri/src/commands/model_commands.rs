@@ -314,6 +314,45 @@ pub fn list_installed_models(
     Ok(entries)
 }
 
+#[tauri::command]
+pub fn delete_installed_model(
+    state: tauri::State<'_, AppState>,
+    filename: String,
+) -> Result<(), String> {
+    // Hardening: refuse anything that isn't a plain .gguf basename. No path
+    // separators, no traversal, no other extensions. The model dir is the
+    // only legal location.
+    let trimmed = filename.trim();
+    if trimmed.is_empty() {
+        return Err("filename must not be empty".into());
+    }
+    if trimmed.contains('/') || trimmed.contains('\\') || trimmed.contains("..") {
+        return Err("invalid filename".into());
+    }
+    if !trimmed.to_ascii_lowercase().ends_with(".gguf") {
+        return Err("only .gguf files can be deleted via this command".into());
+    }
+
+    let dir = ensure_model_dir(&state.app_data_dir)?;
+    let target = dir.join(trimmed);
+
+    // Belt-and-braces: the resolved path must still live under the model dir.
+    let canon_dir = dir.canonicalize().unwrap_or(dir.clone());
+    let canon_target = target.canonicalize().unwrap_or_else(|_| target.clone());
+    if !canon_target.starts_with(&canon_dir) {
+        return Err("refusing to delete file outside model directory".into());
+    }
+
+    if !canon_target.exists() {
+        // Nothing to delete is success — keeps the UI optimistic flow simple.
+        return Ok(());
+    }
+
+    fs::remove_file(&canon_target).map_err(|error| error.to_string())?;
+    tracing::info!("[models] deleted {}", canon_target.display());
+    Ok(())
+}
+
 /// Parse "https://huggingface.co/<owner>/<repo>/resolve/<rev>/<path...>"
 /// into ("<owner>/<repo>", "<path...>").
 fn parse_hf_resolve_url(url: &str) -> Result<(String, String), String> {

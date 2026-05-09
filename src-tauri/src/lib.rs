@@ -372,6 +372,7 @@ pub fn run() {
             commands::read_model_config,
             commands::write_model_config,
             commands::list_installed_models,
+            commands::delete_installed_model,
             commands::get_system_specs,
             commands::get_folder_stats_cached,
             commands::start_folder_stats_scan,

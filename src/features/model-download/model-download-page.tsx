@@ -481,6 +481,9 @@ export function ModelDownloadPage() {
                       const compatibility = assessCompatibility(model, specs);
                       const tags: TagSpec[] = [{ label: compatibility, color: compatibilityTone(compatibility) }];
                       const isDisabled = isDownloading && model.id !== selectedChatId;
+                      const rowState = chatRowState(model);
+                      const isThisDownloading = selectedChatId === model.id && rowState.status === "downloading";
+                      const isThisDone = selectedChatId === model.id && rowState.status === "done";
                       return (
                         <div
                           key={model.id}
@@ -491,8 +494,8 @@ export function ModelDownloadPage() {
                           }}
                           style={{
                             display: "flex",
-                            alignItems: "center",
-                            gap: 10,
+                            flexDirection: "column",
+                            gap: 6,
                             padding: "10px 12px",
                             borderRadius: 11,
                             background: selectedChatId === model.id ? "rgba(15,98,254,.11)" : "#f4f7ff",
@@ -502,34 +505,54 @@ export function ModelDownloadPage() {
                             opacity: isDisabled ? 0.6 : 1,
                           }}
                         >
-                          <div
-                            style={{
-                              width: 18,
-                              height: 18,
-                              borderRadius: "50%",
-                              border: `2px solid ${selectedChatId === model.id ? "#0F62FE" : "#a8b4cc"}`,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {selectedChatId === model.id && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#0F62FE" }} />}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#181e35" }}>{model.label}</div>
-                            <div style={{ fontSize: 11, color: "#a8b4cc", fontFamily: "'JetBrains Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {model.filename}
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div
+                              style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: "50%",
+                                border: `2px solid ${selectedChatId === model.id ? "#0F62FE" : "#a8b4cc"}`,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              {selectedChatId === model.id && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#0F62FE" }} />}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12.5, fontWeight: 700, color: "#181e35" }}>{model.label}</div>
+                              <div style={{ fontSize: 11, color: "#a8b4cc", fontFamily: "'JetBrains Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {model.filename}
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                              {tags.map((tag) => (
+                                <TagPill key={`${model.id}-${tag.label}`} label={tag.label} color={tag.color} size="xs" />
+                              ))}
+                            </div>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: "#6b7a9a", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
+                              {formatBytes(model.sizeBytes)}
                             </div>
                           </div>
-                          <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
-                            {tags.map((tag) => (
-                              <TagPill key={`${model.id}-${tag.label}`} label={tag.label} color={tag.color} size="xs" />
-                            ))}
-                          </div>
-                          <div style={{ fontSize: 12, fontWeight: 800, color: "#6b7a9a", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
-                            {formatBytes(model.sizeBytes)}
-                          </div>
+                          {(isThisDownloading || isThisDone) && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 28 }}>
+                              <div style={{ flex: 1, height: 4, background: "rgba(15,98,254,.12)", borderRadius: 999, overflow: "hidden" }}>
+                                <div
+                                  style={{
+                                    height: "100%",
+                                    width: `${isThisDone ? 100 : Math.max(2, rowState.progress)}%`,
+                                    background: isThisDone ? "#10b981" : "#0F62FE",
+                                    borderRadius: 999,
+                                    transition: "width .25s ease",
+                                  }}
+                                />
+                              </div>
+                              <div style={{ fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", color: isThisDone ? "#10b981" : "#0F62FE", fontWeight: 700, minWidth: 36, textAlign: "right" }}>
+                                {isThisDone ? "Done" : `${rowState.progress}%`}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
