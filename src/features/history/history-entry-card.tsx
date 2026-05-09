@@ -64,7 +64,19 @@ export function HistoryEntryCard({
       )}
       style={{ boxShadow: "0 2px 10px var(--primary-tint)" }}
     >
-      <button type="button" onClick={onToggleExpand} className="w-full text-left">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onToggleExpand}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggleExpand();
+          }
+        }}
+        aria-expanded={isExpanded}
+        className="w-full cursor-pointer text-left"
+      >
         <div className="flex items-center gap-0">
           {/* Left gradient strip */}
           <div
@@ -176,7 +188,7 @@ export function HistoryEntryCard({
             </div>
           </div>
         </div>
-      </button>
+      </div>
 
       {isExpanded && (
         <div

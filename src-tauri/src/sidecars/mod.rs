@@ -76,9 +76,30 @@ pub fn cleanup_all<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     }
 
     let worker = state.worker_child.clone();
-    handles.push(thread::spawn(move || kill_sidecar("klin-worker", &worker)));
+    handles.push(thread::spawn(move || {
+        kill_sidecar("klin-worker", &worker);
+        // klin-worker is built with PyInstaller onefile, which spawns a child
+        // Python interpreter under the bootloader EXE. The PID-tree kill above
+        // catches the bootloader, but the child can escape the job object on
+        // Windows and survive as an orphan. Sweep by image name to guarantee
+        // both the bootloader and any orphaned interpreter are gone.
+        kill_sidecar_by_image_name("klin-worker.exe");
+    }));
 
     for h in handles {
         let _ = h.join();
     }
 }
+
+/// Force-kill all processes matching the given Windows image name. No-op on other platforms.
+#[cfg(target_os = "windows")]
+fn kill_sidecar_by_image_name(image_name: &str) {
+    use std::process::Command;
+    tracing::info!("[shutdown] image-name sweep: taskkill /IM {} /F /T", image_name);
+    let _ = Command::new("taskkill")
+        .args(&["/IM", image_name, "/F", "/T"])
+        .output();
+}
+
+#[cfg(not(target_os = "windows"))]
+fn kill_sidecar_by_image_name(_image_name: &str) {}
