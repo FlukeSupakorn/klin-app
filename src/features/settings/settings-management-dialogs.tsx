@@ -7,6 +7,7 @@ import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { cn } from "@/lib/utils";
+import { normalizePath } from "@/lib/path-utils";
 import { BatchCategoryModal } from "@/features/categories/batch-category-modal";
 import {
   CATEGORY_ICON_OPTIONS,
@@ -127,6 +128,25 @@ function WatchedFoldersSection() {
   const removeWatchedFolder = useAutomationStore((state) => state.removeWatchedFolder);
 
   const [newPath, setNewPath] = useState("");
+  const [downloadsPath, setDownloadsPath] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void tauriClient
+      .getDownloadsFolder()
+      .then((path) => {
+        if (!cancelled) setDownloadsPath(path ?? "");
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const downloadsAlreadyWatched =
+    downloadsPath.trim().length > 0 &&
+    watchedFolders.some((f) => normalizePath(f) === normalizePath(downloadsPath));
+  const showAddDownloads = downloadsPath.trim().length > 0 && !downloadsAlreadyWatched;
 
   return (
     <div className="space-y-3 rounded-lg border border-border bg-background p-4">
@@ -134,14 +154,16 @@ function WatchedFoldersSection() {
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Monitoring</p>
         <h3 className="font-black">Watched Folders</h3>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Button
-          variant="outline"
-          className="justify-start gap-2"
-          onClick={async () => addWatchedFolder(await tauriClient.getDownloadsFolder())}
-        >
-          <FolderPlus className="h-4 w-4" /> Add Downloads
-        </Button>
+      <div className={cn("grid gap-2", showAddDownloads ? "sm:grid-cols-2" : "sm:grid-cols-1")}>
+        {showAddDownloads && (
+          <Button
+            variant="outline"
+            className="justify-start gap-2"
+            onClick={() => addWatchedFolder(downloadsPath)}
+          >
+            <FolderPlus className="h-4 w-4" /> Add Downloads
+          </Button>
+        )}
         <Button
           variant="outline"
           className="justify-start gap-2"

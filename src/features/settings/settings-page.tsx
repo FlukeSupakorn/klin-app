@@ -49,7 +49,7 @@ import { useAutomationStore } from "@/stores/use-automation-store";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 import type { ManagedCategory } from "@/types/domain";
-import { joinFolderPath } from "@/lib/path-utils";
+import { joinFolderPath, normalizePath } from "@/lib/path-utils";
 import { useNavigate } from "react-router-dom";
 import { ModelSettingsTab } from "./model-settings-tab";
 
@@ -240,6 +240,25 @@ export function SettingsPage() {
   const addWatchedFolder = useAutomationStore((s) => s.addWatchedFolder);
   const removeWatchedFolder = useAutomationStore((s) => s.removeWatchedFolder);
   const [newWatchedPath, setNewWatchedPath] = useState("");
+  const [downloadsPath, setDownloadsPath] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void tauriClient
+      .getDownloadsFolder()
+      .then((path) => {
+        if (!cancelled) setDownloadsPath(path ?? "");
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const downloadsAlreadyWatched =
+    downloadsPath.trim().length > 0 &&
+    watchedFolders.some((f) => normalizePath(f) === normalizePath(downloadsPath));
+  const showAddDownloads = downloadsPath.trim().length > 0 && !downloadsAlreadyWatched;
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -683,24 +702,7 @@ export function SettingsPage() {
                   </span>
                 </div>
 
-                {/* Quick-add buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button"
-                    onClick={async () => addWatchedFolder(await tauriClient.getDownloadsFolder())}
-                    className="flex items-center justify-center gap-2 rounded-[11px] border border-border px-3 py-2 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                    <FolderPlus className="h-3.5 w-3.5" />Add Downloads
-                  </button>
-                  <button type="button"
-                    onClick={async () => {
-                      const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
-                      if (folder) addWatchedFolder(folder);
-                    }}
-                    className="flex items-center justify-center gap-2 rounded-[11px] border border-border px-3 py-2 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                    <FolderSearch className="h-3.5 w-3.5" />Browse Folder
-                  </button>
-                </div>
-
-                {/* Paste path + Add */}
+                {/* Add row: input + Browse + Add inline */}
                 <div className="flex gap-2">
                   <div className="flex h-10 flex-1 items-center gap-2 rounded-[11px] border border-border bg-muted px-3">
                     <FolderOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -718,6 +720,15 @@ export function SettingsPage() {
                     />
                   </div>
                   <button type="button"
+                    onClick={async () => {
+                      const folder = await tauriClient.pickFolderForOrganize().catch(() => null);
+                      if (folder) addWatchedFolder(folder);
+                    }}
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-[11px] border border-border px-3.5 py-2 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                    <FolderSearch className="h-3.5 w-3.5" />
+                    Browse
+                  </button>
+                  <button type="button"
                     onClick={() => { if (newWatchedPath.trim()) { addWatchedFolder(newWatchedPath.trim()); setNewWatchedPath(""); } }}
                     disabled={!newWatchedPath.trim()}
                     className="shrink-0 rounded-[11px] px-3.5 py-2 text-[12.5px] font-bold text-white disabled:opacity-40"
@@ -725,6 +736,23 @@ export function SettingsPage() {
                     Add
                   </button>
                 </div>
+
+                {/* Conditional one-click Downloads suggestion */}
+                {showAddDownloads && (
+                  <button type="button"
+                    onClick={() => addWatchedFolder(downloadsPath)}
+                    className="flex w-full items-center gap-2.5 rounded-[12px] border-2 border-dashed border-border px-3 py-2.5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px]"
+                      style={{ background: "var(--primary-tint)", color: "var(--primary)" }}>
+                      <FolderPlus className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12.5px] font-bold text-foreground">Add my Downloads folder</div>
+                      <div className="text-[11px] text-muted-foreground">One click to watch the folder where most files arrive</div>
+                    </div>
+                    <FolderPlus className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--primary)" }} />
+                  </button>
+                )}
 
                 {/* Folder list */}
                 <div className="space-y-2">

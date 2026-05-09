@@ -1,15 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { tauriClient } from "@/services/tauri-client";
 import type { WatcherFolder } from "@/types/onboarding";
+import { normalizePath } from "@/lib/path-utils";
 import {
   AlertCircle,
   Eye,
   FolderInput,
   FolderOpen,
-  Info,
+  FolderPlus,
   Plus,
   Trash2,
 } from "lucide-react";
+
+// `basePath` is still in the prop interface (caller passes it) but no longer
+// used since the Output-destination preview was removed to avoid leaking the
+// user's home path; keeping the prop avoids churning the parent.
 
 interface WatcherStepProps {
   basePath: string;
@@ -20,13 +25,31 @@ interface WatcherStepProps {
 }
 
 export function WatcherStep({
-  basePath,
   folders,
   onFoldersChange,
 }: WatcherStepProps) {
   const [newPath, setNewPath] = useState("");
   const [error, setError] = useState("");
   const [focused, setFocused] = useState(false);
+  const [downloadsPath, setDownloadsPath] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void tauriClient
+      .getDownloadsFolder()
+      .then((path) => {
+        if (!cancelled) setDownloadsPath(path ?? "");
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const downloadsAlreadyWatched =
+    downloadsPath.trim().length > 0 &&
+    folders.some((f) => normalizePath(f.path) === normalizePath(downloadsPath));
+  const showAddDownloads = downloadsPath.trim().length > 0 && !downloadsAlreadyWatched;
 
   const addFolder = (pathOverride?: string) => {
     const trimmed = (pathOverride ?? newPath).trim();
@@ -262,19 +285,46 @@ export function WatcherStep({
         )}
       </div>
 
-      <div style={{ padding: "14px 16px", background: "#f4f7ff", borderRadius: 18, border: "1px solid #e4eafc", boxShadow: "0 2px 8px rgba(15,98,254,.07)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <Info className="h-3.5 w-3.5" style={{ color: "#0F62FE" }} />
-          <span style={{ fontSize: 11, fontWeight: 800, color: "#6b7a9a", textTransform: "uppercase", letterSpacing: ".08em" }}>Output destination</span>
-        </div>
-        <div style={{ fontSize: 12.5, fontFamily: "'JetBrains Mono', monospace", color: "#6b7a9a", lineHeight: 1.6 }}>
-          <span>{basePath || "~/KLIN"}/</span>
-          <span style={{ background: "rgba(15,98,254,.11)", color: "#0F62FE", padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>[category]</span>
-          <span>/</span>
-          <span style={{ background: "rgba(15,98,254,.11)", color: "#0F62FE", padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>[year-month]</span>
-          <span>/</span>
-        </div>
-      </div>
+      {showAddDownloads && (
+        <button
+          type="button"
+          onClick={() => addFolder(downloadsPath)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 11,
+            padding: "12px 16px",
+            background: "rgba(15,98,254,.06)",
+            border: "1.5px dashed rgba(15,98,254,.4)",
+            borderRadius: 14,
+            cursor: "pointer",
+            transition: "all .15s",
+            width: "100%",
+            textAlign: "left",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(15,98,254,.11)";
+            e.currentTarget.style.borderColor = "#0F62FE";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(15,98,254,.06)";
+            e.currentTarget.style.borderColor = "rgba(15,98,254,.4)";
+          }}
+        >
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(15,98,254,.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <FolderPlus className="h-4 w-4" style={{ color: "#0F62FE" }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#0F62FE" }}>
+              Add my Downloads folder
+            </div>
+            <div style={{ fontSize: 11, color: "#6b7a9a", marginTop: 2 }}>
+              One click to watch the folder where most files arrive
+            </div>
+          </div>
+          <Plus className="h-4 w-4" style={{ color: "#0F62FE", flexShrink: 0 }} />
+        </button>
+      )}
     </div>
   );
 }

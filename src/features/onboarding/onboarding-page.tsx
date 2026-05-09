@@ -169,7 +169,11 @@ export function OnboardingPage() {
 
   const showProgress = state.step !== "complete";
   const stepIndex = STEP_ORDER.indexOf(state.step);
-  const canContinue = state.step !== "base-path" || Boolean(state.basePath.trim());
+  const canContinue = (() => {
+    if (state.step === "base-path") return Boolean(state.basePath.trim());
+    if (state.step === "watcher") return state.watcherFolders.length > 0;
+    return true;
+  })();
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#edf1ff", position: "relative", overflow: "hidden" }}>

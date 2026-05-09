@@ -308,6 +308,7 @@ export function HistoryPage() {
                       : false;
                     const canRedo = organizeEntry
                       ? redoStack.some((e) => normalizePath(e.fromPath) === normalizePath(organizeEntry.fromPath) && normalizePath(e.toPath) === normalizePath(organizeEntry.toPath))
+                        && useUndoRedoStore.getState().isUndoneInSession(organizeEntry.fromPath, organizeEntry.toPath)
                       : false;
                     return (
                       <HistoryEntryCard
