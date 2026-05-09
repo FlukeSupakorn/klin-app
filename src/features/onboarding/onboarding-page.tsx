@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { ArrowRight, ChevronLeft } from "lucide-react";
 import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import { StepProgress } from "./step-progress";
 import { DefaultFolderStep } from "./step/default-folder-step";
@@ -22,23 +22,6 @@ const STEP_ORDER: OnboardingStep[] = [
   "watcher",
   "complete",
 ];
-/*
-  TODO: Plan นะ @FlukeSupakorn
-  Implement full logic onboarding with current api after user open app and enter onboarding screen use default path to download of each platform 
-  - C:\Users\Username\Downloads
-  - /Users/sarun/Downloads 
-  then sent to /api/settings/default-base-path immediately so user will not wait and use store to check loading process that wait from api.
-
-  Next base path step(default folder), it will set to previosu download path that we init, With suggesttion logic to Documents and desktop foler, Implement browse folder that already in project.
-
-  Next categories after set base path you will get updated_categories list from api then show in ui, remove DEFAULT_CATEGORIES in frontend and use only from api, then user can edit name and description of category but no icon (if want we will update schema).
-  it should require user to have at least 1 category to next step. 
-
-  Next watcher folder check data model and implement logic in fronend, path, recursive or not, add and remove watcher folder
-
-  After click finish it will send changes like categories and watcher folder from store to api
-
-*/
 
 export function OnboardingPage() {
   const navigate = useNavigate();
@@ -113,17 +96,16 @@ export function OnboardingPage() {
   const handleLaunch = async () => {
     setIsLaunching(true);
     try {
-      // 1. Save base path to worker API
+      const activeCategories = state.categories.filter((category) => category.enabled !== false);
       await categoryManagementService.saveDefaultFolder(state.basePath);
 
-      // 2. Apply category delta using category name as the stable key.
       await categoryManagementService.refreshCategoriesFromWorker();
       const backendCategories = useCategoryManagementStore.getState().categories;
       const backendByName = new Map(
         backendCategories.map((category: ManagedCategory) => [category.name.trim().toLowerCase(), category]),
       );
       const localByName = new Map(
-        state.categories.map((category) => [category.name.trim().toLowerCase(), category]),
+        activeCategories.map((category) => [category.name.trim().toLowerCase(), category]),
       );
 
       for (const backendCategory of backendCategories) {
@@ -132,7 +114,7 @@ export function OnboardingPage() {
         }
       }
 
-      for (const localCategory of state.categories) {
+      for (const localCategory of activeCategories) {
         const normalizedName = localCategory.name.trim();
         const normalizedDescription = localCategory.description.trim();
         if (!normalizedName || !normalizedDescription) {
@@ -168,7 +150,6 @@ export function OnboardingPage() {
         }
       }
 
-      // 3. Save automation config if watcher folders were added
       if (state.watcherFolders.length > 0) {
         await tauriClient
           .saveAutomationConfig({
@@ -179,7 +160,6 @@ export function OnboardingPage() {
           .catch(() => undefined);
       }
     } finally {
-      // 4. Always mark onboarding complete and navigate — don't block user on API errors
       markOnboardingCompletedInSession();
       navigate("/");
       setIsLaunching(false);
@@ -187,72 +167,192 @@ export function OnboardingPage() {
   };
 
   const showProgress = state.step !== "complete";
+  const stepIndex = STEP_ORDER.indexOf(state.step);
+  const canContinue = state.step !== "base-path" || Boolean(state.basePath.trim());
 
   return (
-    <div className="min-h-screen bg-background px-4 py-8 md:py-10">
-      <div className="mx-auto flex w-full max-w-4xl flex-col">
-        {/* Step progress — hidden on welcome and complete */}
-        {showProgress && (
-          <div className="mb-8 w-full px-1 md:px-3">
-            <StepProgress currentStep={state.step} />
-          </div>
-        )}
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#edf1ff", position: "relative", overflow: "hidden" }}>
+      <div
+        style={{
+          position: "absolute",
+          top: -200,
+          right: -200,
+          width: 500,
+          height: 500,
+          borderRadius: "50%",
+          background: "radial-gradient(circle,rgba(15,98,254,.08) 0%,transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          bottom: -200,
+          left: -200,
+          width: 500,
+          height: 500,
+          borderRadius: "50%",
+          background: "radial-gradient(circle,rgba(139,92,246,.06) 0%,transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
 
-        {/* Step content with slide transition */}
+      {showProgress && (
+        <div style={{ maxWidth: 920, margin: "0 auto", width: "100%" }}>
+          <StepProgress currentStep={state.step} />
+        </div>
+      )}
+
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          padding: "10px 32px 30px",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         <div
-          className={cn(
-            "flex w-full justify-center transition-all",
-            animating && direction === "forward"
-              ? "opacity-0 translate-x-8"
-              : animating && direction === "back"
-              ? "opacity-0 -translate-x-8"
-              : "opacity-100 translate-x-0"
-          )}
-          style={{ transitionDuration: "220ms" }}
+          style={{
+            maxWidth: 920,
+            margin: "0 auto",
+            width: "100%",
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
         >
-          {state.step === "base-path" && (
-            <DefaultFolderStep
-              value={state.basePath}
-              onChange={(val) =>
-                setState((prev) => ({ ...prev, basePath: val }))
-              }
-              onNext={goNext}
-            />
-          )}
-
-          {state.step === "categories" && (
-            <CategoriesStep
-              categories={state.categories}
-              onCategoriesChange={(cats) =>
-                setState((prev) => ({ ...prev, categories: cats }))
-              }
-              onNext={goNext}
-              onBack={goBack}
-              onSkip={goNext}
-            />
-          )}
-
-          {state.step === "watcher" && (
-            <WatcherStep
-              basePath={state.basePath}
-              folders={state.watcherFolders}
-              onFoldersChange={(folders) =>
-                setState((prev) => ({ ...prev, watcherFolders: folders }))
-              }
-              onNext={goNext}
-              onBack={goBack}
-            />
-          )}
-
-          {state.step === "complete" && (
-            <CompleteStep
-              state={state}
-              onLaunch={handleLaunch}
-              isLaunching={isLaunching}
-            />
-          )}
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              opacity: animating ? 0 : 1,
+              transform: animating
+                ? direction === "forward"
+                  ? "translateX(20px)"
+                  : "translateX(-20px)"
+                : "translateX(0)",
+              transition: "opacity 220ms ease, transform 220ms ease",
+            }}
+          >
+            {state.step === "base-path" && (
+              <DefaultFolderStep
+                value={state.basePath}
+                onChange={(val) =>
+                  setState((prev) => ({ ...prev, basePath: val }))
+                }
+                onNext={goNext}
+              />
+            )}
+            {state.step === "categories" && (
+              <CategoriesStep
+                categories={state.categories}
+                onCategoriesChange={(nextCategories) =>
+                  setState((prev) => ({ ...prev, categories: nextCategories }))
+                }
+                onNext={goNext}
+                onBack={goBack}
+                onSkip={goNext}
+              />
+            )}
+            {state.step === "watcher" && (
+              <WatcherStep
+                basePath={state.basePath}
+                folders={state.watcherFolders}
+                onFoldersChange={(nextFolders) =>
+                  setState((prev) => ({ ...prev, watcherFolders: nextFolders }))
+                }
+                onNext={goNext}
+                onBack={goBack}
+              />
+            )}
+            {state.step === "complete" && (
+              <CompleteStep
+                state={state}
+                onLaunch={handleLaunch}
+                isLaunching={isLaunching}
+              />
+            )}
+          </div>
         </div>
       </div>
+
+      {showProgress && (
+        <div
+          style={{
+            padding: "14px 32px 18px",
+            borderTop: "1px solid #e4eafc",
+            background: "rgba(255,255,255,.7)",
+            backdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexShrink: 0,
+            position: "sticky",
+            bottom: 0,
+            zIndex: 2,
+          }}
+        >
+          <div style={{ maxWidth: 920, margin: "0 auto", width: "100%", display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 11.5, color: "#a8b4cc" }}>Step {stepIndex + 1} of 4</div>
+            <div style={{ flex: 1 }} />
+            {stepIndex > 0 && (
+              <button
+                onClick={goBack}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all .15s",
+                  whiteSpace: "nowrap",
+                  gap: 6,
+                  padding: "10px 18px",
+                  fontSize: 13,
+                  background: "#fff",
+                  color: "#6b7a9a",
+                  border: "1.5px solid #e4eafc",
+                  boxShadow: "0 2px 8px rgba(15,98,254,.07)",
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+            )}
+            <button
+              onClick={goNext}
+              disabled={!canContinue}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 12,
+                fontWeight: 700,
+                cursor: canContinue ? "pointer" : "not-allowed",
+                opacity: canContinue ? 1 : 0.4,
+                transition: "all .15s",
+                whiteSpace: "nowrap",
+                gap: 6,
+                padding: "10px 18px",
+                fontSize: 13,
+                background: "#0F62FE",
+                color: "#fff",
+                border: "none",
+              }}
+            >
+              Continue
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
       <CloseAppController mode="quit-immediately" />
     </div>
   );

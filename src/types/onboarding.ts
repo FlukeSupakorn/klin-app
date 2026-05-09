@@ -12,6 +12,7 @@ export interface Category {
   description: string;
   color: string;
   isDefault: boolean;
+  enabled?: boolean;
 }
 
 export interface WatcherFolder {

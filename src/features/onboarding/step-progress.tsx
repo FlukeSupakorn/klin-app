@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { Fragment } from "react";
 import { Check } from "lucide-react";
 import type { OnboardingStep } from "@/types/onboarding";
 import { STEPS } from "@/constants/onboarding";
@@ -9,58 +9,84 @@ interface StepProgressProps {
 
 export function StepProgress({ currentStep }: StepProgressProps) {
   const currentIndex = STEPS.findIndex((s) => s.id === currentStep);
-  const progressPercent =
-    currentIndex === 0
-      ? 0
-      : (currentIndex / (STEPS.length - 1)) * 100;
-
   return (
-    <div className="relative flex items-start w-full">
-      {/* Background line */}
-      <div className="absolute left-4 right-4 top-4 h-px bg-border" />
-      {/* Progress line */}
-      <div
-        className="absolute left-4 top-4 h-px bg-primary transition-all duration-500"
-        style={{ width: `calc((100% - 2rem) * ${progressPercent / 100})` }}
-      />
-
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "30px 40px 28px",
+        position: "relative",
+        flexShrink: 0,
+        gap: 0,
+      }}
+    >
       {STEPS.map((step, index) => {
         const isCompleted = index < currentIndex;
         const isActive = index === currentIndex;
-
         return (
-          <div key={step.id} className="flex-1 flex flex-col items-center gap-1.5 relative z-10">
-            <div
-              className={cn(
-                "relative flex items-center justify-center w-8 h-8 rounded-full border-2 text-xs font-mono font-semibold transition-all duration-300",
-                isCompleted &&
-                  "border-primary bg-primary text-primary-foreground",
-                isActive &&
-                  "border-primary bg-transparent text-primary",
-                !isCompleted &&
-                  !isActive &&
-                  "border-border bg-transparent text-muted-foreground"
-              )}
-            >
-              {isCompleted ? (
-                <Check className="w-3.5 h-3.5" strokeWidth={3} />
-              ) : (
-                <span>{index + 1}</span>
-              )}
-              {isActive && (
-                <span className="absolute inset-0 animate-ping rounded-full bg-primary opacity-20" />
-              )}
+          <Fragment key={step.id}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, minWidth: 100, zIndex: 1 }}>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: "50%",
+                  background: isCompleted ? "#0F62FE" : "#fff",
+                  border: `2px solid ${isCompleted ? "#0F62FE" : isActive ? "#0F62FE" : "#e4eafc"}`,
+                  boxShadow: isActive ? "0 0 0 6px rgba(15,98,254,.10)" : "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 14,
+                  fontWeight: 800,
+                  color: isCompleted ? "#fff" : isActive ? "#0F62FE" : "#a8b4cc",
+                  transition: "all .25s",
+                }}
+              >
+                {isCompleted ? <Check className="h-4 w-4" strokeWidth={3} /> : index + 1}
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    color: isCompleted || isActive ? "#0F62FE" : "#a8b4cc",
+                    textTransform: "uppercase",
+                    letterSpacing: ".1em",
+                  }}
+                >
+                  {step.shortLabel}
+                </div>
+              </div>
             </div>
-            <span
-              className={cn(
-                "text-center text-[10px] font-black uppercase tracking-widest transition-colors duration-300",
-                isActive ? "text-primary" : "text-muted-foreground",
-                isCompleted && "text-foreground"
-              )}
-            >
-              {step.shortLabel}
-            </span>
-          </div>
+            {index < STEPS.length - 1 && (
+              <div
+                style={{
+                  flex: 1,
+                  height: 2,
+                  background: "#e4eafc",
+                  marginTop: -22,
+                  marginInline: -6,
+                  borderRadius: 2,
+                  position: "relative",
+                  overflow: "hidden",
+                  maxWidth: 140,
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "#0F62FE",
+                    transform: `scaleX(${isCompleted ? 1 : 0})`,
+                    transformOrigin: "left",
+                    transition: "transform .35s",
+                  }}
+                />
+              </div>
+            )}
+          </Fragment>
         );
       })}
     </div>
