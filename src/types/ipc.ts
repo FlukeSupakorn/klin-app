@@ -78,6 +78,24 @@ export interface SystemSpecsDto {
   vramBytes?: number | null;
 }
 
+export interface FolderStats {
+  fileCount: number;
+  totalBytes: number;
+}
+
+export interface FolderStatsTick {
+  folderPath: string;
+  fileCount: number;
+  totalBytes: number;
+  done: boolean;
+}
+
+export interface FolderStatsUpdated {
+  folderPath: string;
+  fileCount: number;
+  totalBytes: number;
+}
+
 export type FrontendLogLevel = "debug" | "info" | "warn" | "error";
 
 export interface FrontendLogPayload {
@@ -124,4 +142,8 @@ export interface TauriClient {
   writeModelConfig(slot: ModelDownloadSlot, filename: string, sha256: string): Promise<ModelConfigDto>;
   listInstalledModels(): Promise<InstalledModelDto[]>;
   getSystemSpecs(): Promise<SystemSpecsDto>;
+  getFolderStatsCached(folderPath: string): Promise<FolderStats | null>;
+  startFolderStatsScan(folderPath: string): Promise<void>;
+  registerFolderStatsWatcher(folderPath: string): Promise<void>;
+  unregisterFolderStatsWatcher(folderPath: string): Promise<void>;
 }

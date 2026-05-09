@@ -6,8 +6,11 @@ import { historyApiService } from "@/services/history-api-service";
 import { fileSearchApiService } from "@/services/file-search-api-service";
 import { tauriClient } from "@/services/tauri-client";
 import { normalizeOsPath } from "@/lib/path-utils";
+import { formatBytes } from "@/lib/utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import type { FileSearchResultItem } from "@/types/domain";
+import type { FolderStatsTick, FolderStatsUpdated } from "@/types/ipc";
+import { listen } from "@tauri-apps/api/event";
 import {
   Folder, FileText, History, Search, X, Zap,
 } from "lucide-react";
@@ -56,7 +59,7 @@ export function DashboardPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchSubmitted, setSearchSubmitted] = useState(false);
   const [showDrop, setShowDrop] = useState(false);
-  const [catFileCounts, setCatFileCounts] = useState<Record<string, number>>({});
+  const [catStats, setCatStats] = useState<Record<string, { count: number; bytes: number; scanning: boolean }>>({});
   const [catPage, setCatPage] = useState(0);
   const [hoverLeft, setHoverLeft] = useState(false);
   const [hoverRight, setHoverRight] = useState(false);
@@ -76,21 +79,81 @@ export function DashboardPage() {
     [categories],
   );
 
-  const loadCatCounts = useCallback(async () => {
+  const loadCatStats = useCallback(async () => {
     const enabled = categoriesRef.current.filter((c) => c.enabled && c.folderPath.trim().length > 0);
     if (enabled.length === 0) return;
-    const results = await Promise.all(
+
+    // Phase 1: instant cached lookup
+    const cachedResults = await Promise.all(
       enabled.map(async (cat) => {
-        const files = await tauriClient.readFolder({ folderPath: cat.folderPath }).catch(() => [] as string[]);
-        return [cat.id, files.length] as const;
+        const cached = await tauriClient.getFolderStatsCached(cat.folderPath).catch(() => null);
+        return [cat, cached] as const;
       }),
     );
-    setCatFileCounts(Object.fromEntries(results));
+
+    setCatStats((prev) => {
+      const next = { ...prev };
+      for (const [cat, cached] of cachedResults) {
+        if (cached) {
+          next[cat.id] = { count: cached.fileCount, bytes: cached.totalBytes, scanning: false };
+        } else if (next[cat.id] == null) {
+          next[cat.id] = { count: 0, bytes: 0, scanning: true };
+        }
+      }
+      return next;
+    });
+
+    // Phase 2: trigger streaming scans for cache misses
+    cachedResults
+      .filter(([, cached]) => !cached)
+      .forEach(([cat]) => {
+        void tauriClient.startFolderStatsScan(cat.folderPath).catch(() => undefined);
+      });
+  }, []);
+
+  // Map folderPath -> categoryId for resolving Tauri events
+  const folderToCatRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    const map = new Map<string, string>();
+    for (const c of categories) {
+      if (c.folderPath) map.set(c.folderPath, c.id);
+    }
+    folderToCatRef.current = map;
+  }, [categories]);
+
+  // Subscribe once to streaming + live update events
+  useEffect(() => {
+    let unlistenProgress: (() => void) | null = null;
+    let unlistenUpdated: (() => void) | null = null;
+    void (async () => {
+      unlistenProgress = await listen<FolderStatsTick>("folder-stats-progress", (event) => {
+        const { folderPath, fileCount, totalBytes, done } = event.payload;
+        const catId = folderToCatRef.current.get(folderPath);
+        if (!catId) return;
+        setCatStats((prev) => ({
+          ...prev,
+          [catId]: { count: fileCount, bytes: totalBytes, scanning: !done },
+        }));
+      });
+      unlistenUpdated = await listen<FolderStatsUpdated>("folder-stats-updated", (event) => {
+        const { folderPath, fileCount, totalBytes } = event.payload;
+        const catId = folderToCatRef.current.get(folderPath);
+        if (!catId) return;
+        setCatStats((prev) => ({
+          ...prev,
+          [catId]: { count: fileCount, bytes: totalBytes, scanning: false },
+        }));
+      });
+    })();
+    return () => {
+      unlistenProgress?.();
+      unlistenUpdated?.();
+    };
   }, []);
 
   const sortedCats = useMemo(
-    () => [...enabledCats].sort((a, b) => (catFileCounts[b.id] ?? -1) - (catFileCounts[a.id] ?? -1)),
-    [enabledCats, catFileCounts],
+    () => [...enabledCats].sort((a, b) => (catStats[b.id]?.count ?? -1) - (catStats[a.id]?.count ?? -1)),
+    [enabledCats, catStats],
   );
 
   const displayCats = useMemo(
@@ -116,15 +179,15 @@ export function DashboardPage() {
 
   useEffect(() => {
     void loadRecentHistory();
-    void loadCatCounts();
+    void loadCatStats();
     const onHistoryUpdated = () => {
       void loadRecentHistory();
-      void loadCatCounts();
+      void loadCatStats();
       void refreshNotifications();
     };
     window.addEventListener("klin:history-updated", onHistoryUpdated);
     return () => { window.removeEventListener("klin:history-updated", onHistoryUpdated); };
-  }, [loadRecentHistory, loadCatCounts, refreshNotifications]);
+  }, [loadRecentHistory, loadCatStats, refreshNotifications]);
 
   // Close search dropdown on click outside
   useEffect(() => {
@@ -268,6 +331,7 @@ export function DashboardPage() {
           >
             {displayCats.map((cat) => {
               const CatIcon = getCategoryIcon(cat.icon);
+              const stats = catStats[cat.id];
               return (
                 <div
                   key={cat.id}
@@ -297,10 +361,21 @@ export function DashboardPage() {
                     <CatIcon className="h-4 w-4" style={{ color: cat.color }} />
                   </div>
                   {/* File count */}
-                  <div className="text-[28px] font-extrabold leading-none text-foreground" style={{ letterSpacing: "-1.5px" }}>
-                    {catFileCounts[cat.id] ?? "—"}
+                  <div className="text-[28px] font-extrabold leading-none text-foreground tabular-nums" style={{ letterSpacing: "-1.5px" }}>
+                    {stats ? stats.count : "—"}
                   </div>
                   <div className="mt-0.5 text-[10px] font-semibold text-muted-foreground">files</div>
+                  {/* Folder size */}
+                  {stats?.scanning ? (
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground/70">
+                      <span className="tabular-nums">{formatBytes(stats.bytes)}</span>
+                      <span className="inline-block h-1 w-1 rounded-full bg-current animate-pulse" />
+                    </div>
+                  ) : (
+                    <div className="mt-0.5 text-[10px] font-semibold text-muted-foreground/70 tabular-nums">
+                      {stats ? formatBytes(stats.bytes) : "—"}
+                    </div>
+                  )}
                   {/* Name */}
                   <div className="mt-3 truncate text-[13px] font-bold" style={{ color: cat.color }}>
                     {cat.name}

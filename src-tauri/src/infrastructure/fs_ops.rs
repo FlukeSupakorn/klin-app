@@ -1,9 +1,114 @@
+use std::collections::HashMap;
 use std::path::Path;
+use std::time::{Instant, SystemTime};
+
+use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     dto::SubdirEntry,
     file_operations::{DeleteFileCommand, FileCommand, MoveFileCommand},
 };
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderStats {
+    pub file_count: u64,
+    pub total_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderStatsTick {
+    pub folder_path: String,
+    pub file_count: u64,
+    pub total_bytes: u64,
+    pub done: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileInfo {
+    pub size: u64,
+    #[serde(with = "system_time_seconds")]
+    pub mtime: SystemTime,
+}
+
+mod system_time_seconds {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    pub fn serialize<S: Serializer>(t: &SystemTime, s: S) -> Result<S::Ok, S::Error> {
+        let secs = t.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        s.serialize_u64(secs)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<SystemTime, D::Error> {
+        let secs = u64::deserialize(d)?;
+        Ok(UNIX_EPOCH + Duration::from_secs(secs))
+    }
+}
+
+pub struct WalkOutcome {
+    pub stats: FolderStats,
+    pub file_index: HashMap<String, FileInfo>,
+}
+
+const TICK_INTERVAL_MS: u128 = 50;
+
+pub fn walk_folder_stats_streaming<F>(folder: &Path, mut on_tick: F) -> Result<WalkOutcome, String>
+where
+    F: FnMut(u64, u64),
+{
+    if !folder.exists() {
+        return Err(format!("folder does not exist: {}", folder.display()));
+    }
+
+    let mut total_bytes: u64 = 0;
+    let mut file_count: u64 = 0;
+    let mut file_index: HashMap<String, FileInfo> = HashMap::new();
+    let mut last_tick = Instant::now();
+
+    let walker = jwalk::WalkDir::new(folder)
+        .follow_links(false)
+        .skip_hidden(false);
+
+    for entry in walker {
+        let Ok(entry) = entry else { continue };
+        if !entry.file_type().is_file() {
+            continue;
+        }
+
+        let path = entry.path();
+        let metadata = match path.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let size = metadata.len();
+        let mtime = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+
+        total_bytes = total_bytes.saturating_add(size);
+        file_count = file_count.saturating_add(1);
+
+        if let Ok(rel) = path.strip_prefix(folder) {
+            let rel_str = rel.to_string_lossy().replace('\\', "/");
+            file_index.insert(rel_str, FileInfo { size, mtime });
+        }
+
+        if last_tick.elapsed().as_millis() >= TICK_INTERVAL_MS {
+            on_tick(file_count, total_bytes);
+            last_tick = Instant::now();
+        }
+    }
+
+    on_tick(file_count, total_bytes);
+
+    Ok(WalkOutcome {
+        stats: FolderStats {
+            file_count,
+            total_bytes,
+        },
+        file_index,
+    })
+}
 
 impl FileCommand for MoveFileCommand {
     fn execute(&self) -> Result<(), String> {

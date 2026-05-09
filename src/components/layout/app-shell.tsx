@@ -31,6 +31,7 @@ import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import klinLogo from "@/assets/klin-logo.svg";
+import { KlinSetupScreen } from "@/components/layout/klin-setup-screen";
 
 const mainNavItems = [
   { to: "/", label: "Dashboard", icon: LayoutGrid },
@@ -73,6 +74,8 @@ export function AppShell() {
 
   const [healthIssues, setHealthIssues] = useState<FailedService[]>([]);
   const [defaultPathSet, setDefaultPathSet] = useState<{ path: string } | null>(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
+  const [bootstrapStep, setBootstrapStep] = useState("Just a moment");
   const [showDefaultFolderSettings, setShowDefaultFolderSettings] = useState(false);
   const [recentDetectedFiles, setRecentDetectedFiles] = useState<Array<{ path: string; at: number }>>([]);
   const [fallbackDownloadsFolder, setFallbackDownloadsFolder] = useState<string | null>(null);
@@ -119,14 +122,43 @@ export function AppShell() {
       const checks = await runStartupChecks().catch(() => ({ healthIssues: [], defaultPathSet: null }));
       setHealthIssues(checks.healthIssues);
       setDefaultPathSet(checks.defaultPathSet);
-      void bootstrapAppData().catch(() => undefined);
+      try {
+        await bootstrapAppData({ onStep: setBootstrapStep });
+      } catch {
+        // Failures surface via runStartupChecks/healthIssues; always reveal the dashboard.
+      } finally {
+        setBootstrapped(true);
+      }
     })();
   }, [initializeAuth]);
 
   const foldersEnsuredRef = useRef(false);
+  const statsWatchedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let disposed = false;
+    const reconcileStatsWatchers = () => {
+      const wanted = new Set(
+        useCategoryManagementStore.getState().categories
+          .filter((c) => c.enabled && c.folderPath.trim().length > 0)
+          .map((c) => c.folderPath),
+      );
+      // Add new
+      wanted.forEach((path) => {
+        if (!statsWatchedRef.current.has(path)) {
+          void tauriClient.registerFolderStatsWatcher(path).catch(() => undefined);
+          statsWatchedRef.current.add(path);
+        }
+      });
+      // Remove gone
+      Array.from(statsWatchedRef.current).forEach((path) => {
+        if (!wanted.has(path)) {
+          void tauriClient.unregisterFolderStatsWatcher(path).catch(() => undefined);
+          statsWatchedRef.current.delete(path);
+        }
+      });
+    };
+
     const syncCategoriesFromWorker = () => {
       void categoryManagementService
         .refreshCategoriesFromWorker()
@@ -141,6 +173,7 @@ export function AppShell() {
               void tauriClient.ensureCategoryFolders(paths).catch(() => undefined);
             }
           }
+          reconcileStatsWatchers();
         })
         .catch(() => undefined);
     };
@@ -217,6 +250,10 @@ export function AppShell() {
 
   const profileInitial = (profile?.name?.trim()?.charAt(0) || "K").toUpperCase();
   const totalFiles = watchedFolders.length;
+
+  if (!bootstrapped) {
+    return <KlinSetupScreen step={bootstrapStep} />;
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">

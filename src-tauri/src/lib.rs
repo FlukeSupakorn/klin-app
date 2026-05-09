@@ -23,7 +23,8 @@ use repositories::{
     json_history_repository::JsonHistoryRepository, json_rule_repository::JsonRuleRepository,
 };
 use services::{
-    category_service::CategoryService, history_service::HistoryService, rule_service::RuleService,
+    category_service::CategoryService, folder_stats_cache, history_service::HistoryService,
+    rule_service::RuleService,
 };
 use sidecars::{LlamaSlotState, ModelSlot};
 
@@ -232,6 +233,9 @@ pub fn run() {
                 app_data_dir.join("automation-config.json"),
             ));
 
+            // ── Folder-stats cache ──────────────────────────────────
+            folder_stats_cache::init(&app_data_dir);
+
             // ── Llama-server slots ──────────────────────────────────
             let slots = setup_llama_slots();
 
@@ -300,6 +304,10 @@ pub fn run() {
             commands::write_model_config,
             commands::list_installed_models,
             commands::get_system_specs,
+            commands::get_folder_stats_cached,
+            commands::start_folder_stats_scan,
+            commands::register_folder_stats_watcher,
+            commands::unregister_folder_stats_watcher,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -313,6 +321,10 @@ pub fn run() {
                 for slot_state in state.slots.values() {
                     *slot_state.idle_shutdown.lock() = true;
                     slot_state.shutdown_condvar.notify_all();
+                }
+
+                if let Some(cache) = folder_stats_cache::instance() {
+                    cache.flush();
                 }
 
                 sidecars::cleanup_all(app);

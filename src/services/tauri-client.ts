@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AutomationConfigDto,
+  FolderStats,
   FrontendLogPayload,
   DownloadModelDto,
   InstalledModelDto,
@@ -166,6 +167,22 @@ class TauriCommandClient implements TauriClient {
 
   getSystemSpecs(): Promise<SystemSpecsDto> {
     return invoke("get_system_specs");
+  }
+
+  getFolderStatsCached(folderPath: string): Promise<FolderStats | null> {
+    return invoke("get_folder_stats_cached", { folderPath });
+  }
+
+  startFolderStatsScan(folderPath: string): Promise<void> {
+    return invoke("start_folder_stats_scan", { folderPath });
+  }
+
+  registerFolderStatsWatcher(folderPath: string): Promise<void> {
+    return invoke("register_folder_stats_watcher", { folderPath });
+  }
+
+  unregisterFolderStatsWatcher(folderPath: string): Promise<void> {
+    return invoke("unregister_folder_stats_watcher", { folderPath });
   }
 }
 

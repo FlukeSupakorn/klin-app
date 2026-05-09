@@ -119,10 +119,16 @@
   50% { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0.05); }
 }
 
+@keyframes klin-logo-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50%      { transform: scale(1.04); opacity: 1; }
+}
+
 .klin-fade-in { animation: klin-fade-in 0.25s ease; }
 .klin-slide-up { animation: klin-slide-up 0.2s ease; }
 .klin-toast-in { animation: klin-toast-in 0.3s ease; }
 .klin-pulse-dot { animation: klin-pulse-dot 2s infinite; }
+.klin-logo-breathe { animation: klin-logo-breathe 1.6s ease-in-out infinite; }
 
 ::-webkit-scrollbar {
   width: 4px;
