@@ -102,6 +102,8 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
             currentPath: nextQueuedItem.currentPath,
           });
 
+          const analysisStartedAt = performance.now();
+
           // Keep sequential analysis so queue progress is deterministic in the modal.
           // eslint-disable-next-line no-await-in-loop
           const analyzedItem = await organizeApiService.analyzeOne(
@@ -109,6 +111,8 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
             categories,
             controller.signal,
           );
+
+          const analysisDurationMs = Math.round(performance.now() - analysisStartedAt);
 
           logger.info("[organize] analysis completed", {
             itemId: nextQueuedItem.id,
@@ -128,6 +132,7 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
                 fileName: item.fileName,
                 analysisStatus: analyzedItem.analysisStatus === "failed" ? "failed" : "completed",
                 analysisError: analyzedItem.analysisError,
+                analysisDurationMs,
                 moveStatus: item.moveStatus === "completed" ? "completed" : "idle",
                 lastMovedFromPath: item.moveStatus === "completed" ? item.lastMovedFromPath ?? item.currentPath : null,
                 lastMovedToPath: item.moveStatus === "completed" ? item.lastMovedToPath ?? item.destinationPath : null,

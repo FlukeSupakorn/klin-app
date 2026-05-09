@@ -11,6 +11,8 @@ pub mod klin_worker;
 pub mod llama_server;
 
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use tauri::Manager;
@@ -30,42 +32,53 @@ pub use llama_server::{
 /// Logs the result and leaves the slot empty.
 /// On Windows, uses taskkill as fallback if normal kill fails.
 pub(crate) fn kill_sidecar(name: &str, child_slot: &Arc<Mutex<Option<CommandChild>>>) {
-    if let Some(child) = child_slot.lock().take() {
-        #[cfg(target_os = "windows")]
-        {
-            let pid = child.pid();
-            // On Windows always use taskkill /T to kill the entire process tree.
-            // child.kill() only kills the top-level process; spawned sub-processes
-            // (e.g. uvicorn workers) survive and keep holding their ports.
-            use std::process::Command;
-            tracing::info!(
-                "[shutdown] {} force-killing process tree (PID: {})",
-                name,
-                pid
-            );
-            let _ = Command::new("taskkill")
-                .args(&["/PID", &pid.to_string(), "/F", "/T"])
-                .output();
-        }
+    let Some(child) = child_slot.lock().take() else { return };
 
-        #[cfg(not(target_os = "windows"))]
-        {
-            match child.kill() {
-                Ok(_) => tracing::info!("[shutdown] {} terminated", name),
-                Err(e) => tracing::info!("[shutdown] {} kill failed: {}", name, e),
-            }
+    #[cfg(target_os = "windows")]
+    {
+        let pid = child.pid();
+        use std::process::Command;
+
+        // Try graceful exit first: child.kill() sends a normal terminate signal
+        // to the top-level process. Many sidecars (uvicorn, llama-server) can
+        // shut down cleanly within a short window.
+        tracing::info!("[shutdown] {} requesting graceful exit (PID: {})", name, pid);
+        let _ = child.kill();
+
+        // Brief grace window, then escalate to taskkill /T which also reaps
+        // child processes (e.g. uvicorn workers) that survive a soft kill.
+        thread::sleep(Duration::from_millis(800));
+
+        tracing::info!("[shutdown] {} force-killing process tree (PID: {})", name, pid);
+        let _ = Command::new("taskkill")
+            .args(&["/PID", &pid.to_string(), "/F", "/T"])
+            .output();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        match child.kill() {
+            Ok(_) => tracing::info!("[shutdown] {} terminated", name),
+            Err(e) => tracing::info!("[shutdown] {} kill failed: {}", name, e),
         }
     }
 }
 
-/// Stop all sidecars; called from the Tauri `ExitRequested` / `Exit` handler.
+/// Stop all sidecars in parallel; called from the Tauri `ExitRequested` / `Exit` handler.
 pub fn cleanup_all<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     let state = app.state::<crate::AppState>();
+    let mut handles = Vec::new();
+
     for slot_state in state.slots.values() {
-        kill_sidecar(
-            &format!("llama-server[{}]", slot_state.slot.label()),
-            &slot_state.child,
-        );
+        let name = format!("llama-server[{}]", slot_state.slot.label());
+        let child = slot_state.child.clone();
+        handles.push(thread::spawn(move || kill_sidecar(&name, &child)));
     }
-    kill_sidecar("klin-worker", &state.worker_child);
+
+    let worker = state.worker_child.clone();
+    handles.push(thread::spawn(move || kill_sidecar("klin-worker", &worker)));
+
+    for h in handles {
+        let _ = h.join();
+    }
 }

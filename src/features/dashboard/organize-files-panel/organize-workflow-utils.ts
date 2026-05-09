@@ -41,6 +41,7 @@ export function buildQueuedItem(path: string, categories: ManagedCategory[], def
     calendar: null,
     analysisStatus: "queued",
     analysisError: null,
+    analysisDurationMs: null,
     moveStatus: "idle",
     lastMovedFromPath: null,
     lastMovedToPath: null,

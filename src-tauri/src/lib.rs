@@ -10,6 +10,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 #[cfg(windows)]
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -105,6 +107,67 @@ fn setup_deep_links<R: tauri::Runtime>(
         });
     }
 
+    Ok(())
+}
+
+fn setup_tray_icon<R: tauri::Runtime>(
+    app: &tauri::App<R>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let show_item = MenuItemBuilder::with_id("tray-show", "Show KLIN").build(app)?;
+    let quit_item = MenuItemBuilder::with_id("tray-quit", "Quit KLIN").build(app)?;
+    let menu = MenuBuilder::new(app)
+        .item(&show_item)
+        .separator()
+        .item(&quit_item)
+        .build()?;
+
+    let mut builder = TrayIconBuilder::with_id("klin-tray")
+        .tooltip("KLIN")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "tray-show" => {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                    tracing::info!("[tray] show via menu");
+                }
+            }
+            "tray-quit" => {
+                tracing::info!("[tray] quit via menu");
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                let app = tray.app_handle();
+                if let Some(window) = app.get_webview_window("main") {
+                    let visible = window.is_visible().unwrap_or(false);
+                    if visible {
+                        let _ = window.hide();
+                        tracing::info!("[tray] hide via left-click");
+                    } else {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                        tracing::info!("[tray] show via left-click");
+                    }
+                }
+            }
+        });
+
+    if let Some(icon) = app.default_window_icon().cloned() {
+        builder = builder.icon(icon);
+    }
+
+    builder.build(app)?;
     Ok(())
 }
 
@@ -256,6 +319,11 @@ pub fn run() {
             // ── Deep links ──────────────────────────────────────────
             setup_deep_links(app)?;
 
+            // ── System tray ─────────────────────────────────────────
+            if let Err(err) = setup_tray_icon(app) {
+                tracing::info!("[startup] tray icon setup failed: {}", err);
+            }
+
             // ── Window close → hide ─────────────────────────────────
             setup_window_behavior(app);
 
@@ -317,6 +385,12 @@ pub fn run() {
                 event,
                 tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
             ) {
+                // Hide the main window immediately so the user gets instant
+                // visual feedback; sidecar teardown below can take 1-3s.
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+
                 // Signal all idle-timeout threads to exit cleanly.
                 let state = app.state::<AppState>();
                 for slot_state in state.slots.values() {

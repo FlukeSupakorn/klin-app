@@ -87,6 +87,7 @@ export interface OrganizePreviewItem {
   calendar: string | null;
   analysisStatus: AutomationStatus;
   analysisError: string | null;
+  analysisDurationMs: number | null;
   moveStatus: OrganizeMoveStatus;
   // Tracks the exact file move operation so undo remains correct even if UI destination is edited later.
   lastMovedFromPath?: string | null;

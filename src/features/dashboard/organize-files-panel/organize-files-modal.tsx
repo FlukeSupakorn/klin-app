@@ -19,8 +19,20 @@ function splitLockNotice(message: string): { summary: string; details: string[] 
   return { summary, details };
 }
 
-function confColor(c: number): string {
-  return c >= 80 ? "var(--success)" : c >= 65 ? "var(--warning)" : "var(--destructive)";
+function rankColor(rank: number): string {
+  if (rank === 1) return "var(--success)";
+  if (rank === 2) return "var(--warning)";
+  return "var(--muted-foreground)";
+}
+
+function formatDurationMs(ms: number | null): string {
+  if (ms == null || !Number.isFinite(ms) || ms <= 0) return "—";
+  if (ms < 1000) return `${ms} ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 2 : 1)} s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.round(seconds - minutes * 60);
+  return `${minutes}m ${remainder}s`;
 }
 
 function getStatusInfo(item: OrganizePreviewItem): { label: string; bg: string; color: string } {
@@ -49,7 +61,8 @@ function FileListItem({
   const { fileName } = splitDestinationPath(item.destinationPath);
   const isMoved = item.moveStatus === "completed";
   const status = getStatusInfo(item);
-  const conf = Math.round(item.confidence * 100);
+  const selectedRankIndex = item.topScores.findIndex((entry) => entry.name === item.selectedCategory);
+  const selectedRank = selectedRankIndex >= 0 ? selectedRankIndex + 1 : null;
 
   return (
     <button
@@ -78,9 +91,9 @@ function FileListItem({
             >
               {status.label}
             </span>
-            {conf > 0 && (
-              <span className="text-[10.5px] font-extrabold" style={{ color: confColor(conf) }}>
-                {conf}%
+            {selectedRank !== null && item.analysisStatus === "completed" && (
+              <span className="text-[10.5px] font-extrabold" style={{ color: rankColor(selectedRank) }}>
+                #{selectedRank}
               </span>
             )}
           </div>
@@ -130,7 +143,9 @@ function FileDetailPanel({
   };
 
   const status = getStatusInfo(item);
-  const conf = Math.round(item.confidence * 100);
+  const selectedRankIndex = item.topScores.findIndex((entry) => entry.name === item.selectedCategory);
+  const selectedRank = selectedRankIndex >= 0 ? selectedRankIndex + 1 : null;
+  const totalRanked = item.topScores.length;
 
   const getMoveLabel = () => {
     if (item.analysisStatus !== "completed") return "Waiting...";
@@ -264,9 +279,10 @@ function FileDetailPanel({
               >
                 None
               </button>
-              {item.topScores.map((score) => {
+              {item.topScores.map((score, index) => {
                 const isSelected = item.selectedCategory === score.name;
                 const categoryColor = findCategoryColor(score.name, categories);
+                const rank = index + 1;
                 return (
                   <button
                     type="button"
@@ -278,16 +294,23 @@ function FileDetailPanel({
                       color: isSelected ? "var(--primary-foreground)" : "var(--foreground)",
                       border: `1.5px solid ${isSelected ? "transparent" : "var(--border)"}`,
                     }}
+                    title={`Best match #${rank}`}
                   >
                     <span
                       className="absolute left-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full"
                       style={{
                         background: isSelected
                           ? "rgba(255,255,255,0.7)"
-                          : (categoryColor ?? confColor(Math.round(score.score * 100))),
+                          : (categoryColor ?? rankColor(rank)),
                       }}
                     />
-                    {score.name} · {Math.round(score.score * 100)}%
+                    <span
+                      className="mr-1 font-extrabold"
+                      style={{ color: isSelected ? "rgba(255,255,255,0.85)" : rankColor(rank) }}
+                    >
+                      #{rank}
+                    </span>
+                    {score.name}
                   </button>
                 );
               })}
@@ -309,22 +332,39 @@ function FileDetailPanel({
                   {item.destinationPath}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">Confidence</div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{ width: `${conf}%`, background: confColor(conf) }}
-                      />
+                  <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">Match Rank</div>
+                  {selectedRank !== null ? (
+                    <div className="flex items-baseline gap-1">
+                      <span
+                        className="text-[15px] font-extrabold"
+                        style={{ color: rankColor(selectedRank) }}
+                      >
+                        #{selectedRank}
+                      </span>
+                      <span className="text-[11px] font-semibold text-muted-foreground">
+                        of {totalRanked}
+                      </span>
                     </div>
-                    <span className="text-[13px] font-extrabold" style={{ color: confColor(conf) }}>{conf}%</span>
-                  </div>
+                  ) : (
+                    <div className="text-[13px] font-bold text-muted-foreground">—</div>
+                  )}
                 </div>
                 <div>
                   <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">Category</div>
-                  <div className="text-[13px] font-bold text-foreground">{item.selectedCategory}</div>
+                  <div className="truncate text-[13px] font-bold text-foreground" title={item.selectedCategory}>
+                    {item.selectedCategory}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-1 text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">Analysis Time</div>
+                  <div
+                    className="text-[13px] font-bold text-foreground"
+                    style={{ fontFamily: "'JetBrains Mono',monospace" }}
+                  >
+                    {formatDurationMs(item.analysisDurationMs)}
+                  </div>
                 </div>
               </div>
               {isNoChange && !isMoved && (
