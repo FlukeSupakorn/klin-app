@@ -196,6 +196,7 @@ export function HistoryPage() {
         fileName: stackEntry.fileName,
         category: stackEntry.category,
       });
+      useUndoRedoStore.getState().markUndone(entry.fromPath, entry.toPath);
       window.dispatchEvent(new Event("klin:history-updated"));
     } catch (e) {
       logger.error("[history] undo failed", e);
@@ -217,6 +218,7 @@ export function HistoryPage() {
         fileName: stackEntry.fileName,
         category: stackEntry.category,
       });
+      useUndoRedoStore.getState().clearUndone(entry.fromPath, entry.toPath);
       window.dispatchEvent(new Event("klin:history-updated"));
     } catch (e) {
       logger.error("[history] redo failed", e);

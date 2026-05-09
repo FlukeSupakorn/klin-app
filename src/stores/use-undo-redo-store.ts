@@ -33,6 +33,8 @@ interface UndoRedoState {
   popRedo: () => UndoEntry | undefined;
   removeFromUndo: (fromPath: string, toPath: string) => void;
   removeFromRedo: (fromPath: string, toPath: string) => void;
+  markUndone: (originalFromPath: string, originalToPath: string) => void;
+  clearUndone: (originalFromPath: string, originalToPath: string) => void;
   /**
    * Returns true if an organize-history entry with the given original
    * (fromPath → toPath) was undone in this session.
@@ -90,6 +92,18 @@ export const useUndoRedoStore = create<UndoRedoState>()(
             (e) => !(normalizePath(e.fromPath) === normalizePath(fromPath) && normalizePath(e.toPath) === normalizePath(toPath)),
           ),
         })),
+      markUndone: (originalFromPath, originalToPath) =>
+        set((s) => {
+          const nextSet = new Set(s.sessionUndoneIds);
+          nextSet.add(pathKey(originalFromPath, originalToPath));
+          return { sessionUndoneIds: nextSet };
+        }),
+      clearUndone: (originalFromPath, originalToPath) =>
+        set((s) => {
+          const nextSet = new Set(s.sessionUndoneIds);
+          nextSet.delete(pathKey(originalFromPath, originalToPath));
+          return { sessionUndoneIds: nextSet };
+        }),
       isUndoneInSession: (originalFromPath, originalToPath) =>
         get().sessionUndoneIds.has(pathKey(originalFromPath, originalToPath)),
     }),
