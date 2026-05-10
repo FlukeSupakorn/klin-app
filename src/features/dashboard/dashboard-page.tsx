@@ -12,7 +12,16 @@ import type { FileSearchResultItem } from "@/types/domain";
 import type { FolderStatsTick, FolderStatsUpdated } from "@/types/ipc";
 import { listen } from "@tauri-apps/api/event";
 import {
-  Folder, FileText, History, Search, X, Zap,
+  Eye,
+  FileText,
+  Folder,
+  FolderTree,
+  History,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  X,
+  Zap,
 } from "lucide-react";
 import { getCategoryIcon, withAlpha } from "@/features/categories/category-appearance";
 import { logger } from "@/lib/logger";
@@ -157,11 +166,11 @@ export function DashboardPage() {
   );
 
   const displayCats = useMemo(
-    () => sortedCats.slice(catPage * 4, catPage * 4 + 4),
+    () => sortedCats.slice(catPage * 3, catPage * 3 + 3),
     [sortedCats, catPage],
   );
 
-  const hasNextPage = (catPage + 1) * 4 < sortedCats.length;
+  const hasNextPage = (catPage + 1) * 3 < sortedCats.length;
   const hasPrevPage = catPage > 0;
 
   const loadRecentHistory = useCallback(async () => {
@@ -324,7 +333,7 @@ export function DashboardPage() {
           <div
             className="grid gap-3.5 transition-[margin] duration-200"
             style={{
-              gridTemplateColumns: `repeat(${Math.min(displayCats.length, 4)}, 1fr)`,
+              gridTemplateColumns: "repeat(4, 1fr)",
               marginLeft: hoverLeft && hasPrevPage ? 44 : 0,
               marginRight: hoverRight && hasNextPage ? 44 : 0,
             }}
@@ -383,6 +392,41 @@ export function DashboardPage() {
                 </div>
               );
             })}
+
+            {/* Shortcuts panel — pinned in the 4th slot */}
+            <div
+              className="flex flex-col overflow-hidden rounded-[18px] p-3.5"
+              style={{
+                background: "var(--card)",
+                border: "1.5px solid var(--border)",
+                boxShadow: "var(--shadow-xs)",
+              }}
+            >
+              <div className="mb-2.5 flex items-center justify-between">
+                <span className="text-[9.5px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                  Shortcuts
+                </span>
+                <Zap className="h-3.5 w-3.5" style={{ color: "var(--primary)" }} />
+              </div>
+              <div className="grid flex-1 grid-cols-2 gap-2">
+                {[
+                  { Icon: FolderTree, label: "Categories", tab: "config" as const },
+                  { Icon: Eye, label: "Watcher", tab: "automation" as const },
+                  { Icon: ShieldCheck, label: "Security", tab: "security" as const },
+                  { Icon: SlidersHorizontal, label: "All settings", tab: null },
+                ].map((s) => (
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={() => navigate("/settings", s.tab ? { state: { tab: s.tab } } : undefined)}
+                    className="group flex flex-col items-start justify-center gap-1.5 rounded-[12px] border border-border bg-muted/40 p-2.5 text-left transition-colors hover:bg-primary/10 hover:border-primary/30"
+                  >
+                    <s.Icon className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+                    <span className="text-[12px] font-bold text-foreground">{s.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Left edge hover zone + prev arrow */}

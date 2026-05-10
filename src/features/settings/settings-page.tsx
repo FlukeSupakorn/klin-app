@@ -53,7 +53,7 @@ import { useCategoryManagementStore } from "@/stores/use-category-management-sto
 import { usePrivacyStore } from "@/stores/use-privacy-store";
 import type { ManagedCategory } from "@/types/domain";
 import { joinFolderPath, normalizePath } from "@/lib/path-utils";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ModelSettingsTab } from "./model-settings-tab";
 
 type SettingsTab = "account" | "config" | "automation" | "security" | "model" | "developer";
@@ -228,9 +228,20 @@ function CategoryEditorModal({ mode, formState, onFormChange, onClose, onSave, s
 }
 
 /* ── Main Page ── */
+const VALID_SETTINGS_TABS: SettingsTab[] = ["account", "config", "automation", "model", "security", "developer"];
+
 export function SettingsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<SettingsTab>("account");
+
+  useEffect(() => {
+    const navState = location.state as { tab?: unknown } | null;
+    const requested = typeof navState?.tab === "string" ? navState.tab : null;
+    if (requested && (VALID_SETTINGS_TABS as string[]).includes(requested)) {
+      setActiveTab(requested as SettingsTab);
+    }
+  }, [location.key, location.state]);
 
   /* ── Config tab state ── */
   const defaultFolder = useCategoryManagementStore((s) => s.defaultFolder);
