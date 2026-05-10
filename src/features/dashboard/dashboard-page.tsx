@@ -331,13 +331,19 @@ export function DashboardPage() {
         <div className="relative shrink-0">
           {/* Cards grid — shifts inward only when hovering the edge zones */}
           <div
-            className="grid gap-3.5 transition-[margin] duration-200"
+            className="flex gap-3.5 transition-[margin] duration-200"  
             style={{
-              gridTemplateColumns: "repeat(4, 1fr)",
               marginLeft: hoverLeft && hasPrevPage ? 44 : 0,
-              marginRight: hoverRight && hasNextPage ? 44 : 0,
             }}
           >
+            <div                                                                                               
+              className="grid gap-3.5 transition-[margin] duration-200"                                        
+               style={{                                                                                         
+                 gridTemplateColumns: "repeat(3, minmax(0, 1fr))",                                              
+                   flex: "3 1 0%",                                                                                
+               marginRight: hoverRight && hasNextPage ? 44 : 0,                                               
+  }}                                                                                               
+    >  
             {displayCats.map((cat) => {
               const CatIcon = getCategoryIcon(cat.icon);
               const stats = catStats[cat.id];
@@ -392,6 +398,7 @@ export function DashboardPage() {
                 </div>
               );
             })}
+            </div> 
 
             {/* Shortcuts panel — pinned in the 4th slot */}
             <div
@@ -400,6 +407,7 @@ export function DashboardPage() {
                 background: "var(--card)",
                 border: "1.5px solid var(--border)",
                 boxShadow: "var(--shadow-xs)",
+                flex: "1 1 0%", 
               }}
             >
               <div className="mb-2.5 flex items-center justify-between">
@@ -411,7 +419,7 @@ export function DashboardPage() {
               <div className="grid flex-1 grid-cols-2 gap-2">
                 {[
                   { Icon: FolderTree, label: "Categories", tab: "config" as const },
-                  { Icon: Eye, label: "Watcher", tab: "automation" as const },
+                  { Icon: Eye, label: "Auto organize", tab: "automation" as const },
                   { Icon: ShieldCheck, label: "Security", tab: "security" as const },
                   { Icon: SlidersHorizontal, label: "All settings", tab: null },
                 ].map((s) => (
@@ -452,18 +460,20 @@ export function DashboardPage() {
             </div>
           )}
 
-          {/* Right edge hover zone + next arrow */}
+          {/* Hover zone + next arrow — sits between the last category card and the Shortcuts panel */}
           {hasNextPage && (
             <div
-              className="absolute inset-y-0 right-0 w-10 z-10"
+              className="absolute inset-y-0 z-10 transition-[right] duration-200" 
+              style={{ right: "calc(25% + 14px - 2px)", width: 48 }} 
               onMouseEnter={() => setHoverRight(true)}
               onMouseLeave={() => setHoverRight(false)}
             >
               <button
                 onClick={() => setCatPage((p) => p + 1)}
-                className="absolute right-0 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-[12px] transition-all duration-200"
+                className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[12px] transition-all duration-200"
                 style={{
                   opacity: hoverRight ? 1 : 0,
+                  pointerEvents: hoverRight ? "auto" : "none",
                   background: "var(--card)",
                   border: "1.5px solid var(--border)",
                   boxShadow: "var(--shadow-xs)",
