@@ -307,6 +307,16 @@ fn spawn_slot<R: tauri::Runtime>(
 
             let n_gpu_layers = runtime_env::get_or("KLIN_N_GPU_LAYERS", "-1");
             let ctx_size = runtime_env::get_or("KLIN_CTX_SIZE", "4096");
+            // Parallel inference slots — each slot allocates its own
+            // KV cache so total VRAM ≈ ctx_size × n_layers × n_heads × 2
+            // bytes × N. Default 2 lets foreground organize and background
+            // RAG run side-by-side; users on tight VRAM can set
+            // KLIN_CHAT_PARALLEL=1 to fall back to single-slot mode.
+            let chat_parallel = runtime_env::get_or("KLIN_CHAT_PARALLEL", "2");
+            tracing::info!(
+                "llama-server[chat] launching with --parallel {}",
+                chat_parallel
+            );
 
             let mut args = vec![
                 "-m".to_string(),
@@ -319,6 +329,8 @@ fn spawn_slot<R: tauri::Runtime>(
                 "127.0.0.1".to_string(),
                 "--port".to_string(),
                 port.clone(),
+                "--parallel".to_string(),
+                chat_parallel,
                 // "--log-verbose".to_string(),
                 // "--log-verbosity".to_string(),
                 // "4".to_string(),
@@ -348,6 +360,11 @@ fn spawn_slot<R: tauri::Runtime>(
             validate_model_path(slot.slot, &model_path)?;
 
             let n_gpu_layers = runtime_env::get_or("KLIN_EMBED_N_GPU_LAYERS", "0");
+            let embed_parallel = runtime_env::get_or("KLIN_EMBED_PARALLEL", "2");
+            tracing::info!(
+                "llama-server[embed] launching with --parallel {}",
+                embed_parallel
+            );
 
             let args = vec![
                 "-m".to_string(),
@@ -362,6 +379,8 @@ fn spawn_slot<R: tauri::Runtime>(
                 "8192".to_string(),
                 "-ub".to_string(),
                 "8192".to_string(),
+                "--parallel".to_string(),
+                embed_parallel,
                 "--no-webui".to_string(),
                 "--embedding".to_string(),
                 "--pooling".to_string(),
