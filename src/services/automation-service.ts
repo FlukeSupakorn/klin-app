@@ -10,16 +10,6 @@ import { normalizePath } from "@/lib/path-utils";
 import { logger } from "@/lib/logger";
 import type { AutomationJob, AutomationLog } from "@/types/domain";
 
-let calendarRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-
-function scheduleCalendarRefresh(): void {
-  if (calendarRefreshTimer) clearTimeout(calendarRefreshTimer);
-  calendarRefreshTimer = setTimeout(() => {
-    calendarRefreshTimer = null;
-    void useCalendarNotificationsStore.getState().refresh();
-  }, 1500);
-}
-
 export async function processAutomationJob(job: AutomationJob): Promise<void> {
   const start = performance.now();
   logger.info("[automation] job started", { fileName: job.fileName, filePath: job.filePath });
@@ -46,7 +36,20 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
     const topScore = analyzed.topScores[0];
     const processingTimeMs = Math.round(performance.now() - start);
 
-    if (analyzed.analysisStatus === "failed" || !topScore) {
+    logger.info("[automation] analysis result", {
+      fileName: job.fileName,
+      analysisStatus: analyzed.analysisStatus,
+      analysisError: analyzed.analysisError,
+      selectedCategory: analyzed.selectedCategory,
+      destinationPath: analyzed.destinationPath,
+      topScore: topScore?.score ?? null,
+      hasSchedule: Boolean(analyzed.schedule?.events?.length),
+    });
+
+    // Hard-fail only when there's literally nothing to move toward. If the
+    // worker set a non-fatal error but we still have a top score and a
+    // category folder, proceed with the move (just log the warning).
+    if (!topScore) {
       const failedLog: AutomationLog = {
         id: crypto.randomUUID(),
         itemType: "file",
@@ -59,15 +62,36 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
         timestamp: new Date().toISOString(),
         processingTimeMs,
         status: "failed",
-        errorMessage: analyzed.analysisError ?? "Worker analysis failed",
+        errorMessage: analyzed.analysisError ?? "Worker analysis returned no categories",
       };
 
+      logger.warn("[automation] aborting: no top score from worker", {
+        fileName: job.fileName,
+        error: analyzed.analysisError,
+      });
       useHistoryStore.getState().appendLog(failedLog);
       return;
     }
 
+    if (analyzed.analysisError) {
+      logger.warn("[automation] worker reported error but proceeding (categories present)", {
+        fileName: job.fileName,
+        error: analyzed.analysisError,
+      });
+    }
+
     const shouldMove = normalizePath(analyzed.currentPath) !== normalizePath(analyzed.destinationPath);
+    if (!shouldMove) {
+      logger.warn("[automation] skipping move: source equals destination", {
+        currentPath: analyzed.currentPath,
+        destinationPath: analyzed.destinationPath,
+      });
+    }
     if (shouldMove) {
+      logger.info("[automation] moving file", {
+        sourcePath: analyzed.currentPath,
+        destinationPath: analyzed.destinationPath,
+      });
       await tauriClient.moveFile({
         sourcePath: analyzed.currentPath,
         destinationPath: analyzed.destinationPath,
@@ -123,7 +147,13 @@ export async function processAutomationJob(job: AutomationJob): Promise<void> {
     logger.info("[automation] job completed", { fileName: job.fileName, moved: shouldMove, category: analyzed.selectedCategory });
     useHistoryStore.getState().appendLog(log);
     window.dispatchEvent(new Event("klin:history-updated"));
-    scheduleCalendarRefresh();
+
+    useCalendarNotificationsStore.getState().ingestSchedule({
+      filePath: analyzed.currentPath,
+      fileId: analyzed.workerFileId,
+      fileName: analyzed.fileName,
+      schedule: analyzed.schedule,
+    });
   } catch (error) {
     const processingTimeMs = Math.round(performance.now() - start);
     const failedLog: AutomationLog = {

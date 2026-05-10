@@ -16,13 +16,10 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatStart(startIso: string, allDay: boolean): string {
-  if (!startIso) return "-";
-  const date = new Date(allDay && !startIso.includes("T") ? `${startIso}T00:00:00` : startIso);
-  if (Number.isNaN(date.getTime())) return startIso;
-  if (allDay) {
-    return date.toLocaleDateString(undefined, { dateStyle: "long" });
-  }
+function formatDateTime(value: string): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" });
 }
 
@@ -49,7 +46,11 @@ export function EventDetailModal() {
     return null;
   }
 
-  const confidencePct = Math.round(event.event.confidence * 100);
+  const confidencePct = Math.round((event.confidence ?? 0) * 100);
+  const draft = event.googleEvent;
+  const attendeeLabels = draft.attendees
+    .map((a) => a.displayName || a.email)
+    .filter((label) => label && label.length > 0);
 
   return (
     <Dialog.Root open={open} onOpenChange={(next) => (!next ? closeModal() : undefined)}>
@@ -57,29 +58,27 @@ export function EventDetailModal() {
         <Dialog.Overlay className="fixed inset-0 z-100 bg-foreground/30" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-110 w-[min(560px,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-5 shadow-xl">
           <Dialog.Title className="text-lg font-semibold">
-            {event.event.title || "Untitled event"}
+            {draft.summary || "Untitled event"}
           </Dialog.Title>
           <Dialog.Description className="mt-1 text-sm text-muted-foreground">
             Detected from {event.fileName || "file"}
           </Dialog.Description>
 
           <div className="mt-4 space-y-3 rounded-xl border border-border/60 bg-background p-4">
-            <DetailRow
-              label="When"
-              value={formatStart(event.event.start_iso, event.event.all_day)}
-            />
-            {event.event.end_iso && !event.event.all_day && (
-              <DetailRow label="Until" value={formatStart(event.event.end_iso, false)} />
+            <DetailRow label="When" value={formatDateTime(draft.start.dateTime)} />
+            {draft.end.dateTime && (
+              <DetailRow label="Until" value={formatDateTime(draft.end.dateTime)} />
             )}
-            <DetailRow label="Location" value={event.event.location} />
+            {draft.start.timeZone && (
+              <DetailRow label="Time zone" value={draft.start.timeZone} />
+            )}
+            <DetailRow label="Location" value={draft.location ?? ""} />
             <DetailRow
               label="Attendees"
-              value={
-                event.event.attendees.length > 0 ? event.event.attendees.join(", ") : "-"
-              }
+              value={attendeeLabels.length > 0 ? attendeeLabels.join(", ") : "-"}
             />
-            {event.event.description && (
-              <DetailRow label="Notes" value={event.event.description} />
+            {draft.description && (
+              <DetailRow label="Notes" value={draft.description} />
             )}
 
             <div className="grid grid-cols-[110px_1fr] gap-2 text-sm">

@@ -2,7 +2,6 @@ import { create } from "zustand";
 import { createElement } from "react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import { calendarEventsApiService } from "@/services/calendar-events-api-service";
 import { EventAddedToast, CalendarErrorToast } from "@/features/calendar/event-added-toast";
 import {
   CalendarTokenExpiredError,
@@ -13,6 +12,16 @@ import type {
   DetectedCalendarEvent,
   DetectedCalendarEventStatus,
 } from "@/types/calendar-events";
+import type { ScheduleExtractionDto } from "@/types/domain";
+
+const INGEST_CONFIDENCE_THRESHOLD = 0.5;
+
+interface IngestScheduleInput {
+  filePath: string;
+  fileId: string | null;
+  fileName: string;
+  schedule: ScheduleExtractionDto | null | undefined;
+}
 
 interface CalendarNotificationsState {
   events: DetectedCalendarEvent[];
@@ -27,6 +36,7 @@ interface CalendarNotificationsState {
   closeModal: () => void;
   approve: (id: string) => Promise<void>;
   reject: (id: string) => Promise<void>;
+  ingestSchedule: (input: IngestScheduleInput) => void;
 }
 
 function showErrorToast(eyebrow: string, message: string): void {
@@ -76,23 +86,15 @@ export const useCalendarNotificationsStore = create<CalendarNotificationsState>(
   modalEventId: null,
   pendingActionIds: new Set<string>(),
 
+  // Events now arrive via ingestSchedule() at organize time. Refresh is a no-op
+  // kept for compatibility with existing call sites (panel refresh button,
+  // dashboard "klin:history-updated" listener).
   refresh: async () => {
-    set({ isLoading: true });
-    try {
-      const events = await calendarEventsApiService.listPending();
-      set({ events, isLoading: false });
-    } catch (error) {
-      logger.error("[calendar-notifications] refresh failed", error);
-      set({ isLoading: false });
-    }
+    return;
   },
 
   togglePanel: () => {
-    const open = !get().isPanelOpen;
-    set({ isPanelOpen: open });
-    if (open) {
-      void get().refresh();
-    }
+    set({ isPanelOpen: !get().isPanelOpen });
   },
 
   closePanel: () => set({ isPanelOpen: false }),
@@ -119,18 +121,20 @@ export const useCalendarNotificationsStore = create<CalendarNotificationsState>(
 
     setActionPending(set, id, true);
     try {
+      const draft = event.googleEvent;
+      const fallbackTz = draft.start.timeZone || draft.end.timeZone || getUserTimeZone();
       const created = await createGoogleCalendarEvent(token, {
-        title: event.event.title || "Untitled event",
-        startIso: event.event.start_iso,
-        endIso: event.event.end_iso || undefined,
-        allDay: event.event.all_day,
-        location: event.event.location || undefined,
-        attendees: event.event.attendees,
-        description: event.event.description || undefined,
-        timeZone: getUserTimeZone(),
+        title: draft.summary || "Untitled event",
+        startIso: draft.start.dateTime,
+        endIso: draft.end.dateTime || undefined,
+        allDay: false,
+        location: draft.location || undefined,
+        attendees: draft.attendees
+          .map((a) => a.email)
+          .filter((email) => email && email.includes("@")),
+        description: draft.description || undefined,
+        timeZone: fallbackTz,
       });
-
-      await calendarEventsApiService.updateStatus(id, "approved", created.id);
 
       set((state) => ({
         events: state.events.filter((e) => e.id !== id),
@@ -139,7 +143,7 @@ export const useCalendarNotificationsStore = create<CalendarNotificationsState>(
 
       window.dispatchEvent(new Event("klin:history-updated"));
 
-      const eventTitle = event.event.title || "Untitled event";
+      const eventTitle = draft.summary || "Untitled event";
       toast.custom(
         (toastId) =>
           createElement(EventAddedToast, {
@@ -171,18 +175,59 @@ export const useCalendarNotificationsStore = create<CalendarNotificationsState>(
 
     setActionPending(set, id, true);
     try {
-      await calendarEventsApiService.updateStatus(id, "rejected");
       set((state) => ({
         events: state.events.filter((e) => e.id !== id),
         modalEventId: state.modalEventId === id ? null : state.modalEventId,
       }));
-      window.dispatchEvent(new Event("klin:history-updated"));
-    } catch (error) {
-      logger.error("[calendar-notifications] reject failed", error);
-      showErrorToast("Calendar Error", "Failed to dismiss event.");
     } finally {
       setActionPending(set, id, false);
     }
+  },
+
+  ingestSchedule: (input) => {
+    if (!input.schedule || input.schedule.events.length === 0) {
+      return;
+    }
+    const fileIdKey = input.fileId ?? input.filePath;
+    const detectedAt = new Date().toISOString();
+    const additions: DetectedCalendarEvent[] = [];
+
+    input.schedule.events.forEach((ev, idx) => {
+      if (!ev.google_event) {
+        return;
+      }
+      if (typeof ev.confidence === "number" && ev.confidence < INGEST_CONFIDENCE_THRESHOLD) {
+        return;
+      }
+      additions.push({
+        id: `${fileIdKey}:${idx}`,
+        fileId: input.fileId ?? "",
+        fileName: input.fileName,
+        sourcePath: input.filePath,
+        type: ev.type,
+        confidence: ev.confidence,
+        sourcePages: ev.source_pages ?? [],
+        sourceText: ev.source_text ?? "",
+        missingFields: ev.missing_fields ?? [],
+        googleEvent: ev.google_event,
+        status: "pending",
+        detectedAt,
+        googleEventId: null,
+      });
+    });
+
+    if (additions.length === 0) {
+      return;
+    }
+
+    set((state) => {
+      const existingIds = new Set(state.events.map((e) => e.id));
+      const merged = [
+        ...state.events,
+        ...additions.filter((a) => !existingIds.has(a.id)),
+      ];
+      return { events: merged };
+    });
   },
 }));
 

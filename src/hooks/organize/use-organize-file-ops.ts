@@ -13,6 +13,7 @@ import { organizeApiService } from "@/services/organize-api-service";
 import { tauriClient } from "@/services/tauri-client";
 import { splitDestinationPath, normalizePath } from "@/lib/path-utils";
 import { useUndoRedoStore } from "@/stores/use-undo-redo-store";
+import { useCalendarNotificationsStore } from "@/stores/use-calendar-notifications-store";
 import { logger } from "@/lib/logger";
 import type { OrganizePreviewItem } from "@/types/domain";
 
@@ -122,6 +123,13 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
         toPath: item.currentPath,
         fileName: item.fileName,
         category: selectedCategoryPayload,
+      });
+
+      useCalendarNotificationsStore.getState().ingestSchedule({
+        filePath: item.currentPath,
+        fileId: item.workerFileId,
+        fileName: item.fileName,
+        schedule: item.schedule,
       });
 
       window.dispatchEvent(new Event("klin:history-updated"));

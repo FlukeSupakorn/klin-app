@@ -8,14 +8,10 @@ interface NotificationCardProps {
   disabled?: boolean;
 }
 
-function formatDatePill(startIso: string, allDay: boolean): string {
+function formatDatePill(startIso: string): string {
   if (!startIso) return "—";
 
-  const datePart = startIso.includes("T") ? startIso.split("T")[0] : startIso;
-  const timePart =
-    !allDay && startIso.includes("T") ? startIso.split("T")[1]?.slice(0, 5) ?? "" : "";
-
-  const date = new Date(`${datePart}T00:00:00`);
+  const date = new Date(startIso);
   if (Number.isNaN(date.getTime())) {
     return startIso;
   }
@@ -25,11 +21,17 @@ function formatDatePill(startIso: string, allDay: boolean): string {
     day: "numeric",
   });
 
-  if (allDay || !timePart) {
+  const hasTime = startIso.includes("T");
+  if (!hasTime) {
     return dateLabel;
   }
 
-  return `${dateLabel} · ${timePart}`;
+  const timeLabel = date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return `${dateLabel} · ${timeLabel}`;
 }
 
 export function NotificationCard({ event, onOpen, disabled = false }: NotificationCardProps) {
@@ -39,7 +41,7 @@ export function NotificationCard({ event, onOpen, disabled = false }: Notificati
     s.pendingActionIds.has(event.id),
   );
 
-  const datePill = formatDatePill(event.event.start_iso, event.event.all_day);
+  const datePill = formatDatePill(event.googleEvent.start.dateTime);
 
   return (
     <div
@@ -69,7 +71,7 @@ export function NotificationCard({ event, onOpen, disabled = false }: Notificati
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <div className="truncate text-[12.5px] font-bold text-foreground">
-              {event.event.title || "Untitled event"}
+              {event.googleEvent.summary || "Untitled event"}
             </div>
             <span
               className="shrink-0 rounded-full px-2 py-[1px] text-[10px] font-bold"

@@ -85,6 +85,7 @@ export interface OrganizePreviewItem {
   topScores: CategoryScore[];
   summary: string | null;
   calendar: string | null;
+  schedule: ScheduleExtractionDto | null;
   analysisStatus: AutomationStatus;
   analysisError: string | null;
   analysisDurationMs: number | null;
@@ -109,11 +110,29 @@ export interface OrganizeAnalyzeAnalysis {
   suggested_names: string[];
 }
 
+export interface ScheduleEventCandidateDto {
+  type: import("./calendar-events").ScheduleEventType;
+  confidence: number;
+  source_pages: number[];
+  source_text: string;
+  missing_fields: string[];
+  google_event: import("./calendar-events").GoogleCalendarEventDraft | null;
+}
+
+export interface ScheduleExtractionDto {
+  events: ScheduleEventCandidateDto[];
+  error: string | null;
+}
+
 export interface OrganizeAnalyzeFileResult {
   file_id: string;
-  analysis: OrganizeAnalyzeAnalysis;
+  // New worker shape: suggested_names is top-level. `analysis` is kept optional
+  // so old worker payloads still parse.
+  suggested_names?: string[];
+  analysis?: OrganizeAnalyzeAnalysis;
   categories: OrganizeAnalyzeCategoryScore[];
   error: string | null;
+  schedule?: ScheduleExtractionDto | null;
 }
 
 export interface OrganizeAnalyzeResponse {

@@ -114,16 +114,21 @@ function parseWorkerSuggestedNames(fileResult: OrganizeAnalyzeFileResult | undef
     return [];
   }
 
-  // Keep compatibility with older payloads while preferring v3 `suggested_names`.
-  const analysis = fileResult.analysis as {
-    suggested_names?: unknown;
-    suggested_name?: unknown;
-  };
+  // New worker: `suggested_names` is top-level on OrganizeFileResult.
+  if (Array.isArray(fileResult.suggested_names)) {
+    return fileResult.suggested_names.map((entry) => String(entry).trim()).filter(Boolean);
+  }
 
+  // Backward compat: older worker payloads nested it under `analysis`.
+  const analysis = fileResult.analysis as
+    | { suggested_names?: unknown; suggested_name?: unknown }
+    | undefined;
+  if (!analysis) {
+    return [];
+  }
   if (Array.isArray(analysis.suggested_names)) {
     return analysis.suggested_names.map((entry) => String(entry).trim()).filter(Boolean);
   }
-
   return parseSuggestedNames(analysis.suggested_name);
 }
 
@@ -236,6 +241,7 @@ export const organizeApiService = {
         topScores: fallbackScores,
         summary: fileResult?.analysis?.summary ?? fileResult?.error ?? null,
         calendar: null,
+        schedule: fileResult?.schedule ?? null,
         analysisStatus: fileResult?.error ? "failed" : "completed",
         analysisError: fileResult?.error ?? null,
         analysisDurationMs: null,
@@ -266,6 +272,7 @@ export const organizeApiService = {
       topScores: [{ name: "Uncategorized", score: 0 }],
       summary: null,
       calendar: null,
+      schedule: null,
       analysisStatus: "failed",
       analysisError: "No analysis result returned by worker.",
       analysisDurationMs: null,
