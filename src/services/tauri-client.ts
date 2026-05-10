@@ -57,6 +57,10 @@ class TauriCommandClient implements TauriClient {
     return invoke("save_note_file", input);
   }
 
+  noteFileExists(input: { folderPath: string; fileName: string }): Promise<boolean> {
+    return invoke("note_file_exists", input);
+  }
+
   listNoteFiles(folderPath: string): Promise<NoteFileEntryDto[]> {
     return invoke("list_note_files", { folderPath });
   }

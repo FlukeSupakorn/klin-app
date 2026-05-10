@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import "@uiw/react-md-editor/markdown-editor.css";
-import { AlertTriangle, CheckCheck, ChevronLeft, Files, FileText, Loader2, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, CheckCheck, ChevronLeft, FileWarning, Files, FileText, Loader2, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { notesApiService } from "@/services/notes-api-service";
 import { notesFileService, type NoteFileItem } from "@/services/notes-file-service";
@@ -89,6 +89,12 @@ export function NotesPage() {
   const [editorError, setEditorError] = useState<string | null>(null);
   const [showNoticeDetails, setShowNoticeDetails] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<NoteFileItem | null>(null);
+  const [collisionState, setCollisionState] = useState<{
+    targetFolder: string;
+    title: string;
+    options?: { categoryName?: string };
+  } | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const filteredNotes = useMemo(() => {
     const q = notesSearch.trim().toLowerCase();
@@ -321,14 +327,16 @@ export function NotesPage() {
     }
   };
 
-  const saveToFolder = async (targetFolder: string, options?: { categoryName?: string }) => {
-    if (!targetFolder.trim()) { setEditorError("Target folder is required."); return; }
+  const performSave = async (
+    targetFolder: string,
+    saveTitle: string,
+    options?: { categoryName?: string },
+  ) => {
     setIsSaving(true);
     setEditorError(null);
     try {
-      const savedPath = await notesFileService.saveToFolder(targetFolder, title, content);
+      const savedPath = await notesFileService.saveToFolder(targetFolder, saveTitle, content);
       setActivePath(savedPath);
-      // Track external saves so they appear on the notes list
       const normalizedSaved = savedPath.replace(/\\/g, "/");
       const normalizedApp = appNotesPath.replace(/\\/g, "/");
       if (appNotesPath && !normalizedSaved.startsWith(normalizedApp)) {
@@ -351,6 +359,50 @@ export function NotesPage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const saveToFolder = async (targetFolder: string, options?: { categoryName?: string }) => {
+    if (!targetFolder.trim()) { setEditorError("Target folder is required."); return; }
+    let exists = false;
+    try {
+      exists = await notesFileService.existsInFolder(targetFolder, title);
+    } catch (error) {
+      logger.warn("[notes] existsInFolder check failed", error);
+    }
+    if (exists) {
+      setCollisionState({ targetFolder, title, options });
+      return;
+    }
+    await performSave(targetFolder, title, options);
+  };
+
+  const findFreeTitle = async (folder: string, baseTitle: string): Promise<string> => {
+    for (let i = 2; i <= 99; i++) {
+      const candidate = `${baseTitle} (${i})`;
+      try {
+        const taken = await notesFileService.existsInFolder(folder, candidate);
+        if (!taken) return candidate;
+      } catch {
+        return candidate;
+      }
+    }
+    return `${baseTitle}-${Date.now()}`;
+  };
+
+  const handleCollisionRename = async () => {
+    if (!collisionState) return;
+    const baseTitle = collisionState.title.replace(/\s*\(\d+\)\s*$/, "");
+    const suggestion = await findFreeTitle(collisionState.targetFolder, baseTitle);
+    setTitle(suggestion);
+    setCollisionState(null);
+    setTimeout(() => titleInputRef.current?.focus(), 0);
+  };
+
+  const handleCollisionReplace = async () => {
+    if (!collisionState) return;
+    const { targetFolder, title: collisionTitle, options } = collisionState;
+    setCollisionState(null);
+    await performSave(targetFolder, collisionTitle, options);
   };
 
   const handleSaveToAppFolder = async () => {
@@ -394,6 +446,7 @@ export function NotesPage() {
             style={{ boxShadow: "var(--shadow-xs)" }}
           >
             <input
+              ref={titleInputRef}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Note title..."
@@ -596,6 +649,54 @@ export function NotesPage() {
             </div>
           </div>
         </div>
+
+        {collisionState && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setCollisionState(null)} />
+            <div
+              className="relative w-[380px] overflow-hidden rounded-[20px] border border-border bg-card p-6"
+              style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}
+            >
+              <div
+                className="mb-4 flex h-10 w-10 items-center justify-center rounded-[12px]"
+                style={{ background: "rgba(245, 158, 11, 0.12)", border: "1px solid rgba(245, 158, 11, 0.3)" }}
+              >
+                <FileWarning className="h-5 w-5" style={{ color: "var(--warning)" }} />
+              </div>
+              <div className="text-[15px] font-extrabold text-foreground">A note with this name already exists</div>
+              <div className="mt-1 text-[12.5px] text-muted-foreground">
+                &ldquo;{collisionState.title}.md&rdquo; is already in this folder. Replacing will overwrite the existing file.
+              </div>
+              <div className="mt-5 flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setCollisionState(null)}
+                  disabled={isSaving}
+                  className="flex-1 rounded-[12px] border border-border bg-muted py-2.5 text-[13px] font-bold text-foreground transition-colors hover:bg-muted/70 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCollisionRename()}
+                  disabled={isSaving}
+                  className="flex-1 rounded-[12px] py-2.5 text-[13px] font-extrabold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                  style={{ background: "var(--primary)" }}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCollisionReplace()}
+                  disabled={isSaving}
+                  className="flex-1 rounded-[12px] border border-destructive/30 bg-card py-2.5 text-[13px] font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                >
+                  Replace
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

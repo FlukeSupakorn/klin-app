@@ -348,6 +348,7 @@ pub fn run() {
             commands::pick_files_for_organize,
             commands::pick_folder_for_organize,
             commands::save_note_file,
+            commands::note_file_exists,
             commands::open_external_url,
             commands::delete_file,
             commands::get_downloads_folder,

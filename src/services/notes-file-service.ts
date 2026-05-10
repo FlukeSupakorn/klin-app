@@ -67,6 +67,13 @@ export const notesFileService = {
     });
   },
 
+  async existsInFolder(folderPath: string, fileName: string): Promise<boolean> {
+    return tauriClient.noteFileExists({
+      folderPath,
+      fileName: normalizeFileName(fileName),
+    });
+  },
+
   async saveToAppFolder(fileName: string, content: string): Promise<string> {
     const appNotesFolderPath = await this.getAppNotesFolderPath();
     return this.saveToFolder(appNotesFolderPath, fileName, content);

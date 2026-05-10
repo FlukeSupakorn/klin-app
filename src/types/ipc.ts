@@ -114,6 +114,7 @@ export interface TauriClient {
   pickFilesForOrganize(): Promise<string[]>;
   pickFolderForOrganize(): Promise<string | null>;
   saveNoteFile(input: { folderPath: string; fileName: string; content: string }): Promise<string>;
+  noteFileExists(input: { folderPath: string; fileName: string }): Promise<boolean>;
   listNoteFiles(folderPath: string): Promise<NoteFileEntryDto[]>;
   readNoteFile(filePath: string): Promise<string>;
   openExternalUrl(url: string): Promise<void>;

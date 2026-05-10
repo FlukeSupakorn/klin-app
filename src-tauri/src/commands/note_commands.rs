@@ -2,6 +2,23 @@ use std::path::PathBuf;
 
 use crate::domain::dto::NoteFileEntryDto;
 
+fn sanitize_note_file_name(file_name: &str) -> String {
+    let sanitized = file_name
+        .chars()
+        .map(|ch| match ch {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '-',
+            _ => ch,
+        })
+        .collect::<String>();
+
+    let trimmed = sanitized.trim();
+    if trimmed.is_empty() {
+        "Quick-Note".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 #[tauri::command]
 pub fn save_note_file(
     folder_path: String,
@@ -12,20 +29,7 @@ pub fn save_note_file(
         return Err("Folder path is required".to_string());
     }
 
-    let sanitized_name = file_name
-        .chars()
-        .map(|ch| match ch {
-            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '-',
-            _ => ch,
-        })
-        .collect::<String>();
-
-    let final_name = if sanitized_name.trim().is_empty() {
-        "Quick-Note"
-    } else {
-        sanitized_name.trim()
-    };
-
+    let final_name = sanitize_note_file_name(&file_name);
     let full_path = PathBuf::from(folder_path).join(format!("{}.md", final_name));
 
     if let Some(parent) = full_path.parent() {
@@ -35,6 +39,17 @@ pub fn save_note_file(
     std::fs::write(&full_path, content).map_err(|error| error.to_string())?;
 
     Ok(full_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn note_file_exists(folder_path: String, file_name: String) -> Result<bool, String> {
+    if folder_path.trim().is_empty() {
+        return Err("Folder path is required".to_string());
+    }
+
+    let final_name = sanitize_note_file_name(&file_name);
+    let full_path = PathBuf::from(folder_path).join(format!("{}.md", final_name));
+    Ok(full_path.exists())
 }
 
 #[tauri::command]
