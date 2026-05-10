@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MDEditor from "@uiw/react-md-editor";
 import "@uiw/react-md-editor/markdown-editor.css";
-import { AlertTriangle, CheckCheck, ChevronLeft, FileWarning, Files, FileText, Loader2, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, CheckCheck, ChevronLeft, FileWarning, Files, FileText, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { SearchInput } from "@/components/ui/search-input";
 import { cn } from "@/lib/utils";
 import { notesApiService } from "@/services/notes-api-service";
 import { notesFileService, type NoteFileItem } from "@/services/notes-file-service";
@@ -755,18 +756,13 @@ export function NotesPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div
-            className="flex items-center gap-2 rounded-[12px] border border-border bg-card px-3 py-2"
-            style={{ width: 180, boxShadow: "var(--shadow-xs)" }}
-          >
-            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <input
-              value={notesSearch}
-              onChange={(e) => setNotesSearch(e.target.value)}
-              placeholder="Search notes..."
-              className="w-full bg-transparent text-[12.5px] text-foreground placeholder:text-muted-foreground focus:outline-none"
-            />
-          </div>
+          <SearchInput
+            value={notesSearch}
+            onChange={setNotesSearch}
+            onClear={() => setNotesSearch("")}
+            placeholder="Search notes..."
+            containerClassName="w-[200px]"
+          />
           <button
             type="button"
             onClick={handleAddNote}

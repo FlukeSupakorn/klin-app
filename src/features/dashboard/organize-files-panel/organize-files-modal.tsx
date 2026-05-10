@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, FileText, Pencil, Search, Sparkles, X } from "lucide-react";
+import { AlertTriangle, FileText, Pencil, Sparkles, X } from "lucide-react";
+import { SearchInput } from "@/components/ui/search-input";
 import { cn } from "@/lib/utils";
 import { splitDestinationPath } from "@/lib/path-utils";
 import { findCategoryColor } from "@/lib/category-utils";
@@ -524,19 +525,12 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
             </button>
           </div>
 
-          {/* Search */}
-          <div
-            className="flex items-center gap-2 rounded-[11px] border border-border bg-background px-3"
-            style={{ boxShadow: "var(--shadow-xs)" }}
-          >
-            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search files..."
-              className="h-9 flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none"
-            />
-          </div>
+          <SearchInput
+            value={q}
+            onChange={setQ}
+            onClear={() => setQ("")}
+            placeholder="Search files..."
+          />
 
           {/* Error / warning */}
           {workflow.errorMessage && (

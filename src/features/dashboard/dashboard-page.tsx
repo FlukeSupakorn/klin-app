@@ -17,12 +17,11 @@ import {
   Folder,
   FolderTree,
   History,
-  Search,
   ShieldCheck,
   SlidersHorizontal,
-  X,
   Zap,
 } from "lucide-react";
+import { SearchInput } from "@/components/ui/search-input";
 import { getCategoryIcon, withAlpha } from "@/features/categories/category-appearance";
 import { logger } from "@/lib/logger";
 import { NotificationBellButton } from "@/features/calendar-notifications/notification-bell-button";
@@ -256,30 +255,14 @@ export function DashboardPage() {
 
         {/* Semantic search */}
         <div ref={searchRef} className="relative w-[240px] shrink-0">
-          <div
-            className="flex min-w-0 items-center gap-2 rounded-[12px] border bg-card px-3 transition-all"
-            style={{
-              borderColor: showDrop ? "var(--primary)" : "var(--border)",
-              boxShadow: showDrop ? "0 0 0 3px var(--primary-soft)" : "var(--shadow-xs)",
-            }}
-          >
-            <Search className="h-3.5 w-3.5 shrink-0 transition-colors" style={{ color: showDrop ? "var(--primary)" : "var(--muted-foreground)" }} />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={onSearchKeyDown}
-              placeholder="Semantic search..."
-              className="h-9 flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => { setSearchQuery(""); setSearchResults([]); setShowDrop(false); setSearchSubmitted(false); }}
-                className="flex h-4 w-4 items-center justify-center rounded-full bg-border"
-              >
-                <X className="h-2.5 w-2.5 text-muted-foreground" />
-              </button>
-            )}
-          </div>
+          <SearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onKeyDown={onSearchKeyDown}
+            onClear={() => { setSearchQuery(""); setSearchResults([]); setShowDrop(false); setSearchSubmitted(false); }}
+            placeholder="Semantic search..."
+            focused={showDrop}
+          />
 
           {/* Search results dropdown */}
           {showDrop && (searchSubmitted || searchLoading || searchError) && (

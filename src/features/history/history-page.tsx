@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { History, Search } from "lucide-react";
+import { History } from "lucide-react";
+import { SearchInput } from "@/components/ui/search-input";
 import type { HistoryEntry, OrganizeHistoryEntry } from "@/types/history";
 import { tauriClient } from "@/services/tauri-client";
 import { historyApiService } from "@/services/history-api-service";
@@ -238,20 +239,13 @@ export function HistoryPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <div
-          className="flex min-w-[160px] max-w-[240px] flex-shrink overflow-hidden items-center gap-2 rounded-[12px] border border-border bg-card px-3"
-          style={{ boxShadow: "var(--shadow-xs)" }}
-        >
-          <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search files..."
-            className="h-9 flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none"
-          />
-        </div>
-
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          onClear={() => setSearch("")}
+          placeholder="Search files..."
+          containerClassName="flex-1 min-w-[260px] max-w-[480px]"
+        />
       </div>
 
       {/* Content */}

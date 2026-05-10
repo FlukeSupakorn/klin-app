@@ -21,7 +21,6 @@ import {
   Plus,
   RefreshCw,
   ScanSearch,
-  Search,
   Server,
   Settings,
   ShieldCheck,
@@ -34,6 +33,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { BatchCategoryModal } from "@/features/categories/batch-category-modal";
 import {
   CATEGORY_ICON_OPTIONS,
@@ -831,26 +831,13 @@ export function SettingsPage() {
                     <div className="mt-0.5 text-[11px] text-muted-foreground">Files are automatically sorted into these categories</div>
                   </div>
                   <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-                    <div className="relative min-w-[180px] flex-1 max-w-[260px]">
-                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        type="text"
-                        value={categorySearch}
-                        onChange={(e) => setCategorySearch(e.target.value)}
-                        placeholder="Search by name, path, or description"
-                        className="h-9 w-full rounded-[11px] border border-border bg-card pl-8 pr-7 text-[12.5px] text-foreground outline-none transition-colors focus:border-primary"
-                      />
-                      {categorySearch && (
-                        <button
-                          type="button"
-                          onClick={() => setCategorySearch("")}
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          aria-label="Clear search"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
+                    <SearchInput
+                      value={categorySearch}
+                      onChange={setCategorySearch}
+                      onClear={() => setCategorySearch("")}
+                      placeholder="Search by name, path, or description"
+                      containerClassName="min-w-[180px] flex-1 max-w-[260px]"
+                    />
                     <div ref={categoryDropdownRef} className="relative flex">
                       <button type="button" onClick={openCatAdd}
                         className="flex items-center gap-1.5 rounded-l-[11px] border border-r-0 border-border px-3.5 py-2 text-[12.5px] font-bold text-white transition-colors"
