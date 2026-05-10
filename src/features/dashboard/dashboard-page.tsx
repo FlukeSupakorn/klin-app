@@ -6,7 +6,7 @@ import { historyApiService } from "@/services/history-api-service";
 import { useSemanticSearchStore } from "@/stores/use-semantic-search-store";
 import { SearchProgress } from "@/features/dashboard/search-progress";
 import { tauriClient } from "@/services/tauri-client";
-import { normalizeOsPath } from "@/lib/path-utils";
+import { joinFolderPath, normalizeOsPath } from "@/lib/path-utils";
 import { formatBytes } from "@/lib/utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import type { FolderStatsTick, FolderStatsUpdated } from "@/types/ipc";
@@ -241,6 +241,26 @@ export function DashboardPage() {
     navigate("/history", { state: { expandedEntryId: entryId } });
   };
 
+  const handleOpenSearchResult = async (item: (typeof searchResults)[number]) => {
+    const folderPath = item.folder.trim();
+    const filePath = item.path.trim() || joinFolderPath(folderPath, item.fileName);
+
+    try {
+      await tauriClient.openExternalUrl(normalizeOsPath(filePath));
+    } catch (fileError) {
+      if (!folderPath) {
+        logger.warn("[semantic-search] failed to open result file", fileError);
+        return;
+      }
+
+      try {
+        await tauriClient.openExternalUrl(normalizeOsPath(folderPath));
+      } catch (folderError) {
+        logger.warn("[semantic-search] failed to open result file or folder", { fileError, folderError });
+      }
+    }
+  };
+
   return (
     <div className="flex h-full flex-col gap-5 overflow-hidden">
       <EventDetailModal />
@@ -314,8 +334,12 @@ export function DashboardPage() {
                   </div>
                 ) : (
                   searchResults.map((item, i) => (
-                    <div key={item.id}
-                      className="flex cursor-pointer items-center gap-3 border-t border-border px-3.5 py-2.5 transition-colors hover:bg-muted/60">
+                    <button
+                      key={item.id}
+                      type="button"
+                      title={normalizeOsPath(item.path || item.folder)}
+                      onClick={() => { void handleOpenSearchResult(item); }}
+                      className="flex w-full cursor-pointer items-center gap-3 border-t border-border px-3.5 py-2.5 text-left transition-colors hover:bg-muted/60">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px]"
                         style={{ background: searchResultGrads[i % searchResultGrads.length] }}>
                         <FileText className="h-3.5 w-3.5 text-white" />
@@ -329,7 +353,7 @@ export function DashboardPage() {
                       <div className="shrink-0 text-right">
                         <div className="text-[11px] font-bold text-muted-foreground">{item.fileType || "file"}</div>
                       </div>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
