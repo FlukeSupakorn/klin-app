@@ -1,9 +1,16 @@
-import type { FileSearchRequest, FileSearchResponse, FileSearchResultItem } from "@/types/domain";
+import type {
+  FileSearchRequest,
+  FileSearchResponse,
+  FileSearchResultItem,
+  SemanticStatus,
+} from "@/types/domain";
 
 const SEARCH_API_URL_CANDIDATES = [
   "http://127.0.0.1:8000/api/search/files",
   "http://localhost:8000/api/search/files",
 ];
+
+const VALID_STATUSES: SemanticStatus[] = ["ready", "pending", "degraded", "not_ready"];
 
 function asString(input: unknown): string {
   return typeof input === "string" ? input : "";
@@ -14,16 +21,18 @@ function asNumber(input: unknown): number {
   return Number.isFinite(value) ? value : 0;
 }
 
-function normalizeResults(payload: unknown): FileSearchResultItem[] {
-  const root = payload && typeof payload === "object" ? (payload as { results?: unknown }) : null;
-  const rows = Array.isArray(root?.results) ? root.results : [];
+function asSemanticStatus(input: unknown): SemanticStatus {
+  if (typeof input === "string" && (VALID_STATUSES as string[]).includes(input)) {
+    return input as SemanticStatus;
+  }
+  return "ready";
+}
 
-  return rows
+function normalizeResults(rows: unknown): FileSearchResultItem[] {
+  const list = Array.isArray(rows) ? rows : [];
+  return list
     .map((item, index) => {
-      if (!item || typeof item !== "object") {
-        return null;
-      }
-
+      if (!item || typeof item !== "object") return null;
       const row = item as Record<string, unknown>;
 
       const id = asString(row.id) || `search-${index + 1}`;
@@ -34,9 +43,7 @@ function normalizeResults(payload: unknown): FileSearchResultItem[] {
       const lastEdited = asString(row.lastEdited) || asString(row.last_edited);
       const path = asString(row.path);
 
-      if (!fileName || !path) {
-        return null;
-      }
+      if (!fileName || !path) return null;
 
       return {
         id,
@@ -51,35 +58,51 @@ function normalizeResults(payload: unknown): FileSearchResultItem[] {
     .filter((row): row is FileSearchResultItem => row !== null);
 }
 
-async function postSearch(url: string, payload: FileSearchRequest): Promise<FileSearchResultItem[]> {
+function normalizeResponse(payload: unknown): FileSearchResponse {
+  const root = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+
+  const semanticStatus = asSemanticStatus(root.semanticStatus ?? root.semantic_status);
+  const rawError = root.semanticError ?? root.semantic_error;
+  const semanticError = typeof rawError === "string" && rawError.length > 0 ? rawError : null;
+  const indexingPendingCount = asNumber(root.indexingPendingCount ?? root.indexing_pending_count);
+
+  return {
+    results: normalizeResults(root.results),
+    semanticStatus,
+    semanticError,
+    indexingPendingCount,
+  };
+}
+
+async function postSearch(
+  url: string,
+  payload: FileSearchRequest,
+  signal?: AbortSignal,
+): Promise<FileSearchResponse> {
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal,
   });
 
   if (!response.ok) {
     throw new Error(`Search API error: ${response.status} at ${url}`);
   }
 
-  const data = (await response.json()) as FileSearchResponse;
-  return normalizeResults(data);
+  return normalizeResponse(await response.json());
 }
 
 export const fileSearchApiService = {
-  async search(query: string): Promise<FileSearchResultItem[]> {
-    const payload: FileSearchRequest = {
-      query,
-    };
+  async search(query: string, signal?: AbortSignal): Promise<FileSearchResponse> {
+    const payload: FileSearchRequest = { query };
 
     let lastError: unknown = null;
-
     for (const url of SEARCH_API_URL_CANDIDATES) {
       try {
-        return await postSearch(url, payload);
+        return await postSearch(url, payload, signal);
       } catch (error) {
+        if ((error as { name?: string })?.name === "AbortError") throw error;
         lastError = error;
       }
     }

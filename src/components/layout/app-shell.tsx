@@ -22,6 +22,7 @@ import { bootstrapAppData } from "@/services/bootstrap-service";
 import { categoryManagementService } from "@/services/category-management-service";
 import { useAuthStore } from "@/hooks/auth/use-auth-store";
 import { GlobalOrganizeResumeBubble } from "@/features/dashboard/organize-files-panel/global-organize-resume-bubble";
+import { GlobalSemanticSearchBubble } from "@/features/dashboard/global-semantic-search-bubble";
 import { StartupDialogs, runStartupChecks } from "@/features/startup/startup-dialogs";
 import type { FailedService } from "@/features/startup/startup-dialogs";
 import { SettingsManagementDialogs } from "@/features/settings/settings-management-dialogs";
@@ -439,6 +440,7 @@ export function AppShell() {
       </main>
 
       <GlobalOrganizeResumeBubble />
+      <GlobalSemanticSearchBubble />
 
       {/* New File Detected toast */}
       {recentDetectedFiles.length > 0 && (

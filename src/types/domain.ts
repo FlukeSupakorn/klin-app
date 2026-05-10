@@ -153,6 +153,11 @@ export interface FileSearchResultItem {
   path: string;
 }
 
+export type SemanticStatus = "ready" | "pending" | "degraded" | "not_ready";
+
 export interface FileSearchResponse {
   results: FileSearchResultItem[];
+  semanticStatus: SemanticStatus;
+  semanticError: string | null;
+  indexingPendingCount: number;
 }

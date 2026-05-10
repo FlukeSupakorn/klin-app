@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { OrganizeFilesPanel } from "@/features/dashboard/organize-files-panel";
 import type { HistoryEntry } from "@/types/history";
 import { historyApiService } from "@/services/history-api-service";
-import { fileSearchApiService } from "@/services/file-search-api-service";
+import { useSemanticSearchStore } from "@/stores/use-semantic-search-store";
+import { SearchProgress } from "@/features/dashboard/search-progress";
 import { tauriClient } from "@/services/tauri-client";
 import { normalizeOsPath } from "@/lib/path-utils";
 import { formatBytes } from "@/lib/utils";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
-import type { FileSearchResultItem } from "@/types/domain";
 import type { FolderStatsTick, FolderStatsUpdated } from "@/types/ipc";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -60,13 +60,27 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const [recentHistoryEntries, setRecentHistoryEntries] = useState<HistoryEntry[]>([]);
 
-  // Semantic search
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<FileSearchResultItem[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [searchSubmitted, setSearchSubmitted] = useState(false);
-  const [showDrop, setShowDrop] = useState(false);
+  // Semantic search — state lives in a global store so the request keeps
+  // running and is reachable from anywhere in the app even if the dropdown
+  // is closed (see GlobalSemanticSearchBubble).
+  const searchQuery = useSemanticSearchStore((s) => s.query);
+  const setSearchQuery = useSemanticSearchStore((s) => s.setQuery);
+  const searchResults = useSemanticSearchStore((s) => s.results);
+  const searchLoading = useSemanticSearchStore((s) => s.loading);
+  const searchStartedAt = useSemanticSearchStore((s) => s.startedAt);
+  const searchError = useSemanticSearchStore((s) => s.error);
+  const searchSubmitted = useSemanticSearchStore((s) => s.submitted);
+  const showDrop = useSemanticSearchStore((s) => s.isDropdownOpen);
+  const semanticStatus = useSemanticSearchStore((s) => s.semanticStatus);
+  const semanticErrorMsg = useSemanticSearchStore((s) => s.semanticError);
+  const indexingPendingCount = useSemanticSearchStore((s) => s.indexingPendingCount);
+  const submitSearchAction = useSemanticSearchStore((s) => s.submit);
+  const cancelSearch = useSemanticSearchStore((s) => s.cancel);
+  const resetSearch = useSemanticSearchStore((s) => s.reset);
+  const openDropdown = useSemanticSearchStore((s) => s.openDropdown);
+  const closeDropdown = useSemanticSearchStore((s) => s.closeDropdown);
+  const acknowledgeSearch = useSemanticSearchStore((s) => s.acknowledge);
+
   const [catStats, setCatStats] = useState<Record<string, { count: number; bytes: number; scanning: boolean }>>({});
   const [catPage, setCatPage] = useState(0);
   const [hoverLeft, setHoverLeft] = useState(false);
@@ -197,38 +211,34 @@ export function DashboardPage() {
     return () => { window.removeEventListener("klin:history-updated", onHistoryUpdated); };
   }, [loadRecentHistory, loadCatStats, refreshNotifications]);
 
-  // Close search dropdown on click outside
+  // Close search dropdown on click outside. The request itself keeps
+  // running in the store — the floating bubble lets the user reopen it.
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node))
-        setShowDrop(false);
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        closeDropdown();
+        acknowledgeSearch();
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => { document.removeEventListener("mousedown", handler); };
-  }, []);
+  }, [closeDropdown, acknowledgeSearch]);
 
   useEffect(() => {
-    if (!searchQuery) { setShowDrop(false); return; }
-    setShowDrop(true);
-  }, [searchQuery]);
-
-  const submitSearch = async (q: string) => {
-    if (!q.trim()) { setSearchResults([]); setSearchError(null); return; }
-    setSearchLoading(true);
-    setSearchError(null);
-    setSearchSubmitted(true);
-    try {
-      const results = await fileSearchApiService.search(q.trim());
-      setSearchResults(results);
-    } catch (error) {
-      setSearchResults([]);
-      setSearchError(error instanceof Error ? error.message : "Search failed");
-    } finally { setSearchLoading(false); }
-  };
+    if (!searchQuery) { closeDropdown(); return; }
+    openDropdown();
+  }, [searchQuery, openDropdown, closeDropdown]);
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") { e.preventDefault(); void submitSearch(searchQuery); }
-    if (e.key === "Escape") { setShowDrop(false); setSearchQuery(""); }
+    if (e.key === "Enter") { e.preventDefault(); void submitSearchAction(searchQuery); }
+    if (e.key === "Escape") {
+      if (searchLoading) {
+        cancelSearch();
+        closeDropdown();
+      } else {
+        resetSearch();
+      }
+    }
   };
 
   const handleOpenRecentHistoryEntry = (entryId: string) => {
@@ -259,7 +269,8 @@ export function DashboardPage() {
             value={searchQuery}
             onChange={setSearchQuery}
             onKeyDown={onSearchKeyDown}
-            onClear={() => { setSearchQuery(""); setSearchResults([]); setShowDrop(false); setSearchSubmitted(false); }}
+            onClear={() => { resetSearch(); }}
+            onFocus={() => { if (searchSubmitted || searchQuery) openDropdown(); }}
             placeholder="Semantic search..."
             focused={showDrop}
           />
@@ -272,16 +283,38 @@ export function DashboardPage() {
                 style={{ background: "var(--muted)" }}>
                 <Zap className="h-3 w-3 text-primary" />
                 <span className="text-[10.5px] font-extrabold uppercase tracking-widest text-primary">Semantic Search</span>
-                <span className="ml-auto text-[10.5px] text-muted-foreground">{searchResults.length} results</span>
+                {!searchLoading && semanticStatus !== "ready" && (
+                  <span
+                    className="ml-2 rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider"
+                    title={semanticErrorMsg ?? undefined}
+                    style={{
+                      background: semanticStatus === "pending"
+                        ? "var(--muted)"
+                        : "color-mix(in srgb, var(--warning) 18%, transparent)",
+                      color: semanticStatus === "pending" ? "var(--muted-foreground)" : "var(--warning)",
+                    }}
+                  >
+                    {semanticStatus === "pending"
+                      ? `Indexing ${indexingPendingCount}…`
+                      : semanticStatus === "degraded"
+                        ? "Filename only"
+                        : "Index not ready"}
+                  </span>
+                )}
+                <span className="ml-auto text-[10.5px] text-muted-foreground">
+                  {searchLoading ? "Working…" : `${searchResults.length} results`}
+                </span>
               </div>
               <div className="max-h-72 overflow-y-auto">
                 {searchLoading ? (
-                  <div className="py-6 text-center text-[13px] text-muted-foreground">Searching...</div>
+                  <SearchProgress startedAt={searchStartedAt} />
                 ) : searchError ? (
                   <div className="m-2 rounded-[10px] border border-destructive/20 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">{searchError}</div>
                 ) : searchResults.length === 0 ? (
                   <div className="py-6 text-center text-[13px] text-muted-foreground">
-                    No files found for &ldquo;{searchQuery.trim()}&rdquo;
+                    {semanticStatus === "ready"
+                      ? <>No files found for &ldquo;{searchQuery.trim()}&rdquo;</>
+                      : <>No filename matches yet — semantic results will appear once indexing finishes.</>}
                   </div>
                 ) : (
                   searchResults.map((item, i) => (
