@@ -16,10 +16,6 @@ const ENTRY_FG: Record<string, string> = {
   calendar: "var(--secondary-foreground)",
 };
 
-function confColor(c: number): string {
-  return c >= 80 ? "var(--success)" : c >= 65 ? "var(--warning)" : "var(--destructive)";
-}
-
 interface HistoryEntryCardProps {
   entry: HistoryEntry;
   isExpanded: boolean;
@@ -47,7 +43,6 @@ export function HistoryEntryCard({
   const calendarEntry = entry.type === "calendar" ? entry : null;
 
   const topCategoryName = organizeEntry?.scores[0]?.name ?? "";
-  const topCategoryScore = Math.round((organizeEntry?.scores[0]?.score ?? 0) * 100);
 
   const grad = ENTRY_BG[entry.type] ?? ENTRY_BG.organize;
   const gradFg = ENTRY_FG[entry.type] ?? ENTRY_FG.organize;
@@ -136,21 +131,8 @@ export function HistoryEntryCard({
               )}
             </div>
 
-            {/* Right: confidence + time + undo/redo + chevron */}
+            {/* Right: time + undo/redo + chevron */}
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              {organizeEntry && topCategoryScore > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="h-[5px] w-9 rounded-full" style={{ background: "var(--border)" }}>
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${topCategoryScore}%`, background: confColor(topCategoryScore) }}
-                    />
-                  </div>
-                  <span className="text-[12px] font-extrabold" style={{ color: confColor(topCategoryScore) }}>
-                    {topCategoryScore}%
-                  </span>
-                </div>
-              )}
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <Clock className="h-2.5 w-2.5" />
                 {formatTime(entry.timestamp)}

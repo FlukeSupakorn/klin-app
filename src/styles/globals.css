@@ -124,6 +124,9 @@
   50%      { transform: scale(1.04); opacity: 1; }
 }
 
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
 .klin-fade-in { animation: klin-fade-in 0.25s ease; }
 .klin-slide-up { animation: klin-slide-up 0.2s ease; }
 .klin-toast-in { animation: klin-toast-in 0.3s ease; }

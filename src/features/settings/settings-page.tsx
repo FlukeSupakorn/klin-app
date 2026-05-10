@@ -3,6 +3,7 @@ import {
   Activity,
   CheckCircle2,
   ChevronDown,
+  ChevronsDown,
   Cpu,
   Eye,
   FileText,
@@ -19,6 +20,7 @@ import {
   Plus,
   RefreshCw,
   ScanSearch,
+  Search,
   Server,
   Settings,
   ShieldCheck,
@@ -277,6 +279,27 @@ export function SettingsPage() {
     }),
     [categories],
   );
+
+  const CATEGORY_PAGE_SIZE = 10;
+  const [categorySearch, setCategorySearch] = useState("");
+  const [visibleCategoryCount, setVisibleCategoryCount] = useState(CATEGORY_PAGE_SIZE);
+
+  const filteredCategories = useMemo(() => {
+    const q = categorySearch.trim().toLowerCase();
+    if (!q) return sortedCategories;
+    return sortedCategories.filter((c) =>
+      c.name.toLowerCase().includes(q) ||
+      (c.description?.toLowerCase().includes(q) ?? false) ||
+      (c.folderPath?.toLowerCase().includes(q) ?? false),
+    );
+  }, [sortedCategories, categorySearch]);
+
+  useEffect(() => {
+    setVisibleCategoryCount(CATEGORY_PAGE_SIZE);
+  }, [categorySearch]);
+
+  const visibleCategories = filteredCategories.slice(0, visibleCategoryCount);
+  const remainingCategories = Math.max(0, filteredCategories.length - visibleCategories.length);
 
   useEffect(() => { setDraftDefaultFolder(defaultFolder); }, [defaultFolder]);
 
@@ -789,33 +812,55 @@ export function SettingsPage() {
 
               {/* AI Categories */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-[10.5px] font-extrabold uppercase tracking-widest text-muted-foreground">AI Categories</div>
                     <div className="mt-0.5 text-[11px] text-muted-foreground">Files are automatically sorted into these categories</div>
                   </div>
-                  <div ref={categoryDropdownRef} className="relative flex">
-                    <button type="button" onClick={openCatAdd}
-                      className="flex items-center gap-1.5 rounded-l-[11px] border border-r-0 border-border px-3.5 py-2 text-[12.5px] font-bold text-white transition-colors"
-                      style={{ background: "var(--primary)" }}>
-                      <Plus className="h-3.5 w-3.5" />Add Category
-                    </button>
-                    <button type="button" onClick={() => setCategoryDropdownOpen((p) => !p)}
-                      className="flex items-center justify-center rounded-r-[11px] border border-border px-2 py-2"
-                      style={{ background: "var(--primary)" }}
-                      aria-label="More import options">
-                      <ChevronDown className="h-3.5 w-3.5 text-white" />
-                    </button>
-                    {categoryDropdownOpen && (
-                      <div className="absolute right-0 top-full z-10 mt-1 w-52 overflow-hidden rounded-[12px] border border-border bg-card shadow-lg">
-                        <button type="button"
-                          onClick={() => { setCategoryDropdownOpen(false); void openBatch(); }}
-                          className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[13px] transition-colors hover:bg-muted">
-                          <FolderSearch className="h-4 w-4 text-primary" />
-                          Import from Folders
+                  <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+                    <div className="relative min-w-[180px] flex-1 max-w-[260px]">
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={categorySearch}
+                        onChange={(e) => setCategorySearch(e.target.value)}
+                        placeholder="Search by name, path, or description"
+                        className="h-9 w-full rounded-[11px] border border-border bg-card pl-8 pr-7 text-[12.5px] text-foreground outline-none transition-colors focus:border-primary"
+                      />
+                      {categorySearch && (
+                        <button
+                          type="button"
+                          onClick={() => setCategorySearch("")}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          aria-label="Clear search"
+                        >
+                          <X className="h-3 w-3" />
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
+                    <div ref={categoryDropdownRef} className="relative flex">
+                      <button type="button" onClick={openCatAdd}
+                        className="flex items-center gap-1.5 rounded-l-[11px] border border-r-0 border-border px-3.5 py-2 text-[12.5px] font-bold text-white transition-colors"
+                        style={{ background: "var(--primary)" }}>
+                        <Plus className="h-3.5 w-3.5" />Add Category
+                      </button>
+                      <button type="button" onClick={() => setCategoryDropdownOpen((p) => !p)}
+                        className="flex items-center justify-center rounded-r-[11px] border border-border px-2 py-2"
+                        style={{ background: "var(--primary)" }}
+                        aria-label="More import options">
+                        <ChevronDown className="h-3.5 w-3.5 text-white" />
+                      </button>
+                      {categoryDropdownOpen && (
+                        <div className="absolute right-0 top-full z-10 mt-1 w-52 overflow-hidden rounded-[12px] border border-border bg-card shadow-lg">
+                          <button type="button"
+                            onClick={() => { setCategoryDropdownOpen(false); void openBatch(); }}
+                            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[13px] transition-colors hover:bg-muted">
+                            <FolderSearch className="h-4 w-4 text-primary" />
+                            Import from Folders
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -826,8 +871,15 @@ export function SettingsPage() {
                       <div className="text-[12.5px] font-bold text-foreground">No categories yet</div>
                       <div className="mt-0.5 text-[11px] text-muted-foreground">Click Add Category to get started</div>
                     </div>
+                  ) : filteredCategories.length === 0 ? (
+                    <div className="rounded-[12px] border-2 border-dashed border-border py-8 text-center">
+                      <div className="text-[12.5px] font-bold text-foreground">No matches</div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        Nothing matches "{categorySearch}"
+                      </div>
+                    </div>
                   ) : (
-                    sortedCategories.map((category) => {
+                    visibleCategories.map((category) => {
                       const CatIcon = getCategoryIcon(category.icon);
                       return (
                         <div
@@ -841,7 +893,7 @@ export function SettingsPage() {
                           {/* Left color strip */}
                           <div className="w-1 self-stretch shrink-0" style={{ background: category.color, borderRadius: "12px 0 0 12px" }} />
 
-                          <div className="flex flex-1 items-center gap-3 px-3 py-2.5">
+                          <div className="flex flex-1 items-center gap-3 px-3 py-2.5 min-w-0">
                             {/* Category icon with color tint */}
                             <div
                               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px]"
@@ -854,32 +906,37 @@ export function SettingsPage() {
                               <CatIcon className="h-4 w-4" />
                             </div>
 
-                            {/* Content */}
+                            {/* Content (horizontally scrollable on small widths) */}
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="text-[13px] font-extrabold text-foreground">{category.name}</span>
+                                <span className="truncate text-[13px] font-extrabold text-foreground">{category.name}</span>
                                 {category.isAutoDescription && (
-                                  <span className="h-2 w-2 rounded-full bg-amber-400" title="Auto-generated description" />
+                                  <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" title="Auto-generated description" />
                                 )}
                               </div>
                               {category.description && (
-                                <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{category.description}</div>
+                                <div
+                                  className="no-scrollbar mt-0.5 overflow-x-auto whitespace-nowrap text-[11px] text-muted-foreground"
+                                  title={category.description}
+                                >
+                                  {category.description}
+                                </div>
                               )}
                               {category.folderPath && (
                                 <div className="mt-0.5 flex items-center gap-1 text-[10.5px] text-muted-foreground">
                                   <FolderOpen className="h-3 w-3 shrink-0" />
-                                  <span className="truncate font-mono">{category.folderPath}</span>
+                                  <span
+                                    className="no-scrollbar block overflow-x-auto whitespace-nowrap font-mono"
+                                    title={category.folderPath}
+                                  >
+                                    {category.folderPath}
+                                  </span>
                                 </div>
                               )}
                             </div>
 
-                            {/* Right: status + actions */}
+                            {/* Right: actions (always visible) */}
                             <div className="flex shrink-0 items-center gap-1.5">
-                              <span className="flex items-center gap-1 text-[10px] font-bold"
-                                style={{ color: category.aiLearned ? "var(--primary)" : "var(--muted-foreground)" }}>
-                                <CheckCircle2 className="h-3 w-3" />
-                                {category.aiLearned ? "AI ready" : "Learning"}
-                              </span>
                               <button type="button" onClick={() => toggleCategoryEnabled(category)}
                                 className="rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors"
                                 style={
@@ -890,11 +947,13 @@ export function SettingsPage() {
                                 {category.enabled ? "Enabled" : "Disabled"}
                               </button>
                               <button type="button" onClick={() => openCatEdit(category)}
-                                className="rounded-[7px] p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                className="rounded-[7px] p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                aria-label="Edit category">
                                 <Pencil className="h-3.5 w-3.5" />
                               </button>
                               <button type="button" onClick={() => deleteCategory(category)}
-                                className="rounded-[7px] p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
+                                className="rounded-[7px] p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                aria-label="Delete category">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
@@ -902,6 +961,27 @@ export function SettingsPage() {
                         </div>
                       );
                     })
+                  )}
+
+                  {remainingCategories > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCategoryCount((c) => c + CATEGORY_PAGE_SIZE)}
+                      className="flex w-full items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-border py-3 text-[12px] font-bold text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                    >
+                      <ChevronsDown className="h-3.5 w-3.5" />
+                      Load {Math.min(CATEGORY_PAGE_SIZE, remainingCategories)} more
+                      <span className="font-mono text-[10.5px] opacity-70">
+                        ({remainingCategories} remaining)
+                      </span>
+                    </button>
+                  )}
+
+                  {filteredCategories.length > 0 && (
+                    <div className="pt-1 text-center text-[10.5px] text-muted-foreground">
+                      Showing {visibleCategories.length} of {filteredCategories.length}
+                      {categorySearch && ` (filtered from ${sortedCategories.length})`}
+                    </div>
                   )}
                 </div>
               </div>
