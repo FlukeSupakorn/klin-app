@@ -223,11 +223,13 @@ fn setup_configured_watchers<R: tauri::Runtime>(
 fn cleanup_orphaned_llama_servers() {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         use std::process::Command;
 
         tracing::info!("[startup] checking for orphaned llama-server processes...");
         let output = Command::new("tasklist")
             .args(&["/FI", "IMAGENAME eq llama-server.exe"])
+            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
             .output();
 
         if let Ok(output) = output {
@@ -237,6 +239,7 @@ fn cleanup_orphaned_llama_servers() {
                 tracing::info!("[startup] found orphaned llama-server, cleaning up...");
                 let _ = Command::new("taskkill")
                     .args(&["/IM", "llama-server.exe", "/F", "/T"])
+                    .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
                     .output();
                 tracing::info!("[startup] orphaned llama-server cleaned up");
             }

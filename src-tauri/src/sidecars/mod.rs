@@ -37,6 +37,7 @@ pub(crate) fn kill_sidecar(name: &str, child_slot: &Arc<Mutex<Option<CommandChil
     #[cfg(target_os = "windows")]
     {
         let pid = child.pid();
+        use std::os::windows::process::CommandExt;
         use std::process::Command;
 
         // Try graceful exit first: child.kill() sends a normal terminate signal
@@ -52,6 +53,7 @@ pub(crate) fn kill_sidecar(name: &str, child_slot: &Arc<Mutex<Option<CommandChil
         tracing::info!("[shutdown] {} force-killing process tree (PID: {})", name, pid);
         let _ = Command::new("taskkill")
             .args(&["/PID", &pid.to_string(), "/F", "/T"])
+            .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
             .output();
     }
 
@@ -94,10 +96,12 @@ pub fn cleanup_all<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
 /// Force-kill all processes matching the given Windows image name. No-op on other platforms.
 #[cfg(target_os = "windows")]
 fn kill_sidecar_by_image_name(image_name: &str) {
+    use std::os::windows::process::CommandExt;
     use std::process::Command;
     tracing::info!("[shutdown] image-name sweep: taskkill /IM {} /F /T", image_name);
     let _ = Command::new("taskkill")
         .args(&["/IM", image_name, "/F", "/T"])
+        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
         .output();
 }
 
