@@ -375,8 +375,8 @@ export function ModelDownloadPage() {
   ];
 
   return (
-    <div className="min-h-screen" style={{ background: "#edf1ff" }}>
-      <div className="relative flex min-h-screen flex-col overflow-hidden">
+    <div style={{ height: "100vh", background: "#edf1ff", overflow: "hidden" }}>
+      <div className="relative flex h-full flex-col overflow-hidden">
         <div
           style={{
             position: "absolute",
@@ -390,7 +390,7 @@ export function ModelDownloadPage() {
           }}
         />
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "40px 32px 24px", position: "relative", zIndex: 1 }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "40px 32px 24px", position: "relative", zIndex: 1 }}>
           <div style={{ maxWidth: 680, margin: "0 auto" }}>
             <div
               style={{
