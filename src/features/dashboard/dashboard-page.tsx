@@ -329,22 +329,21 @@ export function DashboardPage() {
       {/* Category stat cards */}
       {enabledCats.length > 0 && (
         <div className="relative shrink-0">
-          {/* Cards grid — shifts inward only when hovering the edge zones */}
+          {/* Cards grid */}
           <div
-            className="flex gap-3.5 transition-[margin] duration-200"  
-            style={{
-              marginLeft: hoverLeft && hasPrevPage ? 44 : 0,
-            }}
+            className="grid gap-3.5"
+            style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
           >
-            <div                                                                                               
-              className="grid gap-3.5 transition-[margin] duration-200"                                        
-               style={{                                                                                         
-                 gridTemplateColumns: "repeat(3, minmax(0, 1fr))",                                              
-                   flex: "3 1 0%",                                                                                
-               marginRight: hoverRight && hasNextPage ? 44 : 0,                                               
-  }}                                                                                               
-    >  
-            {displayCats.map((cat) => {
+            <div
+              className="grid gap-3.5 transition-[margin] duration-200"
+              style={{
+                gridColumn: "span 3",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                marginLeft: hoverLeft && hasPrevPage ? 44 : 0,
+                marginRight: hoverRight && hasNextPage ? 44 : 0,
+              }}
+            >
+              {displayCats.map((cat) => {
               const CatIcon = getCategoryIcon(cat.icon);
               const stats = catStats[cat.id];
               return (
@@ -397,17 +396,16 @@ export function DashboardPage() {
                   </div>
                 </div>
               );
-            })}
-            </div> 
+              })}
+            </div>
 
-            {/* Shortcuts panel — pinned in the 4th slot */}
+            {/* Shortcuts panel */}
             <div
               className="flex flex-col overflow-hidden rounded-[18px] p-3.5"
               style={{
                 background: "var(--card)",
                 border: "1.5px solid var(--border)",
                 boxShadow: "var(--shadow-xs)",
-                flex: "1 1 0%", 
               }}
             >
               <div className="mb-2.5 flex items-center justify-between">
@@ -464,7 +462,7 @@ export function DashboardPage() {
           {hasNextPage && (
             <div
               className="absolute inset-y-0 z-10 transition-[right] duration-200" 
-              style={{ right: "calc(25% + 14px - 2px)", width: 48 }} 
+              style={{ right: "calc(25% - 4px)", width: 48 }} 
               onMouseEnter={() => setHoverRight(true)}
               onMouseLeave={() => setHoverRight(false)}
             >
