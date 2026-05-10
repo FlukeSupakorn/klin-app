@@ -39,6 +39,7 @@ export function buildQueuedItem(path: string, categories: ManagedCategory[], def
     topScores: [{ name: selectedCategory, score: 0 }],
     summary: null,
     calendar: null,
+    schedule: null,
     analysisStatus: "queued",
     analysisError: null,
     analysisDurationMs: null,
