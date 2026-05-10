@@ -120,7 +120,31 @@ export const useCalendarStore = create<CalendarStoreState>((set, get) => ({
       }));
     } catch (error) {
       if (error instanceof CalendarTokenExpiredError) {
-        await useAuthStore.getState().logout();
+        const refreshedToken = await useAuthStore.getState().ensureValidToken();
+        if (refreshedToken) {
+          try {
+            const events = await googleCalendarService.fetchMonthEvents(refreshedToken, month);
+            set((current) => ({
+              monthCache: {
+                ...current.monthCache,
+                [monthKey]: events,
+              },
+              isLoadingMonth: false,
+              isOffline: false,
+              error: null,
+            }));
+            return;
+          } catch (retryError) {
+            if (retryError instanceof CalendarApiError) {
+              set({
+                isLoadingMonth: false,
+                isOffline: false,
+                error: mapCalendarApiError(retryError),
+              });
+              return;
+            }
+          }
+        }
         set({
           isLoadingMonth: false,
           error: "Session expired. Please sign in again.",

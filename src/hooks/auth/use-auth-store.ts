@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import {
   googleAuthService,
+  GoogleRefreshFailedError,
   type GoogleProfile,
 } from "@/features/auth/google-auth-service";
 import { tauriClient } from "@/services/tauri-client";
@@ -38,6 +39,7 @@ interface AuthState {
   status: "idle" | "loading" | "authenticated" | "error";
   accessToken: string | null;
   expiresAt: number | null;
+  refreshToken: string | null;
   profile: GoogleProfile | null;
   error: string | null;
   initialize: () => Promise<void>;
@@ -55,6 +57,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   status: "idle",
   accessToken: null,
   expiresAt: null,
+  refreshToken: null,
   profile: null,
   error: null,
 
@@ -78,34 +81,77 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
       const restoredToken = get().accessToken;
       const restoredExpiry = get().expiresAt;
       const restoredProfile = get().profile;
+      const restoredRefreshToken = get().refreshToken;
 
-      if (restoredToken && restoredExpiry) {
-        if (!googleAuthService.isExpired(restoredExpiry)) {
-          try {
-            const profile = await googleAuthService.fetchProfile(restoredToken);
-            set({
-              initialized: true,
-              status: "authenticated",
-              profile,
-              error: null,
-            });
-          } catch {
-            set({
-              initialized: true,
-              status: "authenticated",
-              profile: restoredProfile,
-              error: null,
-            });
-          }
-          return;
-        } else {
+      if (restoredToken && restoredExpiry && !googleAuthService.isExpired(restoredExpiry)) {
+        try {
+          const profile = await googleAuthService.fetchProfile(restoredToken);
           set({
-            accessToken: null,
-            expiresAt: null,
-            profile: null,
-            status: "idle",
+            initialized: true,
+            status: "authenticated",
+            profile,
+            error: null,
+          });
+        } catch {
+          set({
+            initialized: true,
+            status: "authenticated",
+            profile: restoredProfile,
+            error: null,
           });
         }
+        return;
+      }
+
+      if (restoredRefreshToken && googleClientId) {
+        try {
+          const refreshed = await googleAuthService.refreshAccessToken({
+            clientId: googleClientId,
+            refreshToken: restoredRefreshToken,
+            clientSecret: googleClientSecret,
+          });
+          let profile = restoredProfile;
+          try {
+            profile = await googleAuthService.fetchProfile(refreshed.accessToken);
+          } catch {
+            // keep restoredProfile
+          }
+          set({
+            initialized: true,
+            status: "authenticated",
+            accessToken: refreshed.accessToken,
+            expiresAt: refreshed.expiresAt,
+            refreshToken: refreshed.refreshToken ?? restoredRefreshToken,
+            profile,
+            error: null,
+          });
+          return;
+        } catch (error) {
+          if (error instanceof GoogleRefreshFailedError) {
+            set({
+              accessToken: null,
+              expiresAt: null,
+              refreshToken: null,
+              profile: null,
+              status: "idle",
+            });
+          } else {
+            // transient failure (network etc): preserve persisted state, finish init as idle
+            logger.warn("[auth] silent refresh failed during initialize", error);
+            set({
+              accessToken: null,
+              expiresAt: null,
+              status: "idle",
+            });
+          }
+        }
+      } else if (restoredToken || restoredExpiry) {
+        set({
+          accessToken: null,
+          expiresAt: null,
+          profile: null,
+          status: "idle",
+        });
       }
 
       if (!googleClientId) {
@@ -202,6 +248,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
               status: "authenticated",
               accessToken: tokenResult.accessToken,
               expiresAt: tokenResult.expiresAt,
+              refreshToken: tokenResult.refreshToken ?? get().refreshToken,
               profile,
               error: null,
             });
@@ -257,21 +304,50 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   ensureValidToken: async () => {
     const state = get();
 
-    if (!state.accessToken || !state.expiresAt) {
-      return null;
-    }
-
-    if (!googleAuthService.isExpired(state.expiresAt)) {
+    if (state.accessToken && state.expiresAt && !googleAuthService.isExpired(state.expiresAt)) {
       return state.accessToken;
     }
 
-    set({
-      status: "idle",
-      accessToken: null,
-      expiresAt: null,
-      profile: null,
-      error: "Session expired. Please sign in again.",
-    });
+    if (state.refreshToken && googleClientId) {
+      try {
+        const refreshed = await googleAuthService.refreshAccessToken({
+          clientId: googleClientId,
+          refreshToken: state.refreshToken,
+          clientSecret: googleClientSecret,
+        });
+        set({
+          status: "authenticated",
+          accessToken: refreshed.accessToken,
+          expiresAt: refreshed.expiresAt,
+          refreshToken: refreshed.refreshToken ?? state.refreshToken,
+          error: null,
+        });
+        return refreshed.accessToken;
+      } catch (error) {
+        if (error instanceof GoogleRefreshFailedError) {
+          set({
+            status: "idle",
+            accessToken: null,
+            expiresAt: null,
+            refreshToken: null,
+            profile: null,
+            error: "Session expired. Please sign in again.",
+          });
+          return null;
+        }
+        logger.warn("[auth] silent refresh failed", error);
+        return null;
+      }
+    }
+
+    if (state.accessToken || state.expiresAt) {
+      set({
+        status: "idle",
+        accessToken: null,
+        expiresAt: null,
+        error: "Session expired. Please sign in again.",
+      });
+    }
     return null;
   },
 
@@ -285,6 +361,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
       status: "idle",
       accessToken: null,
       expiresAt: null,
+      refreshToken: null,
       profile: null,
       error: null,
     });
@@ -327,6 +404,7 @@ export const useAuthStore = create<AuthState>()(persist((set, get) => ({
   partialize: (state) => ({
     accessToken: state.accessToken,
     expiresAt: state.expiresAt,
+    refreshToken: state.refreshToken,
     profile: state.profile,
   }),
 }));

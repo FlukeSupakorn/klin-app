@@ -24,6 +24,20 @@ export interface GoogleAccessTokenResult {
 export interface GoogleTokenOnlyResult {
   accessToken: string;
   expiresAt: number;
+  refreshToken?: string;
+}
+
+export interface GoogleRefreshResult {
+  accessToken: string;
+  expiresAt: number;
+  refreshToken?: string;
+}
+
+export class GoogleRefreshFailedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GoogleRefreshFailedError";
+  }
 }
 
 interface GoogleTokenResponse {
@@ -36,6 +50,7 @@ interface GoogleTokenResponse {
 interface GoogleCodeTokenResponse {
   access_token?: string;
   expires_in?: number;
+  refresh_token?: string;
   error?: string;
   error_description?: string;
 }
@@ -278,6 +293,52 @@ class GoogleAuthService {
     return {
       accessToken: tokenPayload.access_token,
       expiresAt: Date.now() + tokenPayload.expires_in * 1000,
+      refreshToken: tokenPayload.refresh_token,
+    };
+  }
+
+  async refreshAccessToken(input: {
+    clientId: string;
+    refreshToken: string;
+    clientSecret?: string;
+  }): Promise<GoogleRefreshResult> {
+    const body = new URLSearchParams({
+      client_id: input.clientId,
+      refresh_token: input.refreshToken,
+      grant_type: "refresh_token",
+    });
+
+    if (input.clientSecret) {
+      body.set("client_secret", input.clientSecret);
+    }
+
+    let tokenResponse: Response;
+    try {
+      tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      });
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("Network error refreshing Google token");
+    }
+
+    const tokenPayload = (await tokenResponse.json()) as GoogleCodeTokenResponse;
+
+    if (!tokenResponse.ok || tokenPayload.error || !tokenPayload.access_token || !tokenPayload.expires_in) {
+      const errorCode = tokenPayload.error ?? "";
+      const message = tokenPayload.error_description ?? errorCode ?? "Failed to refresh Google token";
+      // invalid_grant means the refresh token is revoked or expired — caller should clear state
+      if (errorCode === "invalid_grant" || errorCode === "invalid_client") {
+        throw new GoogleRefreshFailedError(message);
+      }
+      throw new Error(message);
+    }
+
+    return {
+      accessToken: tokenPayload.access_token,
+      expiresAt: Date.now() + tokenPayload.expires_in * 1000,
+      refreshToken: tokenPayload.refresh_token,
     };
   }
 
