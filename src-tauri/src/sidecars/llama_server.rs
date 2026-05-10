@@ -319,6 +319,11 @@ fn spawn_slot<R: tauri::Runtime>(
                 "127.0.0.1".to_string(),
                 "--port".to_string(),
                 port.clone(),
+                // "--log-verbose".to_string(),
+                // "--log-verbosity".to_string(),
+                // "4".to_string(),
+                // "--log-timestamps".to_string(),
+                // "--log-prefix".to_string(),
                 "--no-webui".to_string(),
             ];
 
@@ -353,10 +358,19 @@ fn spawn_slot<R: tauri::Runtime>(
                 "127.0.0.1".to_string(),
                 "--port".to_string(),
                 port.clone(),
+                "-b".to_string(),
+                "8192".to_string(),
+                "-ub".to_string(),
+                "8192".to_string(),
                 "--no-webui".to_string(),
                 "--embedding".to_string(),
                 "--pooling".to_string(),
                 "mean".to_string(),
+                "--log-verbose".to_string(),
+                // "--log-verbosity".to_string(),
+                // "4".to_string(),
+                // "--log-timestamps".to_string(),
+                "--log-prefix".to_string(),
             ];
 
             (model_path, args)
