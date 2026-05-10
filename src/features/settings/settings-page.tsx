@@ -7,6 +7,7 @@ import {
   Cpu,
   Eye,
   FileText,
+  FileLock,
   FileX2,
   FolderLock,
   FolderOpen,
@@ -457,6 +458,7 @@ export function SettingsPage() {
 
   /* ── Security tab state ── */
   const lockedPaths = usePrivacyStore((s) => s.lockedPaths);
+  const lockedFolders = usePrivacyStore((s) => s.lockedFolders);
   const lockFile = usePrivacyStore((s) => s.lockFile);
   const lockFolder = usePrivacyStore((s) => s.lockFolder);
   const unlockPath = usePrivacyStore((s) => s.unlockPath);
@@ -1136,21 +1138,32 @@ export function SettingsPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {lockedPaths.map((p) => (
-                      <div key={p} className="flex items-center gap-3 rounded-[12px] border px-3 py-3"
-                        style={{ background: "rgba(239,68,68,0.05)", borderColor: "rgba(239,68,68,0.18)" }}>
-                        <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: "rgba(239,68,68,0.1)" }}>
-                          <Lock className="h-3.5 w-3.5" style={{ color: "var(--destructive)" }} />
-                        </div>
-                        <span className="flex-1 truncate font-mono text-[12px] text-foreground" title={p}>{p}</span>
-                        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(239,68,68,0.1)", color: "var(--destructive)" }}>Locked</span>
-                        <button type="button" onClick={() => unlockPath(p)}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] transition-colors hover:bg-destructive/10"
-                          style={{ background: "rgba(239,68,68,0.08)" }}>
-                          <X className="h-3.5 w-3.5" style={{ color: "var(--destructive)" }} />
-                        </button>
-                      </div>
-                    ))}
+                    {(() => {
+                      const folderSet = new Set(lockedFolders.map((f) => normalizePath(f)));
+                      return lockedPaths.map((p) => {
+                        const isFolder = folderSet.has(normalizePath(p));
+                        const KindIcon = isFolder ? FolderLock : FileLock;
+                        const kindLabel = isFolder ? "Folder" : "File";
+                        const kindColor = isFolder ? "var(--primary)" : "var(--secondary-foreground)";
+                        const kindTint = isFolder ? "rgba(74,124,247,0.12)" : "rgba(107,122,154,0.12)";
+                        return (
+                          <div key={p} className="flex items-center gap-3 rounded-[12px] border px-3 py-3"
+                            style={{ background: "rgba(239,68,68,0.05)", borderColor: "rgba(239,68,68,0.18)" }}>
+                            <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px]" style={{ background: kindTint }}>
+                              <KindIcon className="h-3.5 w-3.5" style={{ color: kindColor }} />
+                            </div>
+                            <span className="shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-widest" style={{ background: kindTint, color: kindColor }}>{kindLabel}</span>
+                            <span className="flex-1 truncate font-mono text-[12px] text-foreground" title={p}>{p}</span>
+                            <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(239,68,68,0.1)", color: "var(--destructive)" }}>Locked</span>
+                            <button type="button" onClick={() => unlockPath(p)}
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] transition-colors hover:bg-destructive/10"
+                              style={{ background: "rgba(239,68,68,0.08)" }}>
+                              <X className="h-3.5 w-3.5" style={{ color: "var(--destructive)" }} />
+                            </button>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 )}
               </div>
