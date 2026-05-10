@@ -249,7 +249,7 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
       return nextState;
     });
 
-    await runAnalyzeQueue();
+    void runAnalyzeQueue();
   }, [categories, defaultFolder, setItems, setModalOpen, setErrorMessage, resetResumeDismissed, runAnalyzeQueue]);
 
   const handleAddFiles = useCallback(async () => {

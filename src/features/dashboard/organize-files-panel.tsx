@@ -6,6 +6,15 @@ import { useOrganizeWorkflow } from "@/hooks/organize/use-organize-workflow";
 
 export function OrganizeFilesPanel() {
   const workflow = useOrganizeWorkflow();
+  const hasOrganizerSession = workflow.items.length > 0;
+  const openOrganizerOrBrowse = () => {
+    if (hasOrganizerSession) {
+      workflow.openModal();
+      return;
+    }
+
+    void workflow.handleAddFiles();
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -14,13 +23,13 @@ export function OrganizeFilesPanel() {
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={workflow.handleDrop}
-        onClick={() => void workflow.handleAddFiles()}
+        onClick={openOrganizerOrBrowse}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            void workflow.handleAddFiles();
+            openOrganizerOrBrowse();
           }
         }}
         className="cursor-pointer select-none transition-all duration-200"
@@ -62,7 +71,7 @@ export function OrganizeFilesPanel() {
             {workflow.isDraggingOver ? "Release to organize" : "Drop files here"}
           </div>
           <div className="mt-1 text-[12px] text-muted-foreground">
-            or click to browse your computer
+            {hasOrganizerSession ? "or click to reopen the organizer" : "or click to browse your computer"}
           </div>
         </div>
 
