@@ -1,10 +1,17 @@
 import { useCallback, useMemo, useState, useTransition } from "react";
-import { FolderOpen, Plus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  AlertCircle,
+  Check,
+  FolderOpen,
+  Keyboard,
+  Layers,
+  Plus,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { categoryManagementService } from "@/services/category-management-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
-import { cn } from "@/lib/utils";
 import { FolderTreeView } from "./folder-tree-view";
 
 interface BatchCategoryModalProps {
@@ -61,6 +68,8 @@ function buildExistingCategoryPathMap(categories: Array<{ folderPath: string; na
   }
   return map;
 }
+
+const TX3 = "#a8b4cc";
 
 export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryModalProps) {
   const existingCategories = useCategoryManagementStore((state) => state.categories);
@@ -253,6 +262,14 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
     return count;
   }, [rootFolders, rootFolderSelected, allKnownPaths, deselectedPaths]);
 
+  const totalRootsSelected = useMemo(() => {
+    return rootFolders.filter((root) => {
+      if (rootFolderSelected[root]) return true;
+      const allPaths = allKnownPaths.get(root) ?? [];
+      return allPaths.some((p) => !deselectedPaths.has(p));
+    }).length;
+  }, [rootFolders, rootFolderSelected, allKnownPaths, deselectedPaths]);
+
   const handleCreate = async () => {
     await categoryManagementService.refreshCategoriesFromWorker().catch(() => { });
     const latestPathMap = buildExistingCategoryPathMap(useCategoryManagementStore.getState().categories);
@@ -292,150 +309,614 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
     }
   };
 
+  const createDisabled = isCreating || isPendingTreeIndexUpdate || totalCount === 0;
+
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-      <div className="flex h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              Batch Import
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,30,80,.42)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+        padding: 30,
+      }}
+      className="klin-fade-in"
+    >
+      <div
+        className="klin-slide-up"
+        style={{
+          width: "min(1080px, 96vw)",
+          height: "min(720px, 92vh)",
+          background: "var(--card)",
+          borderRadius: 22,
+          border: "1px solid var(--border)",
+          boxShadow: "var(--shadow-2xl)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "22px 26px 18px",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 14,
+            borderBottom: "1px solid var(--border)",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              background: "var(--primary)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              boxShadow: "0 6px 18px var(--primary-glow)",
+            }}
+          >
+            <Layers size={20} color="#fff" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "3px 9px",
+                borderRadius: 14,
+                background: "var(--primary-soft)",
+                marginBottom: 5,
+              }}
+            >
+              <Sparkles size={11} color="var(--primary)" />
+              <span
+                style={{
+                  fontSize: 9.5,
+                  fontWeight: 800,
+                  color: "var(--primary)",
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Batch import
+              </span>
+            </div>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 800,
+                letterSpacing: "-0.5px",
+                color: "var(--foreground)",
+                marginBottom: 3,
+              }}
+            >
+              Import folders as categories
+            </h1>
+            <p style={{ fontSize: 12.5, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
+              Pick a root folder, then choose which subfolders KLIN should create as categories.{" "}
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "1px 7px",
+                  borderRadius: 6,
+                  background: "var(--muted)",
+                  border: "1px solid var(--border)",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  color: "var(--muted-foreground)",
+                  marginLeft: 4,
+                }}
+              >
+                <Keyboard size={10} color="var(--muted-foreground)" />
+                Shift+Click
+              </span>{" "}
+              selects a folder and all of its subfolders.
             </p>
-            <h2 className="font-syne text-xl font-black uppercase tracking-tight">
-              Import Folders as Categories
-            </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 9,
+              background: "var(--muted)",
+              border: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              cursor: "pointer",
+              transition: "all .15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#ffe6e6";
+              e.currentTarget.style.borderColor = "#ffb4b4";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "var(--muted)";
+              e.currentTarget.style.borderColor = "var(--border)";
+            }}
           >
-            <X className="h-4 w-4" />
+            <X size={15} color="var(--muted-foreground)" />
           </button>
         </div>
 
-        <div className="flex flex-1 flex-row overflow-hidden">
-          <div className="flex w-80 shrink-0 flex-col border-r border-border">
-            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-              <p className="whitespace-nowrap text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                Selected Folders
-              </p>
+        {/* Body */}
+        <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0 }}>
+          {/* Left rail */}
+          <div
+            style={{
+              width: 280,
+              borderRight: "1px solid var(--border)",
+              display: "flex",
+              flexDirection: "column",
+              background: "var(--muted)",
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                padding: "16px 16px 10px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: TX3,
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Selected folders
+              </div>
               <button
                 type="button"
                 onClick={() => void handleAddMore()}
-                className="flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-widest text-primary transition-colors hover:bg-primary/10"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "5px 10px",
+                  borderRadius: 9,
+                  background: "var(--primary-soft)",
+                  color: "var(--primary)",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: ".04em",
+                  border: "none",
+                  cursor: "pointer",
+                }}
               >
-                <Plus className="h-3 w-3" /> Add More
+                <Plus size={11} color="var(--primary)" />
+                Add more
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2">
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "4px 12px 16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 7,
+              }}
+            >
               {rootFolders.length === 0 ? (
-                <div className="flex h-full items-center justify-center">
-                  <p className="text-center text-xs text-muted-foreground">
-                    No folders selected.
-                    <br />
-                    Click Add More to begin.
-                  </p>
+                <div
+                  style={{
+                    padding: "24px 12px",
+                    textAlign: "center",
+                    fontSize: 12,
+                    color: "var(--muted-foreground)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  No folders selected.
+                  <br />
+                  Click "Add more" to begin.
                 </div>
               ) : (
-                <div className="space-y-0.5">
-                  {rootFolders.map((folder) => {
-                    const isDuplicate = hasDuplicateName(folder, rootFolders);
-                    const parentPath = isDuplicate ? getParentPath(folder) : "";
-                    return (
-                      <div
-                        key={folder}
-                        className={cn(
-                          "group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent/60",
-                          activeFolderPath === folder && "bg-accent/80",
-                        )}
-                        onClick={() => setActiveFolderPath(folder)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={!!rootFolderSelected[folder]}
-                          title="Include this folder itself as a category"
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            setRootFolderSelected((prev) => ({
-                              ...prev,
-                              [folder]: e.target.checked,
-                            }));
+                rootFolders.map((root) => {
+                  const active = root === activeFolderPath;
+                  const isDuplicate = hasDuplicateName(root, rootFolders);
+                  const parentPath = isDuplicate ? getParentPath(root) : root;
+                  const allPaths = allKnownPaths.get(root) ?? [];
+                  const selectedInRoot =
+                    (rootFolderSelected[root] ? 1 : 0) +
+                    allPaths.filter((p) => !deselectedPaths.has(p)).length;
+                  const any = selectedInRoot > 0;
+                  return (
+                    <button
+                      key={root}
+                      type="button"
+                      onClick={() => setActiveFolderPath(root)}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "11px 12px",
+                        borderRadius: 12,
+                        background: active ? "var(--card)" : "transparent",
+                        border: `1.5px solid ${active ? "var(--primary)" : "transparent"}`,
+                        boxShadow: active
+                          ? "0 0 0 3px var(--primary-soft), var(--shadow-sm)"
+                          : "none",
+                        textAlign: "left",
+                        transition: "all .12s",
+                        position: "relative",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {active && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            top: 8,
+                            bottom: 8,
+                            width: 3,
+                            background: "var(--primary)",
+                            borderRadius: "0 3px 3px 0",
                           }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
                         />
+                      )}
+                      <div
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 9,
+                          background: any ? "var(--primary-soft)" : "var(--muted)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          border: `1px solid ${any ? "var(--primary-border)" : "var(--border)"}`,
+                        }}
+                      >
                         <FolderOpen
-                          className={cn(
-                            "h-4 w-4 shrink-0 transition-colors",
-                            activeFolderPath === folder ? "text-primary" : "text-primary/60",
-                          )}
+                          size={15}
+                          color={any ? "var(--primary)" : "var(--muted-foreground)"}
                         />
-                        <div className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">
-                            {getFolderName(folder)}
-                          </span>
-                          {isDuplicate && parentPath && (
-                            <span className="block truncate text-[10px] text-muted-foreground">
-                              {parentPath}
-                            </span>
-                          )}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 800,
+                            color: "var(--foreground)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {getFolderName(root)}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 10.5,
+                            fontFamily: "var(--font-mono)",
+                            color: TX3,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            marginTop: 1,
+                          }}
+                        >
+                          {parentPath || root}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-end",
+                          gap: 3,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 800,
+                            color: any ? "var(--primary)" : TX3,
+                            fontFamily: "var(--font-mono)",
+                          }}
+                        >
+                          {selectedInRoot}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 8.5,
+                            fontWeight: 800,
+                            color: TX3,
+                            letterSpacing: ".08em",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          picked
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
               )}
+              {/* Add slot */}
+              <button
+                type="button"
+                onClick={() => void handleAddMore()}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 7,
+                  padding: "14px 12px",
+                  borderRadius: 12,
+                  background: "transparent",
+                  border: "2px dashed var(--border)",
+                  color: "var(--muted-foreground)",
+                  transition: "all .12s",
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "var(--primary)";
+                  e.currentTarget.style.color = "var(--primary)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--border)";
+                  e.currentTarget.style.color = "var(--muted-foreground)";
+                }}
+              >
+                <Plus size={14} color="currentColor" />
+                <span style={{ fontSize: 12.5, fontWeight: 700 }}>Browse for folder</span>
+              </button>
+            </div>
+
+            {/* Footer summary */}
+            <div
+              style={{
+                padding: "12px 16px",
+                borderTop: "1px solid var(--border)",
+                background: "var(--card)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 9.5,
+                  fontWeight: 800,
+                  color: TX3,
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                  marginBottom: 5,
+                }}
+              >
+                Across all roots
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--foreground)",
+                    letterSpacing: "-0.5px",
+                  }}
+                >
+                  {totalCount}
+                </span>
+                <span style={{ fontSize: 11.5, color: "var(--muted-foreground)", fontWeight: 600 }}>
+                  folders selected
+                </span>
+              </div>
+              <div style={{ fontSize: 10.5, color: TX3, marginTop: 3 }}>
+                from {totalRootsSelected} root{totalRootsSelected === 1 ? "" : "s"}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex items-start justify-between gap-2 border-b border-border px-4 py-2.5">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                  {activeFolderPath
-                    ? `Subfolders of "${getFolderName(activeFolderPath)}"`
-                    : "Subfolder Preview"}
-                </p>
-                {activeFolderPath && (
-                  <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
-                    {activeFolderPath}
-                  </p>
-                )}
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  Tip: Shift+Click a checkbox to select/deselect that folder and all its subfolders.
-                </p>
-              </div>
-
-              {activeFolderPath && (
-                <div className="flex shrink-0 items-center gap-1 pt-0.5">
-                  <button
-                    type="button"
-                    disabled={!canSelectDeselect}
-                    onClick={handleSelectAll}
-                    className="rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"
+          {/* Right pane */}
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+              background: "var(--card)",
+            }}
+          >
+            {/* Tree header */}
+            <div
+              style={{
+                padding: "14px 22px 14px",
+                borderBottom: "1px solid var(--border)",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-end",
+                  justifyContent: "space-between",
+                  gap: 14,
+                }}
+              >
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: TX3,
+                      letterSpacing: ".12em",
+                      textTransform: "uppercase",
+                      marginBottom: 3,
+                    }}
                   >
-                    All
-                  </button>
-                  <span className="text-[10px] text-muted-foreground">/</span>
-                  <button
-                    type="button"
-                    disabled={!canSelectDeselect}
-                    onClick={handleDeselectAll}
-                    className="rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    None
-                  </button>
+                    {activeFolderPath ? "Subfolders of" : "Subfolder preview"}
+                  </div>
+                  {activeFolderPath ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 800,
+                          color: "var(--foreground)",
+                          letterSpacing: "-0.4px",
+                        }}
+                      >
+                        {getFolderName(activeFolderPath)}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11.5,
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--muted-foreground)",
+                          padding: "3px 9px",
+                          borderRadius: 8,
+                          background: "var(--muted)",
+                          border: "1px solid var(--border)",
+                          maxWidth: "100%",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {activeFolderPath}
+                      </span>
+                    </div>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: 13,
+                        color: "var(--muted-foreground)",
+                      }}
+                    >
+                      Pick a folder on the left.
+                    </span>
+                  )}
                 </div>
-              )}
+
+                {activeFolderPath && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0,
+                      padding: 3,
+                      borderRadius: 11,
+                      background: "var(--muted)",
+                      border: "1px solid var(--border)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={handleSelectAll}
+                      disabled={!canSelectDeselect}
+                      style={{
+                        padding: "7px 14px",
+                        borderRadius: 8,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: "var(--primary)",
+                        letterSpacing: ".08em",
+                        textTransform: "uppercase",
+                        background: "transparent",
+                        border: "none",
+                        cursor: canSelectDeselect ? "pointer" : "not-allowed",
+                        opacity: canSelectDeselect ? 1 : 0.4,
+                        transition: "background .12s",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (canSelectDeselect)
+                          e.currentTarget.style.background = "var(--primary-soft)";
+                      }}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      All
+                    </button>
+                    <div style={{ width: 1, height: 14, background: "var(--border)" }} />
+                    <button
+                      type="button"
+                      onClick={handleDeselectAll}
+                      disabled={!canSelectDeselect}
+                      style={{
+                        padding: "7px 14px",
+                        borderRadius: 8,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: "var(--muted-foreground)",
+                        letterSpacing: ".08em",
+                        textTransform: "uppercase",
+                        background: "transparent",
+                        border: "none",
+                        cursor: canSelectDeselect ? "pointer" : "not-allowed",
+                        opacity: canSelectDeselect ? 1 : 0.4,
+                        transition: "background .12s",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (canSelectDeselect) e.currentTarget.style.background = "var(--card)";
+                      }}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      None
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            {/* Tree body */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px 12px" }}>
               {!activeFolderPath ? (
-                <div className="flex h-full items-center justify-center">
-                  <div className="text-center">
-                    <FolderOpen className="mx-auto h-10 w-10 text-muted-foreground/30" />
-                    <p className="mt-2 text-sm text-muted-foreground">
+                <div
+                  style={{
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <div style={{ textAlign: "center" }}>
+                    <FolderOpen
+                      size={40}
+                      color="var(--muted-foreground)"
+                      style={{ opacity: 0.3, margin: "0 auto" }}
+                    />
+                    <p
+                      style={{
+                        marginTop: 8,
+                        fontSize: 13,
+                        color: "var(--muted-foreground)",
+                      }}
+                    >
                       Select a folder on the left to preview its subfolders.
                     </p>
                   </div>
@@ -455,29 +936,174 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col gap-2 border-t border-border px-6 py-3">
-          {skippedWarning && (
-            <p className="text-xs font-medium text-amber-500">{skippedWarning}</p>
-          )}
-          {createError && (
-            <p className="text-xs text-destructive">{createError}</p>
-          )}
-          <div className="flex items-center justify-between">
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black text-primary">
-              {totalCount} folder{totalCount !== 1 ? "s" : ""} will be created
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose} disabled={isCreating}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => void handleCreate()}
-                disabled={isCreating || isPendingTreeIndexUpdate || totalCount === 0}
+        {/* Footer */}
+        <div
+          style={{
+            padding: "14px 26px",
+            borderTop: "1px solid var(--border)",
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            flexShrink: 0,
+            background: "var(--muted)",
+          }}
+        >
+          {skippedWarning ? (
+            <div
+              className="klin-fade-in"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "7px 12px",
+                borderRadius: 10,
+                background: "rgba(245,158,11,.12)",
+                border: "1.5px solid rgba(245,158,11,.3)",
+                maxWidth: "60%",
+              }}
+            >
+              <AlertCircle size={13} color="#d97706" style={{ flexShrink: 0 }} />
+              <span
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  color: "#a85d00",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
               >
-                {isCreating ? "Creating…" : "Create Categories"}
-              </Button>
+                {skippedWarning}
+              </span>
             </div>
-          </div>
+          ) : createError ? (
+            <div
+              className="klin-fade-in"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "7px 12px",
+                borderRadius: 10,
+                background: "var(--destructive-tint)",
+                border: "1.5px solid var(--destructive-border)",
+                maxWidth: "60%",
+              }}
+            >
+              <AlertCircle size={13} color="var(--destructive)" style={{ flexShrink: 0 }} />
+              <span
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  color: "var(--destructive)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {createError}
+              </span>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "7px 13px",
+                borderRadius: 10,
+                background: "var(--primary-soft)",
+                border: "1.5px solid var(--primary-border)",
+              }}
+            >
+              <div
+                className="klin-pulse-dot"
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "var(--primary)",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: "var(--primary)",
+                  letterSpacing: ".02em",
+                }}
+              >
+                <span style={{ fontFamily: "var(--font-mono)" }}>{totalCount}</span>{" "}
+                {totalCount === 1 ? "category" : "categories"} will be created
+              </span>
+            </div>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isCreating}
+            style={{
+              padding: "10px 20px",
+              borderRadius: 12,
+              background: "var(--card)",
+              border: "1.5px solid var(--border)",
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--muted-foreground)",
+              boxShadow: "var(--shadow-sm)",
+              transition: "all .12s",
+              cursor: isCreating ? "not-allowed" : "pointer",
+              opacity: isCreating ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!isCreating) e.currentTarget.style.borderColor = "#c1cdee";
+            }}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCreate()}
+            disabled={createDisabled}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 22px",
+              borderRadius: 12,
+              background: "var(--primary)",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 800,
+              letterSpacing: ".01em",
+              border: "none",
+              opacity: createDisabled ? 0.4 : 1,
+              cursor: createDisabled ? "not-allowed" : "pointer",
+              boxShadow: "0 6px 18px var(--primary-glow)",
+              transition: "all .15s",
+            }}
+          >
+            <Check size={14} color="#fff" strokeWidth={2.4} />
+            {isCreating ? "Creating…" : "Create"}
+            {!isCreating && totalCount > 0 && (
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  padding: "1px 7px",
+                  borderRadius: 6,
+                  background: "rgba(255,255,255,.18)",
+                  fontSize: 11.5,
+                }}
+              >
+                {totalCount}
+              </span>
+            )}
+            {!isCreating && (totalCount === 1 ? " category" : " categories")}
+          </button>
         </div>
       </div>
     </div>

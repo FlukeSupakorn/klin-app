@@ -235,11 +235,46 @@ export function FolderTreeView({ rootPath, deselectedPaths, focusPath = null, on
   }
 
   return (
-    <div ref={treeContainerRef} className="relative space-y-0.5 py-2">
+    <div ref={treeContainerRef} style={{ position: "relative", paddingTop: 4, paddingBottom: 4 }}>
       {isLoadingAllPaths && (
-        <div className="sticky top-0 z-10 flex justify-end px-3 pb-1">
-          <div className="inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground ring-1 ring-border">
-            <span className="h-3 w-3 animate-spin rounded-full border border-primary border-t-transparent" />
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
+            display: "flex",
+            justifyContent: "flex-end",
+            padding: "0 12px 4px",
+          }}
+        >
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "3px 10px",
+              borderRadius: 999,
+              background: "var(--card)",
+              border: "1px solid var(--border)",
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: ".12em",
+              textTransform: "uppercase",
+              color: "var(--muted-foreground)",
+              boxShadow: "var(--shadow-xs)",
+            }}
+          >
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                border: "1.5px solid var(--primary)",
+                borderTopColor: "transparent",
+                animation: "spin .9s linear infinite",
+                display: "inline-block",
+              }}
+            />
             Loading
           </div>
         </div>
