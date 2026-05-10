@@ -52,10 +52,6 @@ function getHourGreeting() {
   return "Good evening 🌙";
 }
 
-function confColor(c: number): string {
-  return c >= 80 ? "var(--success)" : c >= 65 ? "var(--warning)" : "var(--destructive)";
-}
-
 export function DashboardPage() {
   const navigate = useNavigate();
   const [recentHistoryEntries, setRecentHistoryEntries] = useState<HistoryEntry[]>([]);
@@ -563,7 +559,6 @@ export function DashboardPage() {
                 const iconFg = ENTRY_TYPE_FG[entry.type] ?? "var(--primary-foreground)";
                 const name = entry.type === "organize" ? entry.oldName : entry.title;
                 const cat = entry.type === "organize" ? (entry.scores[0]?.name ?? "Unknown") : entry.type;
-                const conf = entry.type === "organize" ? Math.round((entry.scores[0]?.score ?? 0) * 100) : 0;
                 const ago = new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
                 return (
                   <button
@@ -581,7 +576,6 @@ export function DashboardPage() {
                       <div className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{cat}</div>
                     </div>
                     <div className="shrink-0 text-right">
-                      {conf > 0 && <div className="text-[11px] font-bold" style={{ color: confColor(conf) }}>{conf}%</div>}
                       <div className="mt-0.5 text-[10px] text-muted-foreground">{ago}</div>
                     </div>
                   </button>
