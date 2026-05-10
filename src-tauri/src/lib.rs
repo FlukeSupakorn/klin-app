@@ -205,11 +205,9 @@ fn setup_configured_watchers<R: tauri::Runtime>(
         config.watched_folders.len()
     );
 
-    if !config.auto_organize_enabled {
-        tracing::info!("[startup] watcher registration skipped: auto organize disabled");
-        return;
-    }
-
+    // Watchers always run so the UI can surface "new file detected" notices
+    // regardless of auto-organize state. Auto-organize gating happens later
+    // in the frontend handler — see app-shell.tsx handleDetectedFile.
     for folder in config.watched_folders {
         tracing::info!("[startup] registering watcher for {}", folder);
         if let Err(err) =

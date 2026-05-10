@@ -78,6 +78,9 @@ export function AppShell() {
   const [bootstrapStep, setBootstrapStep] = useState("Just a moment");
   const [showDefaultFolderSettings, setShowDefaultFolderSettings] = useState(false);
   const [recentDetectedFiles, setRecentDetectedFiles] = useState<Array<{ path: string; at: number }>>([]);
+  const [isToastFading, setIsToastFading] = useState(false);
+  const dismissTimerRef = useRef<number | null>(null);
+  const fadeTimerRef = useRef<number | null>(null);
   const [fallbackDownloadsFolder, setFallbackDownloadsFolder] = useState<string | null>(null);
   // Real-time watcher queue must be serial (1) — the local LLM handles one inference at a time.
   // Concurrent requests while the model cold-starts cause all but the first to fail with 503.
@@ -93,6 +96,35 @@ export function AppShell() {
       ? [fallbackDownloadsFolder]
       : [];
 
+  const dismissDetectedToast = () => {
+    if (dismissTimerRef.current !== null) { window.clearTimeout(dismissTimerRef.current); dismissTimerRef.current = null; }
+    if (fadeTimerRef.current !== null) { window.clearTimeout(fadeTimerRef.current); fadeTimerRef.current = null; }
+    setIsToastFading(false);
+    setRecentDetectedFiles([]);
+  };
+
+  const scheduleDetectedToastFade = () => {
+    if (dismissTimerRef.current !== null) window.clearTimeout(dismissTimerRef.current);
+    if (fadeTimerRef.current !== null) window.clearTimeout(fadeTimerRef.current);
+    setIsToastFading(false);
+    fadeTimerRef.current = window.setTimeout(() => {
+      setIsToastFading(true);
+      dismissTimerRef.current = window.setTimeout(() => {
+        setRecentDetectedFiles([]);
+        setIsToastFading(false);
+        dismissTimerRef.current = null;
+        fadeTimerRef.current = null;
+      }, 300);
+    }, 6000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current !== null) window.clearTimeout(dismissTimerRef.current);
+      if (fadeTimerRef.current !== null) window.clearTimeout(fadeTimerRef.current);
+    };
+  }, []);
+
   const handleDetectedFile = (pathFromEvent: string) => {
     if (!pathFromEvent) return;
     if (activeJobPathsRef.current.has(pathFromEvent)) return;
@@ -105,6 +137,7 @@ export function AppShell() {
       const next = [{ path: pathFromEvent, at: now }, ...state.filter((item) => item.path !== pathFromEvent)];
       return next.slice(0, 6);
     });
+    scheduleDetectedToastFade();
     if (!useAutomationStore.getState().isRunning) return;
     activeJobPathsRef.current.add(pathFromEvent);
     queueRef.current.enqueue(async () => {
@@ -199,19 +232,18 @@ export function AppShell() {
   // Intentionally not syncing concurrencyLimit to queueRef — watcher queue stays serial (1).
 
   useEffect(() => {
-    if (!isAutomationRunning) { setFallbackDownloadsFolder(null); return; }
     void tauriClient.getDownloadsFolder().then((downloadsPath) => {
       if (!downloadsPath) return;
       setFallbackDownloadsFolder(downloadsPath);
       if (watchedFolders.length > 0) return;
       addWatchedFolder(downloadsPath);
     }).catch(() => undefined);
-  }, [isAutomationRunning, watchedFolders, addWatchedFolder]);
+  }, [watchedFolders, addWatchedFolder]);
 
   useEffect(() => {
-    if (!isAutomationRunning || effectiveWatchedFolders.length === 0) return;
+    if (effectiveWatchedFolders.length === 0) return;
     void Promise.all(effectiveWatchedFolders.map((folderPath) => tauriClient.watchFolder({ folderPath }))).catch(() => undefined);
-  }, [isAutomationRunning, effectiveWatchedFolders]);
+  }, [effectiveWatchedFolders]);
 
   useEffect(() => {
     let unlistener: (() => void) | null = null;
@@ -226,7 +258,7 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
-    if (!isAutomationRunning || effectiveWatchedFolders.length === 0) {
+    if (effectiveWatchedFolders.length === 0) {
       knownFilesByFolderRef.current.clear(); return;
     }
     let disposed = false;
@@ -246,7 +278,7 @@ export function AppShell() {
     void syncFolderState();
     const timer = window.setInterval(() => { void syncFolderState(); }, 5000);
     return () => { disposed = true; window.clearInterval(timer); };
-  }, [isAutomationRunning, effectiveWatchedFolders]);
+  }, [effectiveWatchedFolders]);
 
   const profileInitial = (profile?.name?.trim()?.charAt(0) || "K").toUpperCase();
   const totalFiles = watchedFolders.length;
@@ -410,7 +442,11 @@ export function AppShell() {
 
       {/* New File Detected toast */}
       {recentDetectedFiles.length > 0 && (
-        <div className="klin-toast-in pointer-events-none fixed bottom-6 right-6 z-50 w-[320px] max-w-[90vw] overflow-hidden rounded-[16px] border border-border bg-card shadow-lg">
+        <div
+          className={cn(
+            "klin-toast-in pointer-events-none fixed bottom-6 right-6 z-50 w-[320px] max-w-[90vw] overflow-hidden rounded-[16px] border border-border bg-card shadow-lg transition-opacity duration-300",
+            isToastFading ? "opacity-0" : "opacity-100",
+          )}>
           <div className="h-0.5 w-full" style={{ background: "var(--primary)" }} />
           <div className="p-3.5">
             <div className="mb-2 flex items-center justify-between gap-3">
@@ -424,7 +460,7 @@ export function AppShell() {
               <button
                 type="button"
                 className="pointer-events-auto flex h-6 w-6 items-center justify-center rounded-[7px] border border-border bg-muted text-muted-foreground hover:text-foreground"
-                onClick={() => setRecentDetectedFiles([])}
+                onClick={dismissDetectedToast}
               >
                 <X className="h-3 w-3" />
               </button>

@@ -18,11 +18,11 @@ pub fn save_automation_config<R: tauri::Runtime>(
     );
     state.automation_config_repository.save(&config)?;
 
-    if config.auto_organize_enabled {
-        for folder in config.watched_folders {
-            tracing::info!("[automation] register watcher for {}", folder);
-            FileService::watch_folder(app.clone(), folder)?;
-        }
+    // Always register watchers; auto-organize gating happens in the frontend
+    // handler so users still see "new file detected" notices when off.
+    for folder in config.watched_folders {
+        tracing::info!("[automation] register watcher for {}", folder);
+        FileService::watch_folder(app.clone(), folder)?;
     }
 
     Ok(())
