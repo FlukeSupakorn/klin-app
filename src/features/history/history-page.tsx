@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { History, Search } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { HistoryEntry, HistoryEntryType, OrganizeHistoryEntry } from "@/types/history";
+import type { HistoryEntry, OrganizeHistoryEntry } from "@/types/history";
 import { tauriClient } from "@/services/tauri-client";
 import { historyApiService } from "@/services/history-api-service";
 import { HistoryEntryCard } from "@/features/history/history-entry-card";
@@ -13,12 +12,6 @@ import { normalizePath } from "@/lib/path-utils";
 import { logger } from "@/lib/logger";
 
 const HISTORY_PAGE_SIZE = 20;
-
-const TYPE_FILTERS: Array<{ label: string; value: "all" | HistoryEntryType }> = [
-  { label: "All", value: "all" },
-  { label: "Organize", value: "organize" },
-  { label: "Calendar", value: "calendar" },
-];
 
 function groupByDate(entries: HistoryEntry[]): Array<{ label: string; items: HistoryEntry[] }> {
   const today = new Date();
@@ -50,7 +43,6 @@ export function HistoryPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | HistoryEntryType>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const categoryDefaultFolder = useCategoryManagementStore((state) => state.defaultFolder);
@@ -111,7 +103,6 @@ export function HistoryPage() {
     if (!expandedEntryIdFromNavState) return;
     const targetExists = historyEntries.some((entry) => entry.id === expandedEntryIdFromNavState);
     if (!targetExists) return;
-    setTypeFilter("all");
     setSearch("");
     setExpandedId(expandedEntryIdFromNavState);
   }, [expandedEntryIdFromNavState, historyEntries]);
@@ -160,14 +151,19 @@ export function HistoryPage() {
 
   const filteredRows = useMemo(() => {
     return historyEntries.filter((entry) => {
-      const byType = typeFilter === "all" || entry.type === typeFilter;
-      const bySearch =
-        search.length === 0 ||
-        entry.title.toLowerCase().includes(search.toLowerCase()) ||
-        entry.subtitle.toLowerCase().includes(search.toLowerCase());
-      return byType && bySearch;
+      if (entry.type !== "organize") {
+        return false;
+      }
+      if (search.length === 0) {
+        return true;
+      }
+      const needle = search.toLowerCase();
+      return (
+        entry.title.toLowerCase().includes(needle) ||
+        entry.subtitle.toLowerCase().includes(needle)
+      );
     });
-  }, [historyEntries, search, typeFilter]);
+  }, [historyEntries, search]);
 
   const grouped = useMemo(() => groupByDate(filteredRows), [filteredRows]);
 
@@ -256,28 +252,6 @@ export function HistoryPage() {
           />
         </div>
 
-        {/* Filter pills */}
-        <div
-          className="flex gap-1 rounded-[12px] border border-border bg-card p-1"
-          style={{ boxShadow: "var(--shadow-xs)" }}
-        >
-          {TYPE_FILTERS.map((f) => {
-            const active = typeFilter === f.value;
-            return (
-              <button
-                key={f.value}
-                onClick={() => setTypeFilter(f.value)}
-                className={cn(
-                  "rounded-[9px] px-3.5 py-1.5 text-[12.5px] font-bold transition-all",
-                  active ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground",
-                )}
-                style={active ? { boxShadow: "0 3px 8px var(--primary-glow)" } : {}}
-              >
-                {f.label}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* Content */}
