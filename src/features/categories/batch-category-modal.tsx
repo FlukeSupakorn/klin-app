@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import {
   AlertCircle,
   Check,
@@ -12,7 +12,7 @@ import {
 import { categoryManagementService } from "@/services/category-management-service";
 import { tauriClient } from "@/services/tauri-client";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
-import { FolderTreeView } from "./folder-tree-view";
+import { FolderTreeView, type CachedTreeData } from "./folder-tree-view";
 
 interface BatchCategoryModalProps {
   initialFolders: string[];
@@ -85,6 +85,12 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
   const [skippedWarning, setSkippedWarning] = useState<string | null>(null);
   const [focusSubfolderPath, setFocusSubfolderPath] = useState<string | null>(null);
   const [isPendingTreeIndexUpdate, startTransition] = useTransition();
+  const treeCacheRef = useRef<Map<string, CachedTreeData>>(new Map());
+
+  const getTreeCache = useCallback((root: string) => treeCacheRef.current.get(root), []);
+  const setTreeCache = useCallback((root: string, data: CachedTreeData) => {
+    treeCacheRef.current.set(root, data);
+  }, []);
 
   const existingCategoryByPath = useMemo(() => {
     return buildExistingCategoryPathMap(existingCategories);
@@ -271,13 +277,14 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
   }, [rootFolders, rootFolderSelected, allKnownPaths, deselectedPaths]);
 
   const handleCreate = async () => {
-    await categoryManagementService.refreshCategoriesFromWorker().catch(() => { });
-    const latestPathMap = buildExistingCategoryPathMap(useCategoryManagementStore.getState().categories);
     if (totalCount === 0) return;
     setIsCreating(true);
     setCreateError(null);
+    setSkippedWarning(null);
 
     try {
+      const latestPathMap = buildExistingCategoryPathMap(useCategoryManagementStore.getState().categories);
+
       const items: Array<{ name: string; path: string }> = [];
       const seen = new Set<string>();
 
@@ -474,7 +481,6 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
                 padding: "16px 16px 10px",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
                 gap: 8,
               }}
             >
@@ -489,27 +495,6 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
               >
                 Selected folders
               </div>
-              <button
-                type="button"
-                onClick={() => void handleAddMore()}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "5px 10px",
-                  borderRadius: 9,
-                  background: "var(--primary-soft)",
-                  color: "var(--primary)",
-                  fontSize: 11,
-                  fontWeight: 800,
-                  letterSpacing: ".04em",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                <Plus size={11} color="var(--primary)" />
-                Add more
-              </button>
             </div>
 
             <div
@@ -923,13 +908,14 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
                 </div>
               ) : (
                 <FolderTreeView
-                  key={activeFolderPath}
                   rootPath={activeFolderPath}
                   deselectedPaths={deselectedPaths}
                   focusPath={focusSubfolderPath}
                   onToggle={handleToggleDeselected}
                   onToggleMany={handleToggleManyDeselected}
                   onAllPathsLoaded={handleAllPathsLoaded}
+                  getCache={getTreeCache}
+                  setCache={setTreeCache}
                 />
               )}
             </div>
@@ -1069,6 +1055,15 @@ export function BatchCategoryModal({ initialFolders, onClose }: BatchCategoryMod
             type="button"
             onClick={() => void handleCreate()}
             disabled={createDisabled}
+            title={
+              isCreating
+                ? "Creating categories…"
+                : isPendingTreeIndexUpdate
+                  ? "Still indexing folders — please wait"
+                  : totalCount === 0
+                    ? "Select at least one folder to create"
+                    : "Create the selected categories"
+            }
             style={{
               display: "inline-flex",
               alignItems: "center",
