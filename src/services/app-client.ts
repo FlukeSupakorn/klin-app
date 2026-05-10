@@ -5,6 +5,10 @@ class AppClient {
     return invoke("exit_app");
   }
 
+  async consumePendingCloseRequest(): Promise<boolean> {
+    return invoke("consume_pending_close_request");
+  }
+
   async minimizeToTray(): Promise<void> {
     return invoke("minimize_to_tray");
   }

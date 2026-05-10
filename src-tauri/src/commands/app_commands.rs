@@ -1,4 +1,17 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use tauri::Manager;
+
+static PENDING_CLOSE_REQUEST: AtomicBool = AtomicBool::new(false);
+
+pub fn mark_pending_close_request() {
+    PENDING_CLOSE_REQUEST.store(true, Ordering::SeqCst);
+}
+
+#[tauri::command]
+pub fn consume_pending_close_request() -> bool {
+    PENDING_CLOSE_REQUEST.swap(false, Ordering::SeqCst)
+}
 
 #[tauri::command]
 pub fn exit_app<R: tauri::Runtime>(app: tauri::AppHandle<R>) {

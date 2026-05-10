@@ -178,6 +178,7 @@ fn setup_window_behavior<R: tauri::Runtime>(app: &tauri::App<R>) {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 tracing::info!("[tray] close requested intercepted; opening close-to-tray prompt");
+                commands::mark_pending_close_request();
                 let _ = close_window.emit("window://close-requested", ());
             }
         });
@@ -334,6 +335,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::exit_app,
+            commands::consume_pending_close_request,
             commands::minimize_to_tray,
             commands::watch_folder,
             commands::move_file,

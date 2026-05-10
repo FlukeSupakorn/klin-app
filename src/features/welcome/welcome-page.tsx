@@ -1,7 +1,6 @@
 import { Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import { markWelcomeShownInSession } from "./welcome-guard";
 
 export function WelcomePage() {
@@ -33,7 +32,6 @@ export function WelcomePage() {
           Get Started
         </Button>
       </div>
-      <CloseAppController mode="quit-immediately" />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { router } from "@/app/router";
+import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import "@/styles/globals.css";
 import { logger } from "@/lib/logger";
 
@@ -96,6 +97,7 @@ if (import.meta.env.DEV) {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
+    <CloseAppController />
     <RouterProvider
       router={router}
       future={{

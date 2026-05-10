@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, ChevronLeft } from "lucide-react";
-import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import { StepProgress } from "./step-progress";
 import { DefaultFolderStep } from "./step/default-folder-step";
 import { CategoriesStep } from "./step/categories-step";
@@ -358,7 +357,6 @@ export function OnboardingPage() {
           </div>
         </div>
       )}
-      <CloseAppController mode="quit-immediately" />
     </div>
   );
 }

@@ -13,7 +13,6 @@ import {
   Server,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import { logger } from "@/lib/logger";
 import { tauriClient } from "@/services/tauri-client";
 import type { SystemSpecsDto } from "@/types/ipc";
@@ -662,7 +661,6 @@ export function ModelDownloadPage() {
             </Button>
           </div>
         </div>
-        <CloseAppController mode="quit-immediately" />
       </div>
     </div>
   );

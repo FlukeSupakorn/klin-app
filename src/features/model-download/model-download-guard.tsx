@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { AppSkeleton } from "@/components/layout/app-skeleton";
+import { KlinSetupScreen } from "@/components/layout/klin-setup-screen";
 import { logger } from "@/lib/logger";
 import { tauriClient } from "@/services/tauri-client";
 import type { ModelConfigDto } from "@/types/ipc";
@@ -50,7 +50,7 @@ export function ModelDownloadGuard({ children }: { children: ReactNode }) {
   }, []);
 
   if (status === "loading") {
-    return <AppSkeleton />;
+    return <KlinSetupScreen step="Checking models" />;
   }
 
   if (status === "model-download") {

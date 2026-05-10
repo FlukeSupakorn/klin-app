@@ -28,7 +28,6 @@ import { SettingsManagementDialogs } from "@/features/settings/settings-manageme
 import { AsyncProcessingQueue } from "@/services/automation-queue";
 import { processAutomationJob } from "@/services/automation-service";
 import { tauriClient } from "@/services/tauri-client";
-import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import { useAutomationStore } from "@/stores/use-automation-store";
 import { useCategoryManagementStore } from "@/stores/use-category-management-store";
 import klinLogo from "@/assets/klin-logo.svg";
@@ -458,8 +457,6 @@ export function AppShell() {
         sections={["default-folder"]}
         onClose={() => setShowDefaultFolderSettings(false)}
       />
-
-      <CloseAppController />
 
       <Toaster />
       <NotificationStack />
