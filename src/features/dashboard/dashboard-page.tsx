@@ -18,7 +18,7 @@ import {
   FolderTree,
   History,
   ShieldCheck,
-  SlidersHorizontal,
+  Cpu,
   Zap,
 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
@@ -455,7 +455,7 @@ export function DashboardPage() {
                   { Icon: FolderTree, label: "Categories", tab: "config" as const },
                   { Icon: Eye, label: "Auto organize", tab: "automation" as const },
                   { Icon: ShieldCheck, label: "Security", tab: "security" as const },
-                  { Icon: SlidersHorizontal, label: "All settings", tab: null },
+                  { Icon: Cpu, label: "Model", tab: "model" as const },
                 ].map((s) => (
                   <button
                     key={s.label}
