@@ -23,25 +23,16 @@ interface NotesStreamCallbacks {
   signal?: AbortSignal;
 }
 
+function buildSuggestedTitleFromPath(filePath: string): string {
+  const base = filePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "")?.trim();
+  return base && base.length > 0 ? base : "Quick-Note";
+}
+
 export interface NoteHistoryPayload {
   fileName: string;
   destinationPath: string;
   sourceFiles?: string[];
   categoryName?: string;
-}
-
-function buildSuggestedTitleFromPaths(filePaths: string[]): string {
-  if (filePaths.length > 1) {
-    return `Summary - ${filePaths.length} files`;
-  }
-
-  const first = filePaths[0];
-  if (!first) {
-    return "Quick-Note";
-  }
-
-  const base = first.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "")?.trim();
-  return base && base.length > 0 ? base : "Quick-Note";
 }
 
 function normalizeResponse(payload: unknown): NotesSummarizeResult {
@@ -78,9 +69,9 @@ function normalizeResponse(payload: unknown): NotesSummarizeResult {
 }
 
 export const notesApiService = {
-  async summarizeFromFiles(filePaths: string[]): Promise<NotesSummarizeResult> {
-    logger.info("[notes] summarize started", { fileCount: filePaths.length });
-    const fallbackTitle = buildSuggestedTitleFromPaths(filePaths);
+  async summarizeFromFile(filePath: string): Promise<NotesSummarizeResult> {
+    logger.info("[notes] summarize started", { filePath });
+    const fallbackTitle = buildSuggestedTitleFromPath(filePath);
     return withLlama(['chat'], async () => {
       let lastError: unknown = null;
 
@@ -91,7 +82,7 @@ export const notesApiService = {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ file_paths: filePaths }),
+            body: JSON.stringify({ file_path: filePath }),
           });
 
           if (!response.ok) {
@@ -116,11 +107,11 @@ export const notesApiService = {
     });
   },
 
-  async summarizeFromFilesStream(
-    filePaths: string[],
+  async summarizeFromFileStream(
+    filePath: string,
     callbacks: NotesStreamCallbacks = {},
   ): Promise<NotesSummarizeResult> {
-    const fallbackTitle = buildSuggestedTitleFromPaths(filePaths);
+    const fallbackTitle = buildSuggestedTitleFromPath(filePath);
     return withLlama(['chat'], async () => {
       let lastError: unknown = null;
 
@@ -134,7 +125,7 @@ export const notesApiService = {
               "Content-Type": "application/json",
               Accept: "text/event-stream",
             },
-            body: JSON.stringify({ file_paths: filePaths }),
+            body: JSON.stringify({ file_path: filePath }),
             signal: callbacks.signal,
           });
 
@@ -239,7 +230,7 @@ export const notesApiService = {
 
       // Fallback to existing non-stream call if stream endpoint is unavailable.
       try {
-        return await notesApiService.summarizeFromFiles(filePaths);
+        return await notesApiService.summarizeFromFile(filePath);
       } catch {
         throw lastError ?? new Error("Notes API stream unavailable");
       }

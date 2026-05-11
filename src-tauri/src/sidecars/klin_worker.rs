@@ -11,6 +11,17 @@ pub fn spawn_klin_worker<R: tauri::Runtime>(
         .sidecar("klin-worker")
         .map_err(|e| format!("Failed to create klin-worker sidecar: {e}"))?
         .env("KLIN_APP_DATA_DIR", app_data_dir)
+        .env("KLIN_APP_ENVIRONMENT", "production")
+        .env("KLIN_LANGFUSE_ENABLED", "true")
+        .env(
+            "KLIN_LANGFUSE_PUBLIC_KEY",
+            "pk-lf-b7f3cf9c-e0e6-4c98-8db2-0871556aef8e",
+        )
+        .env(
+            "KLIN_LANGFUSE_SECRET_KEY",
+            "sk-lf-c6ccd8cd-7b23-4b30-9cc8-400694ba2fcf",
+        )
+        .env("KLIN_LANGFUSE_HOST", "http://localhost:3000")
         .args([
             "--host",
             "127.0.0.1",

@@ -220,39 +220,29 @@ export function NotesPage() {
         return;
       }
 
-      const blocked: Array<{ source: "file" | "folder"; fileName: string; lockedByName: string }> = [];
-      const allowed: string[] = [];
-      for (const path of filePaths) {
-        const match = getLockMatch(path);
-        if (match) {
-          blocked.push({ source: match.source, fileName: getPathTail(path), lockedByName: getPathTail(match.lockedPath) });
-          continue;
-        }
-        allowed.push(path);
+      // Backend summarises one file per request — only the first picked file is used.
+      const targetPath = filePaths[0];
+      if (filePaths.length > 1) {
+        setEditorNotice(`Summary supports one file at a time. Using ${getPathTail(targetPath)}.`);
       }
 
-      const blockedNotice = blocked.length > 0
-        ? (() => {
-          const previewNames = blocked.slice(0, 2).map((item) => item.fileName);
-          const remaining = blocked.length - previewNames.length;
-          const head = previewNames.join(", ");
-          const summary = `${blocked.length} file(s) skipped — locked: ${head}${remaining > 0 ? ` +${remaining} more` : ""}`;
-          const detailLines = blocked.map((item) => (
-            item.source === "folder"
-              ? `${item.fileName} (locked by folder ${item.lockedByName})`
-              : `${item.fileName} (locked)`
-          ));
-          return `${summary}${LOCK_NOTICE_DETAILS_SEPARATOR}${detailLines.join("\n")}`;
-        })()
-        : null;
+      const lockMatch = getLockMatch(targetPath);
+      if (lockMatch) {
+        const lockedName = getPathTail(targetPath);
+        const lockedByName = getPathTail(lockMatch.lockedPath);
+        const notice = lockMatch.source === "folder"
+          ? `File skipped — locked: ${lockedName} (locked by folder ${lockedByName})`
+          : `File skipped — locked: ${lockedName}`;
+        setEditorNotice(notice);
+        return;
+      }
 
-      if (blockedNotice) setEditorNotice(blockedNotice);
-      if (!allowed.length) return;
+      const allowed = [targetPath];
 
-      const loadingTitle = allowed.length > 1 ? `Summary - ${allowed.length} files` : createDefaultTitle("Summary");
-      const loadingContent = `# ${loadingTitle}\n\n_Summarizing selected files._`;
+      const loadingTitle = createDefaultTitle("Summary");
+      const loadingContent = `# ${loadingTitle}\n\n_Summarizing selected file._`;
       openEditorForDraft(loadingTitle, loadingContent, allowed);
-      setEditorNotice(blockedNotice ? `${blockedNotice} | Summarizing remaining files...` : "Summarizing files. Please wait...");
+      setEditorNotice("Summarizing file. Please wait...");
 
       let liveTitle = loadingTitle;
       let streamed = "";
@@ -263,13 +253,13 @@ export function NotesPage() {
         if (hasFirstChunk) return;
         const dots = dotPhases[dotIndex % dotPhases.length];
         dotIndex += 1;
-        setContent(`# ${liveTitle}\n\n_Summarizing selected files${dots}_`);
+        setContent(`# ${liveTitle}\n\n_Summarizing selected file${dots}_`);
       };
 
       renderWaiting();
       waitingTimer = setInterval(renderWaiting, 350);
 
-      const summarizeResult = await notesApiService.summarizeFromFilesStream(allowed, {
+      const summarizeResult = await notesApiService.summarizeFromFileStream(targetPath, {
         signal: streamController.signal,
         onMeta: (meta) => {
           if (meta.suggestedTitle?.trim()) {
