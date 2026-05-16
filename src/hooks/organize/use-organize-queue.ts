@@ -67,6 +67,7 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
   const isQueueRunningRef = useRef(false);
   const activeAnalyzeRef = useRef<{ itemId: string; controller: AbortController } | null>(null);
   const isPickingFilesRef = useRef(false);
+  const forceRetryIdsRef = useRef<Set<string>>(new Set());
 
   const runAnalyzeQueue = useCallback(async () => {
     if (isQueueRunningRef.current) {
@@ -104,12 +105,16 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
 
           const analysisStartedAt = performance.now();
 
+          const shouldForce = forceRetryIdsRef.current.has(nextQueuedItem.id);
+          if (shouldForce) forceRetryIdsRef.current.delete(nextQueuedItem.id);
+
           // Keep sequential analysis so queue progress is deterministic in the modal.
           // eslint-disable-next-line no-await-in-loop
           const analyzedItem = await organizeApiService.analyzeOne(
             nextQueuedItem.currentPath,
             categories,
             controller.signal,
+            shouldForce ? { force: true } : undefined,
           );
 
           const analysisDurationMs = Math.round(performance.now() - analysisStartedAt);
@@ -268,8 +273,18 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
 
   const retryAnalyzeItem = useCallback((itemId: string) => {
     resetResumeDismissed();
+    forceRetryIdsRef.current.add(itemId);
     setItems((state) => state.map((item) => (
-      item.id === itemId ? { ...item, analysisStatus: "queued", analysisError: null } : item
+      item.id === itemId
+        ? {
+            ...item,
+            analysisStatus: "queued",
+            analysisError: null,
+            moveStatus: "idle",
+            lastMovedFromPath: null,
+            lastMovedToPath: null,
+          }
+        : item
     )));
     void runAnalyzeQueue();
   }, [resetResumeDismissed, setItems, runAnalyzeQueue]);

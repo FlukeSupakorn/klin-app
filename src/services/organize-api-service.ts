@@ -132,10 +132,8 @@ function parseWorkerSuggestedNames(fileResult: OrganizeAnalyzeFileResult | undef
   return parseSuggestedNames(analysis.suggested_name);
 }
 
-function buildRequest(paths: string[]): OrganizeAnalyzeRequest {
-  return {
-    file_paths: paths,
-  };
+function buildRequest(paths: string[], force?: boolean): OrganizeAnalyzeRequest {
+  return force ? { file_paths: paths, force: true } : { file_paths: paths };
 }
 
 function normalizeResults(payload: unknown): Map<string, OrganizeAnalyzeFileResult> {
@@ -205,12 +203,17 @@ function buildFallbackScores(categoryCatalog: ManagedCategory[]): CategoryScore[
 }
 
 export const organizeApiService = {
-  async analyze(paths: string[], categoryCatalog: ManagedCategory[], signal?: AbortSignal): Promise<OrganizePreviewItem[]> {
+  async analyze(
+    paths: string[],
+    categoryCatalog: ManagedCategory[],
+    signal?: AbortSignal,
+    options?: { force?: boolean },
+  ): Promise<OrganizePreviewItem[]> {
     if (paths.length === 0) {
       return [];
     }
 
-    const requestPayload = buildRequest(paths);
+    const requestPayload = buildRequest(paths, options?.force);
     const payload = await postAnalyze(requestPayload, signal);
     const resultMap = normalizeResults(payload);
 
@@ -252,8 +255,13 @@ export const organizeApiService = {
     });
   },
 
-  async analyzeOne(path: string, categoryCatalog: ManagedCategory[], signal?: AbortSignal): Promise<OrganizePreviewItem> {
-    const [item] = await this.analyze([path], categoryCatalog, signal);
+  async analyzeOne(
+    path: string,
+    categoryCatalog: ManagedCategory[],
+    signal?: AbortSignal,
+    options?: { force?: boolean },
+  ): Promise<OrganizePreviewItem> {
+    const [item] = await this.analyze([path], categoryCatalog, signal, options);
     if (item) {
       return item;
     }

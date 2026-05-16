@@ -169,15 +169,6 @@ function FileDetailPanel({
             >
               {status.label}
             </span>
-            {item.analysisStatus === "failed" && (
-              <button
-                type="button"
-                onClick={() => workflow.retryAnalyzeItem(item.id)}
-                className="rounded-[7px] border border-border px-2 py-0.5 text-[10px] font-bold text-muted-foreground transition-colors hover:bg-muted"
-              >
-                Retry
-              </button>
-            )}
             {(item.analysisStatus === "queued" || item.analysisStatus === "processing") && (
               <button
                 type="button"
@@ -238,27 +229,50 @@ function FileDetailPanel({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (isMoved) { void workflow.undoSingleItem(item); return; }
-            const forMove = itemWithDraftName();
-            if (forMove.destinationPath !== item.destinationPath) {
-              workflow.updateFileName(item.id, nameDraft.trim());
-              setIsEditingName(false);
-            }
-            void workflow.moveSingleItem(forMove);
-          }}
-          disabled={item.analysisStatus !== "completed" || item.moveStatus === "processing" || (!isMoved && isNoChange)}
-          className="shrink-0 rounded-[10px] px-4 py-2 text-[12.5px] font-bold transition-all disabled:opacity-50"
-          style={{
-            background: isMoved ? "var(--muted)" : "var(--primary)",
-            color: isMoved ? "var(--foreground)" : "var(--primary-foreground)",
-            border: isMoved ? "1px solid var(--border)" : "none",
-          }}
-        >
-          {getMoveLabel()}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {(
+            item.analysisStatus === "failed" ||
+            (item.analysisStatus === "completed" && item.moveStatus === "idle") ||
+            item.moveStatus === "failed"
+          ) && (
+            <button
+              type="button"
+              onClick={() => workflow.retryAnalyzeItem(item.id)}
+              className="rounded-[10px] px-4 py-2 text-[12.5px] font-bold transition-colors hover:bg-muted"
+              style={{
+                background: "var(--muted)",
+                color: "var(--foreground)",
+                border: "1px solid var(--border)",
+              }}
+              title="Re-analyze with force (bypass cache)"
+            >
+              Retry
+            </button>
+          )}
+          {item.analysisStatus !== "failed" && item.moveStatus !== "failed" && (
+            <button
+              type="button"
+              onClick={() => {
+                if (isMoved) { void workflow.undoSingleItem(item); return; }
+                const forMove = itemWithDraftName();
+                if (forMove.destinationPath !== item.destinationPath) {
+                  workflow.updateFileName(item.id, nameDraft.trim());
+                  setIsEditingName(false);
+                }
+                void workflow.moveSingleItem(forMove);
+              }}
+              disabled={item.analysisStatus !== "completed" || item.moveStatus === "processing" || (!isMoved && isNoChange)}
+              className="rounded-[10px] px-4 py-2 text-[12.5px] font-bold transition-all disabled:opacity-50"
+              style={{
+                background: isMoved ? "var(--muted)" : "var(--primary)",
+                color: isMoved ? "var(--foreground)" : "var(--primary-foreground)",
+                border: isMoved ? "1px solid var(--border)" : "none",
+              }}
+            >
+              {getMoveLabel()}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Category suggestions */}

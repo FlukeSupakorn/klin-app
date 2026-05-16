@@ -97,6 +97,7 @@ export interface OrganizePreviewItem {
 
 export interface OrganizeAnalyzeRequest {
   file_paths: string[];
+  force?: boolean;
 }
 
 export interface OrganizeAnalyzeCategoryScore {
