@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { History } from "lucide-react";
+import { History, Redo2, Undo2 } from "lucide-react";
 import { SearchInput } from "@/components/ui/search-input";
 import type { HistoryEntry, OrganizeHistoryEntry } from "@/types/history";
 import { tauriClient } from "@/services/tauri-client";
@@ -222,6 +222,50 @@ export function HistoryPage() {
     }
   }, []);
 
+  const handleUndoAll = useCallback(async () => {
+    const snapshot = [...useUndoRedoStore.getState().undoStack];
+    if (snapshot.length === 0) return;
+    for (const stackEntry of snapshot) {
+      try {
+        await tauriClient.moveFile({ sourcePath: stackEntry.fromPath, destinationPath: stackEntry.toPath });
+        useUndoRedoStore.getState().removeFromUndo(stackEntry.fromPath, stackEntry.toPath);
+        useUndoRedoStore.getState().pushRedo({
+          workerFileId: stackEntry.workerFileId,
+          fromPath: stackEntry.toPath,
+          toPath: stackEntry.fromPath,
+          fileName: stackEntry.fileName,
+          category: stackEntry.category,
+        });
+        useUndoRedoStore.getState().markUndone(stackEntry.toPath, stackEntry.fromPath);
+      } catch (e) {
+        logger.error("[history] undo-all entry failed", { fromPath: stackEntry.fromPath, toPath: stackEntry.toPath, error: e });
+      }
+    }
+    window.dispatchEvent(new Event("klin:history-updated"));
+  }, []);
+
+  const handleRedoAll = useCallback(async () => {
+    const snapshot = [...useUndoRedoStore.getState().redoStack];
+    if (snapshot.length === 0) return;
+    for (const stackEntry of snapshot) {
+      try {
+        await tauriClient.moveFile({ sourcePath: stackEntry.fromPath, destinationPath: stackEntry.toPath });
+        useUndoRedoStore.getState().removeFromRedo(stackEntry.fromPath, stackEntry.toPath);
+        useUndoRedoStore.getState().pushUndo({
+          workerFileId: stackEntry.workerFileId,
+          fromPath: stackEntry.toPath,
+          toPath: stackEntry.fromPath,
+          fileName: stackEntry.fileName,
+          category: stackEntry.category,
+        });
+        useUndoRedoStore.getState().clearUndone(stackEntry.fromPath, stackEntry.toPath);
+      } catch (e) {
+        logger.error("[history] redo-all entry failed", { fromPath: stackEntry.fromPath, toPath: stackEntry.toPath, error: e });
+      }
+    }
+    window.dispatchEvent(new Event("klin:history-updated"));
+  }, []);
+
   return (
     <div className="flex h-full flex-col gap-5">
       {/* Header row */}
@@ -264,10 +308,46 @@ export function HistoryPage() {
           </div>
         ) : (
           <div className="space-y-6 pb-8">
-            {grouped.map((group) => (
+            {grouped.map((group, groupIndex) => (
               <div key={group.label}>
-                <div className="mb-2.5 pl-1 text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                  {group.label}
+                <div className="mb-2.5 flex items-center justify-between gap-3 pl-1">
+                  <div className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                    {group.label}
+                  </div>
+                  {groupIndex === 0 && (undoStack.length > 0 || redoStack.length > 0) && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleUndoAll}
+                        disabled={undoStack.length === 0}
+                        className="flex items-center gap-1 rounded-[7px] border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-muted disabled:hover:text-muted-foreground"
+                        title="Undo every move in history"
+                      >
+                        <Undo2 className="h-3 w-3" />
+                        Undo All
+                        {undoStack.length > 0 && (
+                          <span className="ml-0.5 rounded-[5px] bg-background px-1 py-px text-[10px] font-bold text-muted-foreground">
+                            {undoStack.length}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRedoAll}
+                        disabled={redoStack.length === 0}
+                        className="flex items-center gap-1 rounded-[7px] border border-border bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-muted disabled:hover:text-muted-foreground"
+                        title="Redo every undone move"
+                      >
+                        <Redo2 className="h-3 w-3" />
+                        Redo All
+                        {redoStack.length > 0 && (
+                          <span className="ml-0.5 rounded-[5px] bg-background px-1 py-px text-[10px] font-bold text-muted-foreground">
+                            {redoStack.length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   {group.items.map((entry) => {

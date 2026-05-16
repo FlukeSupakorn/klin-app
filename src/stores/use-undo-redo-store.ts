@@ -2,8 +2,6 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { normalizePath } from "@/lib/path-utils";
 
-const MAX_STACK = 10;
-
 export type UndoEntry = {
   workerFileId: string | null;
   fromPath: string;
@@ -50,7 +48,7 @@ export const useUndoRedoStore = create<UndoRedoState>()(
       sessionUndoneIds: new Set<string>(),
       pushUndo: (entry) =>
         set((s) => ({
-          undoStack: [entry, ...s.undoStack].slice(0, MAX_STACK),
+          undoStack: [entry, ...s.undoStack],
         })),
       popUndo: () => {
         const top = get().undoStack[0];
@@ -67,7 +65,7 @@ export const useUndoRedoStore = create<UndoRedoState>()(
       },
       pushRedo: (entry) =>
         set((s) => ({
-          redoStack: [entry, ...s.redoStack].slice(0, MAX_STACK),
+          redoStack: [entry, ...s.redoStack],
         })),
       popRedo: () => {
         const top = get().redoStack[0];
