@@ -27,6 +27,7 @@ const LOCK_NOTICE_DETAILS_SEPARATOR = "\n__DETAILS__\n";
 export interface UseOrganizeQueueReturn {
   handleAddFiles: () => Promise<void>;
   retryAnalyzeItem: (itemId: string) => void;
+  retryAllAnalyze: () => void;
   cancelItem: (itemId: string) => void;
   cancelOrganize: () => void;
   runAnalyzeQueue: () => Promise<void>;
@@ -283,6 +284,34 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
             moveStatus: "idle",
             lastMovedFromPath: null,
             lastMovedToPath: null,
+            hasBeenApplied: false,
+          }
+        : item
+    )));
+    void runAnalyzeQueue();
+  }, [resetResumeDismissed, setItems, runAnalyzeQueue]);
+
+  const retryAllAnalyze = useCallback(() => {
+    const eligibleIds = itemsRef.current
+      .filter((item) =>
+        item.analysisStatus === "failed" ||
+        item.moveStatus === "failed",
+      )
+      .map((item) => item.id);
+    if (eligibleIds.length === 0) return;
+    resetResumeDismissed();
+    eligibleIds.forEach((id) => forceRetryIdsRef.current.add(id));
+    const eligibleSet = new Set(eligibleIds);
+    setItems((state) => state.map((item) => (
+      eligibleSet.has(item.id)
+        ? {
+            ...item,
+            analysisStatus: "queued",
+            analysisError: null,
+            moveStatus: "idle",
+            lastMovedFromPath: null,
+            lastMovedToPath: null,
+            hasBeenApplied: false,
           }
         : item
     )));
@@ -310,6 +339,7 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
   return {
     handleAddFiles,
     retryAnalyzeItem,
+    retryAllAnalyze,
     cancelItem,
     cancelOrganize,
     runAnalyzeQueue,

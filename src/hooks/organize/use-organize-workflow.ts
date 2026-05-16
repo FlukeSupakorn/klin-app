@@ -27,6 +27,7 @@ export interface OrganizeWorkflow {
   failedCount: number;
   movedCount: number;
   readyToMoveCount: number;
+  retryableCount: number;
   allReadyMoved: boolean;
   canUndoAll: boolean;
   unresolvedCount: number;
@@ -45,6 +46,7 @@ export interface OrganizeWorkflow {
   cancelOrganize: () => void;
   clearCompleted: () => void;
   retryAnalyzeItem: (itemId: string) => void;
+  retryAllAnalyze: () => void;
   moveSingleItem: (item: OrganizePreviewItem) => Promise<void>;
   undoSingleItem: (item: OrganizePreviewItem) => Promise<void>;
   moveAllPending: () => Promise<void>;
@@ -203,6 +205,7 @@ export function useOrganizeWorkflow(): OrganizeWorkflow {
     // Queue operations
     handleAddFiles: queueOps.handleAddFiles,
     retryAnalyzeItem: queueOps.retryAnalyzeItem,
+    retryAllAnalyze: queueOps.retryAllAnalyze,
     cancelItem: queueOps.cancelItem,
     cancelOrganize: queueOps.cancelOrganize,
     // File operations

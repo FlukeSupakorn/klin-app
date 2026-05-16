@@ -8,6 +8,7 @@ export interface OrganizeWorkflowMetrics {
   failedCount: number;
   movedCount: number;
   readyToMoveCount: number;
+  retryableCount: number;
   allReadyMoved: boolean;
   canUndoAll: boolean;
   unresolvedCount: number;
@@ -117,6 +118,9 @@ export function computeOrganizeWorkflowMetrics(
   const failedCount = items.filter((item) => item.analysisStatus === "failed").length;
   const movedCount = items.filter((item) => item.moveStatus === "completed").length;
   const readyToMoveCount = items.filter((item) => item.analysisStatus === "completed" && item.moveStatus !== "completed").length;
+  const retryableCount = items.filter((item) =>
+    item.analysisStatus === "failed" || item.moveStatus === "failed",
+  ).length;
   const allReadyMoved = readyCount > 0 && readyToMoveCount === 0;
   const canUndoAll = readyCount > 0 && items.every((item) => item.analysisStatus !== "completed" || item.moveStatus === "completed");
   const unresolvedCount = items.filter((item) => item.moveStatus !== "completed").length;
@@ -129,6 +133,7 @@ export function computeOrganizeWorkflowMetrics(
     failedCount,
     movedCount,
     readyToMoveCount,
+    retryableCount,
     allReadyMoved,
     canUndoAll,
     unresolvedCount,

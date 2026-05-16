@@ -661,6 +661,21 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
           >
             Categories
           </button>
+          {workflow.retryableCount > 0 && (
+            <button
+              type="button"
+              onClick={workflow.retryAllAnalyze}
+              className="rounded-[10px] border px-3.5 py-2 text-[12.5px] font-bold transition-colors"
+              style={{
+                background: "var(--destructive-tint)",
+                color: "var(--destructive)",
+                borderColor: "var(--destructive-border)",
+              }}
+              title="Re-analyze every failed file with force (bypass cache)"
+            >
+              Retry All ({workflow.retryableCount})
+            </button>
+          )}
           <div className="flex-1" />
           <button
             type="button"

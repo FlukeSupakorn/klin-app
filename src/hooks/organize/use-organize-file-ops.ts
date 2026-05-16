@@ -91,12 +91,17 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
         throw new Error(`Missing category id for '${item.selectedCategory}'. Please re-analyze or reselect category.`);
       }
 
-      // Persist the user decision in worker first, then perform local file move.
-      await organizeApiService.applyDecision({
-        fileId: item.workerFileId,
-        selectedName: selectedNameForApi,
-        selectedCategory: selectedCategoryPayload,
-      });
+      // Persist the user decision in worker on the FIRST move only. Subsequent
+      // re-moves (after a modal undo) are pure file-system operations — the
+      // backend has already recorded the decision and re-applying with the same
+      // source/dest path returns 400 ("No confirmed file change was applied.").
+      if (!item.hasBeenApplied) {
+        await organizeApiService.applyDecision({
+          fileId: item.workerFileId,
+          selectedName: selectedNameForApi,
+          selectedCategory: selectedCategoryPayload,
+        });
+      }
 
       await tauriClient.moveFile({ sourcePath: item.currentPath, destinationPath: item.destinationPath });
 
@@ -104,6 +109,7 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
         itemId: item.id,
         sourcePath: item.currentPath,
         destinationPath: item.destinationPath,
+        appliedNow: !item.hasBeenApplied,
       });
 
       setItems((state) => state.map((entry) => (
@@ -113,6 +119,7 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
             moveStatus: "completed",
             lastMovedFromPath: item.currentPath,
             lastMovedToPath: item.destinationPath,
+            hasBeenApplied: true,
           }
           : entry
       )));
@@ -171,13 +178,10 @@ export function useOrganizeFileOps(deps: FileOpsDependencies): UseOrganizeFileOp
 
       await tauriClient.moveFile({ sourcePath, destinationPath });
 
-      if (item.workerFileId) {
-        await organizeApiService.applyDecision({
-          fileId: item.workerFileId,
-          selectedName: null,
-          selectedCategory: null,
-        }).catch((e) => logger.warn("[organize] undo applyDecision failed", e));
-      }
+      // No applyDecision call here — the backend already recorded the original
+      // apply on first move, and a null/null re-apply returns 400 anyway. This
+      // mirrors the history page's undo, which is a pure file-system move plus
+      // an undo/redo-stack update.
 
       logger.info("[organize] undo completed", {
         itemId: item.id,

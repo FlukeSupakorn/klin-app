@@ -93,6 +93,10 @@ export interface OrganizePreviewItem {
   // Tracks the exact file move operation so undo remains correct even if UI destination is edited later.
   lastMovedFromPath?: string | null;
   lastMovedToPath?: string | null;
+  // True once /api/organize/apply has succeeded for this item. Subsequent in-modal
+  // moves (after undo / re-move) skip the apply call — backend already recorded
+  // the decision and re-applying with the same source/dest fails with 400.
+  hasBeenApplied?: boolean;
 }
 
 export interface OrganizeAnalyzeRequest {
