@@ -287,7 +287,7 @@ export function DashboardPage() {
             onKeyDown={onSearchKeyDown}
             onClear={() => { resetSearch(); }}
             onFocus={() => { if (searchSubmitted || searchQuery) openDropdown(); }}
-            placeholder="Semantic search..."
+            placeholder="Search files..."
             focused={showDrop}
           />
 
