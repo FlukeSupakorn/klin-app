@@ -654,24 +654,12 @@ export function OrganizeFilesModal({ workflow }: OrganizeFilesModalProps) {
           >
             Add More
           </button>
-          <button
-            type="button"
-            onClick={() => workflow.setOpenSettingsWindow(true)}
-            className="rounded-[10px] border border-border px-3.5 py-2 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-          >
-            Categories
-          </button>
           {workflow.retryableCount > 0 && (
             <button
               type="button"
               onClick={workflow.retryAllAnalyze}
-              className="rounded-[10px] border px-3.5 py-2 text-[12.5px] font-bold transition-colors"
-              style={{
-                background: "var(--destructive-tint)",
-                color: "var(--destructive)",
-                borderColor: "var(--destructive-border)",
-              }}
-              title="Re-analyze every failed file with force (bypass cache)"
+              className="rounded-[10px] border border-border px-3.5 py-2 text-[12.5px] font-bold text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+              title="Re-analyze every retryable file with force (bypass cache)"
             >
               Retry All ({workflow.retryableCount})
             </button>

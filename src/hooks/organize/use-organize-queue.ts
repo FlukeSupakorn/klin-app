@@ -295,6 +295,7 @@ export function useOrganizeQueue(deps: QueueDependencies): UseOrganizeQueueRetur
     const eligibleIds = itemsRef.current
       .filter((item) =>
         item.analysisStatus === "failed" ||
+        (item.analysisStatus === "completed" && item.moveStatus === "idle") ||
         item.moveStatus === "failed",
       )
       .map((item) => item.id);

@@ -119,7 +119,9 @@ export function computeOrganizeWorkflowMetrics(
   const movedCount = items.filter((item) => item.moveStatus === "completed").length;
   const readyToMoveCount = items.filter((item) => item.analysisStatus === "completed" && item.moveStatus !== "completed").length;
   const retryableCount = items.filter((item) =>
-    item.analysisStatus === "failed" || item.moveStatus === "failed",
+    item.analysisStatus === "failed" ||
+    (item.analysisStatus === "completed" && item.moveStatus === "idle") ||
+    item.moveStatus === "failed",
   ).length;
   const allReadyMoved = readyCount > 0 && readyToMoveCount === 0;
   const canUndoAll = readyCount > 0 && items.every((item) => item.analysisStatus !== "completed" || item.moveStatus === "completed");
