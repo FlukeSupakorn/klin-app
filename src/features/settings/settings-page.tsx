@@ -41,6 +41,7 @@ import {
   withAlpha,
 } from "@/features/categories/category-appearance";
 import { cn } from "@/lib/utils";
+import { IS_DEV } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { googleAuthService } from "@/features/auth/google-auth-service";
 import { useAuthStore } from "@/hooks/auth/use-auth-store";
@@ -538,7 +539,7 @@ export function SettingsPage() {
   useEffect(() => { void initializeAuth(); }, [initializeAuth]);
   useEffect(() => { void hydrateLocks().catch(() => undefined); }, [hydrateLocks]);
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    if (!IS_DEV) return;
     void checkFastApiHealth();
     const interval = setInterval(() => { void checkFastApiHealth(); }, 5000);
     return () => clearInterval(interval);
@@ -581,7 +582,7 @@ export function SettingsPage() {
               );
             })}
           </div>
-          {import.meta.env.DEV && (
+          {IS_DEV && (
             <>
               <div className="my-3 border-t border-border" />
               <div className="mb-1.5 px-2 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">Developer</div>
@@ -1172,7 +1173,7 @@ export function SettingsPage() {
           {activeTab === "model" && <ModelSettingsTab />}
 
           {/* ── Developer (DEV only) ── */}
-          {activeTab === "developer" && import.meta.env.DEV && (
+          {activeTab === "developer" && IS_DEV && (
             <div className="space-y-4 p-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

@@ -11,6 +11,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { IS_DEV } from "@/lib/env";
 import { tauriClient } from "@/services/tauri-client";
 import type {
   InstalledModelDto,
@@ -475,7 +476,6 @@ export function ModelSettingsTab() {
     []
   );
 
-  const isDev = import.meta.env.DEV;
 
   if (loadState === "loading") {
     return (
@@ -514,7 +514,7 @@ export function ModelSettingsTab() {
       </div>
 
       {/* Dev mode banner */}
-      {isDev && (
+      {IS_DEV && (
         <div className="flex items-start gap-2.5 rounded-[11px] border border-border bg-muted/50 px-3.5 py-3">
           <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-400" />
           <p className="text-[12px] leading-relaxed text-muted-foreground">

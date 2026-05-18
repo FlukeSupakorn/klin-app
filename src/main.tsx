@@ -5,6 +5,7 @@ import { router } from "@/app/router";
 import { CloseAppController } from "@/components/dialogs/close-app-controller";
 import "@/styles/globals.css";
 import { logger } from "@/lib/logger";
+import { IS_DEV } from "@/lib/env";
 
 const isTauri = "__TAURI__" in window;
 const hash = window.location.hash;
@@ -33,7 +34,7 @@ window.onunhandledrejection = (event: PromiseRejectionEvent) => {
   });
 };
 
-if (import.meta.env.DEV) {
+if (IS_DEV) {
   const originalFetch = window.fetch;
   window.fetch = async (...args) => {
     const startTime = performance.now();

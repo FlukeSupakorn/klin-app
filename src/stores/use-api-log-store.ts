@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { IS_DEV } from "@/lib/env";
 
 export interface ApiLogEntry {
   id: string;
@@ -28,7 +29,7 @@ export const useApiLogStore = create<ApiLogStoreState>()(
     (set) => ({
       logs: [],
       addLog: (log) => {
-        if (!import.meta.env.DEV) return;
+        if (!IS_DEV) return;
         set((state) => {
           const newLog = { ...log, id: crypto.randomUUID() };
           const now = Date.now();

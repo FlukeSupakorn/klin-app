@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronDown, ChevronRight, Clock, Trash2 } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { useApiLogStore, type ApiLogEntry } from "@/stores/use-api-log-store";
 import { cn } from "@/lib/utils";
+import { IS_DEV } from "@/lib/env";
 
 function LogEntryRow({ log }: { log: ApiLogEntry }) {
   const [expanded, setExpanded] = useState(false);
@@ -128,7 +129,7 @@ export function ApiLogsPage() {
   const logs = useApiLogStore((state) => state.logs);
   const clearLogs = useApiLogStore((state) => state.clearLogs);
 
-  if (!import.meta.env.DEV) {
+  if (!IS_DEV) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center text-muted-foreground">
         API Logs are only available in Development Mode.

@@ -4,8 +4,10 @@ import { useCategoryStore } from "@/stores/use-category-store";
 import { useRuleStore } from "@/stores/use-rule-store";
 import { useHistoryStore } from "@/stores/use-history-store";
 import { usePrivacyStore } from "@/stores/use-privacy-store";
+import { IS_DEV } from "@/lib/env";
 
 export function DeveloperPage() {
+  if (!IS_DEV) return null;
   const watchedFolders = useAutomationStore((state) => state.watchedFolders);
   const isRunning = useAutomationStore((state) => state.isRunning);
   const lastScanTime = useAutomationStore((state) => state.lastScanTime);
